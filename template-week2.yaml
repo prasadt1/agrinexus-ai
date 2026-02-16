@@ -1,0 +1,356 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: AgriNexus AI - Week 2 (WhatsApp Integration + Behavioral Nudge Engine)
+
+Globals:
+  Function:
+    Runtime: python3.11
+    Timeout: 30
+    MemorySize: 512
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref AgriNexusTable
+        KNOWLEDGE_BASE_ID: !GetAtt BedrockKnowledgeBase.KnowledgeBaseId
+        GUARDRAIL_ID: !GetAtt BedrockGuardrail.GuardrailId
+        GUARDRAIL_VERSION: !GetAtt BedrockGuardrail.Version
+        WHATSAPP_VERIFY_TOKEN: !Sub '{{resolve:secretsmanager:${WhatsAppSecrets}:SecretString:VERIFY_TOKEN}}'
+        WEATHER_API_KEY: !Sub '{{resolve:secretsmanager:${WeatherSecrets}:SecretString:API_KEY}}'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+    Description: Environment name
+
+Resources:
+  # ============================================================================
+  # Week 1 Resources (DynamoDB, S3, Bedrock KB, Guardrails)
+  # Imported from template.yaml - not duplicated here
+  # ============================================================================
+  
+  # Reference Week 1 stack outputs
+  AgriNexusTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: agrinexus-data
+      # ... (same as Week 1)
+
+  # ============================================================================
+  # Secrets Manager for API Keys
+  # ============================================================================
+  WhatsAppSecrets:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub agrinexus-whatsapp-${Environment}
+      Description: WhatsApp Business API credentials
+      SecretString: !Sub |
+        {
+          "VERIFY_TOKEN": "REPLACE_WITH_YOUR_VERIFY_TOKEN",
+          "ACCESS_TOKEN": "REPLACE_WITH_YOUR_ACCESS_TOKEN",
+          "PHONE_NUMBER_ID": "REPLACE_WITH_YOUR_PHONE_NUMBER_ID",
+          "WEBHOOK_SECRET": "REPLACE_WITH_YOUR_WEBHOOK_SECRET"
+        }
+
+  WeatherSecrets:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub agrinexus-weather-${Environment}
+      Description: Weather API credentials
+      SecretString: !Sub |
+        {
+          "API_KEY": "REPLACE_WITH_YOUR_WEATHER_API_KEY",
+          "BASE_URL": "https://api.openweathermap.org/data/2.5"
+        }
+
+  # ============================================================================
+  # SQS Queue for Async Message Processing
+  # ============================================================================
+  MessageQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub agrinexus-messages-${Environment}
+      VisibilityTimeout: 180
+      MessageRetentionPeriod: 345600  # 4 days
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt MessageDLQ.Arn
+        maxReceiveCount: 3
+
+  MessageDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub agrinexus-messages-dlq-${Environment}
+      MessageRetentionPeriod: 1209600  # 14 days
+
+  # ============================================================================
+  # API Gateway for WhatsApp Webhook
+  # ============================================================================
+  WhatsAppApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub agrinexus-whatsapp-${Environment}
+      StageName: !Ref Environment
+      Cors:
+        AllowMethods: "'GET,POST'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+
+  # ============================================================================
+  # Lambda: WhatsApp Webhook Handler
+  # ============================================================================
+  WebhookHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-webhook-${Environment}
+      CodeUri: src/webhook/
+      Handler: handler.lambda_handler
+      Description: WhatsApp webhook handler with signature validation
+      Environment:
+        Variables:
+          QUEUE_URL: !Ref MessageQueue
+      Policies:
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt MessageQueue.QueueName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Ref WhatsAppSecrets
+      Events:
+        WebhookGet:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WhatsAppApi
+            Path: /webhook
+            Method: GET
+        WebhookPost:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WhatsAppApi
+            Path: /webhook
+            Method: POST
+
+  # ============================================================================
+  # Lambda: Message Processor
+  # ============================================================================
+  MessageProcessor:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-processor-${Environment}
+      CodeUri: src/processor/
+      Handler: handler.lambda_handler
+      Description: Process messages from SQS and interact with Bedrock
+      Timeout: 60
+      Environment:
+        Variables:
+          QUEUE_URL: !Ref MessageQueue
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AgriNexusTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
+                - bedrock-agent:Retrieve
+                - bedrock-agent:RetrieveAndGenerate
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Ref WhatsAppSecrets
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt MessageQueue.Arn
+            BatchSize: 10
+
+  # ============================================================================
+  # Lambda: DLQ Handler (Dialect-Aware Error Messages)
+  # ============================================================================
+  DLQHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-dlq-${Environment}
+      CodeUri: src/dlq/
+      Handler: handler.lambda_handler
+      Description: Handle failed messages with dialect-aware error responses
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref AgriNexusTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Ref WhatsAppSecrets
+      Events:
+        DLQEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt MessageDLQ.Arn
+            BatchSize: 10
+
+  # ============================================================================
+  # Lambda: Weather Poller
+  # ============================================================================
+  WeatherPoller:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-weather-${Environment}
+      CodeUri: src/weather/
+      Handler: handler.lambda_handler
+      Description: Poll weather API and trigger nudge workflow
+      Timeout: 60
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref AgriNexusTable
+        - StepFunctionsExecutionPolicy:
+            StateMachineName: !GetAtt NudgeStateMachine.Name
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Ref WeatherSecrets
+      Events:
+        ScheduledPoll:
+          Type: Schedule
+          Properties:
+            Schedule: rate(6 hours)
+            Description: Poll weather every 6 hours
+            Enabled: true
+
+  # ============================================================================
+  # Lambda: Nudge Sender
+  # ============================================================================
+  NudgeSender:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-nudge-sender-${Environment}
+      CodeUri: src/nudge/
+      Handler: sender.lambda_handler
+      Description: Send behavioral nudges via WhatsApp
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AgriNexusTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - scheduler:CreateSchedule
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - iam:PassRole
+              Resource: !GetAtt SchedulerRole.Arn
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Ref WhatsAppSecrets
+
+  # ============================================================================
+  # Lambda: Reminder Sender
+  # ============================================================================
+  ReminderSender:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-reminder-${Environment}
+      CodeUri: src/nudge/
+      Handler: reminder.lambda_handler
+      Description: Send T+24h and T+48h reminders
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AgriNexusTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Ref WhatsAppSecrets
+
+  # ============================================================================
+  # Lambda: Response Detector (DynamoDB Streams)
+  # ============================================================================
+  ResponseDetector:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-response-detector-${Environment}
+      CodeUri: src/nudge/
+      Handler: detector.lambda_handler
+      Description: Detect DONE/NOT YET responses and update nudge status
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AgriNexusTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - scheduler:DeleteSchedule
+              Resource: '*'
+      Events:
+        StreamEvent:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt AgriNexusTable.StreamArn
+            StartingPosition: LATEST
+            BatchSize: 100
+            MaximumBatchingWindowInSeconds: 10
+
+  # ============================================================================
+  # Step Functions: Nudge Workflow
+  # ============================================================================
+  NudgeStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Name: !Sub agrinexus-nudge-workflow-${Environment}
+      DefinitionUri: statemachine/nudge-workflow.asl.json
+      DefinitionSubstitutions:
+        NudgeSenderArn: !GetAtt NudgeSender.Arn
+        TableName: !Ref AgriNexusTable
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref NudgeSender
+        - DynamoDBReadPolicy:
+            TableName: !Ref AgriNexusTable
+
+  # ============================================================================
+  # IAM Role for EventBridge Scheduler
+  # ============================================================================
+  SchedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub AgriNexus-Scheduler-Role-${Environment}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeLambda
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt ReminderSender.Arn
+
+Outputs:
+  WebhookUrl:
+    Description: WhatsApp webhook URL
+    Value: !Sub https://${WhatsAppApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/webhook
+
+  MessageQueueUrl:
+    Description: SQS queue URL for message processing
+    Value: !Ref MessageQueue
+
+  NudgeStateMachineArn:
+    Description: Step Functions state machine ARN
+    Value: !Ref NudgeStateMachine
