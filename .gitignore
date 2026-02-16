@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# AWS SAM
+.aws-sam/
+samconfig.toml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment
+.env
+.env.local
+
+# Test
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# Data
+data/fao-pdfs/*.pdf
+*.bak
+
+# Outputs
+output.json
+SETUP-GUIDE.md
+INSTALL-PREREQUISITES.md
+SETUP-CHECKLIST.md
+REDEEM-CREDITS.md
+COST-ALIGNMENT-FIXES.md
+THRESHOLD-ALIGNMENT-SUMMARY.md
+WEEK1-SUMMARY.md
+RAG-FLOW-EXPLAINED.md
+DEPLOYMENT.md
+*.bak

@@ -1,0 +1,128 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: AgriNexus AI - Week 1 Simplified (DynamoDB + S3 only, manual Bedrock setup)
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+    Description: Environment name
+
+Resources:
+  # ============================================================================
+  # DynamoDB Single Table Design
+  # ============================================================================
+  AgriNexusTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: agrinexus-data
+      BillingMode: PAY_PER_REQUEST
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+        - AttributeName: GSI2PK
+          AttributeType: S
+        - AttributeName: GSI2SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: GSI2
+          KeySchema:
+            - AttributeName: GSI2PK
+              KeyType: HASH
+            - AttributeName: GSI2SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Project
+          Value: AgriNexus
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ============================================================================
+  # S3 Bucket for Knowledge Base PDFs
+  # ============================================================================
+  KnowledgeBaseBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub agrinexus-kb-${AWS::AccountId}-${AWS::Region}
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldVersions
+            Status: Enabled
+            NoncurrentVersionExpirationInDays: 30
+      Tags:
+        - Key: Project
+          Value: AgriNexus
+        - Key: Environment
+          Value: !Ref Environment
+
+Outputs:
+  TableName:
+    Description: DynamoDB table name
+    Value: !Ref AgriNexusTable
+    Export:
+      Name: !Sub ${AWS::StackName}-TableName
+
+  TableArn:
+    Description: DynamoDB table ARN
+    Value: !GetAtt AgriNexusTable.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-TableArn
+
+  TableStreamArn:
+    Description: DynamoDB Stream ARN
+    Value: !GetAtt AgriNexusTable.StreamArn
+    Export:
+      Name: !Sub ${AWS::StackName}-TableStreamArn
+
+  KnowledgeBaseBucketName:
+    Description: S3 bucket for FAO PDFs
+    Value: !Ref KnowledgeBaseBucket
+    Export:
+      Name: !Sub ${AWS::StackName}-KBBucket
+
+  NextSteps:
+    Description: Manual steps to complete setup
+    Value: |
+      1. Upload PDFs: bash scripts/upload-fao-pdfs.sh agrinexus-dev
+      2. Create Bedrock KB manually in console (OpenSearch Serverless has CloudFormation issues)
+      3. Go to: https://console.aws.amazon.com/bedrock/home?region=us-east-1#/knowledge-bases
+      4. Click "Create knowledge base"
+      5. Use S3 bucket from outputs above
