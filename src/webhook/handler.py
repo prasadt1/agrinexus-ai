@@ -126,7 +126,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 print(f"Error checking idempotency: {e}")
                 # Continue processing even if dedup check fails
             
-            # Queue message for processing
+            # Queue message for processing (FIFO queue requires MessageGroupId and MessageDeduplicationId)
             sqs.send_message(
                 QueueUrl=QUEUE_URL,
                 MessageBody=json.dumps({
@@ -135,7 +135,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'type': message_type,
                     'message': message,
                     'metadata': value.get('metadata', {})
-                })
+                }),
+                MessageGroupId=from_number,  # Group by phone number to maintain order per user
+                MessageDeduplicationId=wamid  # Use wamid for deduplication
             )
         
         # Always return 200 OK within 2 seconds
