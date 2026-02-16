@@ -1,53 +1,11 @@
 {
   "Comment": "Behavioral Nudge Workflow - Send nudges when weather conditions are favorable",
-  "StartAt": "GetFarmersForLocation",
+  "StartAt": "SendNudgeToFarmers",
   "States": {
-    "GetFarmersForLocation": {
+    "SendNudgeToFarmers": {
       "Type": "Task",
-      "Resource": "arn:aws:states:::dynamodb:query",
-      "Parameters": {
-        "TableName": "${TableName}",
-        "IndexName": "GSI1",
-        "KeyConditionExpression": "GSI1PK = :location",
-        "ExpressionAttributeValues": {
-          ":location": {
-            "S.$": "States.Format('LOCATION#{}', $.location)"
-          }
-        }
-      },
-      "ResultPath": "$.farmers",
-      "Next": "CheckFarmersExist"
-    },
-    "CheckFarmersExist": {
-      "Type": "Choice",
-      "Choices": [
-        {
-          "Variable": "$.farmers.Count",
-          "NumericGreaterThan": 0,
-          "Next": "ProcessFarmers"
-        }
-      ],
-      "Default": "NoFarmers"
-    },
-    "ProcessFarmers": {
-      "Type": "Map",
-      "ItemsPath": "$.farmers.Items",
-      "MaxConcurrency": 10,
-      "Iterator": {
-        "StartAt": "SendNudge",
-        "States": {
-          "SendNudge": {
-            "Type": "Task",
-            "Resource": "${NudgeSenderArn}",
-            "End": true
-          }
-        }
-      },
+      "Resource": "${NudgeSenderArn}",
       "End": true
-    },
-    "NoFarmers": {
-      "Type": "Succeed",
-      "Comment": "No farmers found for this location"
     }
   }
 }

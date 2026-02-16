@@ -16,18 +16,23 @@ Parameters:
     Default: agrinexus-data
     Description: DynamoDB table name from Week 1
   
+  TableStreamArn:
+    Type: String
+    Description: DynamoDB Stream ARN from Week 1 (required for Response Detector)
+  
   KnowledgeBaseId:
     Type: String
     Description: Bedrock Knowledge Base ID from Week 1
   
   GuardrailId:
     Type: String
-    Description: Bedrock Guardrail ID from Week 1
+    Default: ""
+    Description: Bedrock Guardrail ID from Week 1 (optional)
   
   GuardrailVersion:
     Type: String
     Default: "1"
-    Description: Bedrock Guardrail Version from Week 1
+    Description: Bedrock Guardrail Version from Week 1 (optional)
 
 Globals:
   Function:
@@ -254,11 +259,6 @@ Resources:
                 - secretsmanager:GetSecretValue
               Resource:
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus/whatsapp/*
-            - Effect: Allow
-              Action:
-                - secretsmanager:GetSecretValue
-              Resource:
-                - !Ref WhatsAppSecrets
 
   # ============================================================================
   # Lambda: Reminder Sender
@@ -309,7 +309,7 @@ Resources:
                 - dynamodb:GetShardIterator
                 - dynamodb:DescribeStream
                 - dynamodb:ListStreams
-              Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TableName}/stream/*
+              Resource: !Ref TableStreamArn
 
   # ============================================================================
   # Step Functions: Nudge Workflow
@@ -359,7 +359,7 @@ Resources:
   ResponseDetectorEventSourceMapping:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
-      EventSourceArn: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TableName}/stream/*
+      EventSourceArn: !Ref TableStreamArn
       FunctionName: !GetAtt ResponseDetector.Arn
       StartingPosition: LATEST
       BatchSize: 100

@@ -1,0 +1,17 @@
+## Week 1 Status (agrinexus-dev stack)
+
+✅ Deployed:
+- DynamoDB table: agrinexus-data
+- S3 bucket: agrinexus-kb-043624892076-us-east-1
+- Knowledge Base: H81XLD3YWY (agrinexus-fao-kb)
+
+❌ Not Created:
+- Bedrock Guardrails (need to create manually or via Bedrock console)
+
+## For Week 2 Deployment:
+
+Use these values:
+- TableName: agrinexus-data
+- KnowledgeBaseId: H81XLD3YWY
+- GuardrailId: (create one or use "NONE" for now)
+- GuardrailVersion: 1

@@ -55,48 +55,65 @@ def create_reminder_schedule(phone_number: str, nudge_id: str, hours_offset: int
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """Send nudge and schedule reminders"""
-    farmer = event.get('farmer', {})
+    location = event.get('location')
     weather = event.get('weather', {})
     activity = event.get('activity', 'spray')
     
-    phone_number = farmer.get('phone_number')
-    dialect = farmer.get('dialect', 'hi')
-    wind_speed = weather.get('wind_speed', 0)
-    
-    # Generate nudge message
-    template = NUDGE_TEMPLATES.get(dialect, NUDGE_TEMPLATES['hi'])
-    message = template['spray'].format(wind_speed=wind_speed)
-    message += '\n\n' + template['done_prompt']
-    
-    # Create nudge record in DynamoDB
-    timestamp = datetime.utcnow().isoformat()
-    nudge_id = f"{timestamp}#{activity}"
-    ttl = int(datetime.utcnow().timestamp()) + (180 * 24 * 60 * 60)  # 180 days
-    
-    table.put_item(
-        Item={
-            'PK': f'USER#{phone_number}',
-            'SK': f'NUDGE#{nudge_id}',
-            'GSI2PK': 'NUDGE',
-            'GSI2SK': timestamp,
-            'status': 'SENT',
-            'activity': activity,
-            'weather': weather,
-            'message': message,
-            'ttl': ttl
+    # Query farmers in this location
+    response = table.query(
+        IndexName='GSI1',
+        KeyConditionExpression='GSI1PK = :location',
+        ExpressionAttributeValues={
+            ':location': f'LOCATION#{location}'
         }
     )
     
-    # Send WhatsApp message
-    # TODO: Implement WhatsApp API call
-    print(f"Sending nudge to {phone_number}: {message}")
+    farmers = response.get('Items', [])
+    print(f"Found {len(farmers)} farmers in {location}")
     
-    # Schedule reminders at T+24h and T+48h
-    create_reminder_schedule(phone_number, nudge_id, 24, dialect)
-    create_reminder_schedule(phone_number, nudge_id, 48, dialect)
+    nudges_sent = 0
+    
+    for farmer in farmers:
+        phone_number = farmer.get('phone_number')
+        dialect = farmer.get('dialect', 'hi')
+        wind_speed = weather.get('wind_speed', 0)
+        
+        # Generate nudge message
+        template = NUDGE_TEMPLATES.get(dialect, NUDGE_TEMPLATES['hi'])
+        message = template['spray'].format(wind_speed=wind_speed)
+        message += '\n\n' + template['done_prompt']
+        
+        # Create nudge record in DynamoDB
+        timestamp = datetime.utcnow().isoformat()
+        nudge_id = f"{timestamp}#{activity}"
+        ttl = int(datetime.utcnow().timestamp()) + (180 * 24 * 60 * 60)  # 180 days
+        
+        table.put_item(
+            Item={
+                'PK': f'USER#{phone_number}',
+                'SK': f'NUDGE#{nudge_id}',
+                'GSI2PK': 'NUDGE',
+                'GSI2SK': timestamp,
+                'status': 'SENT',
+                'activity': activity,
+                'weather': weather,
+                'message': message,
+                'ttl': ttl
+            }
+        )
+        
+        # Send WhatsApp message
+        # TODO: Implement WhatsApp API call
+        print(f"Sending nudge to {phone_number}: {message}")
+        
+        # Schedule reminders at T+24h and T+48h
+        create_reminder_schedule(phone_number, nudge_id, 24, dialect)
+        create_reminder_schedule(phone_number, nudge_id, 48, dialect)
+        
+        nudges_sent += 1
     
     return {
         'statusCode': 200,
-        'nudge_id': nudge_id,
-        'phone_number': phone_number
+        'nudges_sent': nudges_sent,
+        'location': location
     }
