@@ -1,6 +1,6 @@
 """
 WhatsApp Webhook Handler
-Validates webhook signature and queues messages for async processing
+Validates webhook signature and implements DynamoDB-based idempotency
 """
 import json
 import os
@@ -8,12 +8,17 @@ import hmac
 import hashlib
 import boto3
 from typing import Dict, Any
+from datetime import datetime
 
 sqs = boto3.client('sqs')
+dynamodb = boto3.resource('dynamodb')
 secrets = boto3.client('secretsmanager')
 
 QUEUE_URL = os.environ['QUEUE_URL']
+TABLE_NAME = os.environ['TABLE_NAME']
 SECRET_NAME = os.environ.get('WHATSAPP_SECRET_NAME', 'agrinexus-whatsapp-dev')
+
+table = dynamodb.Table(TABLE_NAME)
 
 
 def get_webhook_secret() -> str:
@@ -95,7 +100,38 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             from_number = message.get('from')
             message_type = message.get('type')
             
-            # Use wamid as deduplication ID
+            # Idempotency check: Check if wamid already exists in DynamoDB
+            try:
+                response = table.get_item(
+                    Key={
+                        'PK': f'WAMID#{wamid}',
+                        'SK': 'DEDUP'
+                    }
+                )
+                
+                if 'Item' in response:
+                    # Message already processed, return 200 immediately
+                    print(f"Duplicate message detected: {wamid}")
+                    continue
+                
+                # Store wamid for deduplication (with 24h TTL)
+                import time
+                ttl = int(time.time()) + (24 * 60 * 60)
+                table.put_item(
+                    Item={
+                        'PK': f'WAMID#{wamid}',
+                        'SK': 'DEDUP',
+                        'from': from_number,
+                        'processed_at': datetime.utcnow().isoformat(),
+                        'ttl': ttl
+                    }
+                )
+                
+            except Exception as e:
+                print(f"Error checking idempotency: {e}")
+                # Continue processing even if dedup check fails
+            
+            # Queue message for processing
             sqs.send_message(
                 QueueUrl=QUEUE_URL,
                 MessageBody=json.dumps({
@@ -104,9 +140,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'type': message_type,
                     'message': message,
                     'metadata': value.get('metadata', {})
-                }),
-                MessageDeduplicationId=wamid,
-                MessageGroupId=from_number
+                })
             )
         
         # Always return 200 OK within 2 seconds

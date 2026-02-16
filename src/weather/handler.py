@@ -1,32 +1,27 @@
 """
 Weather Poller
 Polls weather API and triggers nudge workflow for favorable conditions
+DEMO MODE: Mocks perfect weather for Aurangabad for reliable demo
 """
 import json
 import os
 import boto3
-import requests
 from typing import Dict, Any, List
 
 dynamodb = boto3.resource('dynamodb')
 stepfunctions = boto3.client('stepfunctions')
-secrets = boto3.client('secretsmanager')
 
 TABLE_NAME = os.environ['TABLE_NAME']
 STATE_MACHINE_ARN = os.environ.get('STATE_MACHINE_ARN')
 
 table = dynamodb.Table(TABLE_NAME)
 
-
-def get_weather_api_key() -> Dict[str, str]:
-    """Get weather API credentials from Secrets Manager"""
-    response = secrets.get_secret_value(SecretId='agrinexus-weather-dev')
-    return json.loads(response['SecretString'])
+# DEMO MODE: Mock perfect weather for Aurangabad
+MOCK_WEATHER = True
 
 
 def get_unique_locations() -> List[str]:
     """Get unique locations from user profiles"""
-    # Query GSI1 to get all users grouped by location
     response = table.scan(
         FilterExpression='begins_with(SK, :sk)',
         ExpressionAttributeValues={':sk': 'PROFILE'}
@@ -41,46 +36,38 @@ def get_unique_locations() -> List[str]:
     return list(locations)
 
 
-def check_weather(location: str, api_key: str, base_url: str) -> Dict[str, Any]:
-    """Check weather conditions for location"""
-    try:
-        response = requests.get(
-            f"{base_url}/weather",
-            params={
-                'q': location,
-                'appid': api_key,
-                'units': 'metric'
-            },
-            timeout=5
-        )
-        response.raise_for_status()
-        data = response.json()
-        
-        wind_speed = data.get('wind', {}).get('speed', 0) * 3.6  # m/s to km/h
-        rain = data.get('rain', {}).get('1h', 0)
-        
+def check_weather_mock(location: str) -> Dict[str, Any]:
+    """Mock weather for demo - always return perfect conditions for Aurangabad"""
+    if location == 'Aurangabad':
         return {
             'location': location,
-            'wind_speed': wind_speed,
-            'rain': rain,
-            'favorable': wind_speed < 10 and rain == 0
+            'wind_speed': 8.5,  # km/h (< 10)
+            'rain': 0,
+            'temperature': 28,
+            'humidity': 65,
+            'favorable': True,
+            'mock': True
         }
-    except Exception as e:
-        print(f"Error checking weather for {location}: {e}")
+    else:
+        # For other locations, return unfavorable to focus demo on Aurangabad
         return {
             'location': location,
-            'error': str(e),
-            'favorable': False
+            'wind_speed': 15,
+            'rain': 0,
+            'favorable': False,
+            'mock': True
         }
+
+
+def check_weather_real(location: str) -> Dict[str, Any]:
+    """Real weather API call (disabled for demo)"""
+    # TODO: Implement real OpenWeatherMap API call
+    # For now, return mock data
+    return check_weather_mock(location)
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """Poll weather and trigger nudge workflow"""
-    # Get weather API credentials
-    weather_creds = get_weather_api_key()
-    api_key = weather_creds['API_KEY']
-    base_url = weather_creds['BASE_URL']
-    
     # Get unique locations
     locations = get_unique_locations()
     print(f"Checking weather for {len(locations)} locations")
@@ -89,7 +76,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     
     # Check weather for each location
     for location in locations:
-        weather = check_weather(location, api_key, base_url)
+        if MOCK_WEATHER:
+            weather = check_weather_mock(location)
+        else:
+            weather = check_weather_real(location)
         
         if weather.get('favorable'):
             favorable_locations.append(weather)
@@ -110,5 +100,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         'statusCode': 200,
         'locations_checked': len(locations),
         'favorable_locations': len(favorable_locations),
-        'details': favorable_locations
+        'details': favorable_locations,
+        'mock_mode': MOCK_WEATHER
     }

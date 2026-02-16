@@ -11,12 +11,23 @@
         "KeyConditionExpression": "GSI1PK = :location",
         "ExpressionAttributeValues": {
           ":location": {
-            "S.$": "$.location"
+            "S.$": "States.Format('LOCATION#{}', $.location)"
           }
         }
       },
       "ResultPath": "$.farmers",
-      "Next": "ProcessFarmers"
+      "Next": "CheckFarmersExist"
+    },
+    "CheckFarmersExist": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.farmers.Count",
+          "NumericGreaterThan": 0,
+          "Next": "ProcessFarmers"
+        }
+      ],
+      "Default": "NoFarmers"
     },
     "ProcessFarmers": {
       "Type": "Map",
@@ -33,6 +44,10 @@
         }
       },
       "End": true
+    },
+    "NoFarmers": {
+      "Type": "Succeed",
+      "Comment": "No farmers found for this location"
     }
   }
 }
