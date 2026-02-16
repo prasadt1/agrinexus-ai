@@ -109,15 +109,33 @@ aws bedrock-runtime invoke-model \
 ├── design.md                        # Technical design
 ├── scripts/
 │   ├── setup-week1.sh              # Week 1 deployment script
-│   └── upload-fao-pdfs.sh          # Upload FAO manuals
+│   ├── upload-fao-pdfs.sh          # Upload FAO manuals
+│   ├── download-official-sources.sh # Download Indian govt sources
+│   └── prepare-pest-management-docs.sh # Prepare knowledge base docs
 ├── tests/
 │   ├── test_golden_questions.py    # 20 golden questions
+│   ├── test_golden_questions_realistic.py # Realistic test scenarios
 │   └── fixtures/
-│       └── test-user.json          # Test data
+│       ├── test-user.json          # Test data
+│       └── valid_pesticides.py     # Approved pesticide list
 └── data/
-    └── fao-pdfs/
-        └── en/                      # FAO manuals (English)
+    └── fao-pdfs/                    # Agricultural knowledge base sources
+        └── en/
+            ├── cotton-production.pdf        # FAO cotton production guide
+            ├── ipm-guide.pdf               # FAO IPM guide
+            ├── pesticide-application.pdf   # FAO pesticide safety
+            └── new-sources/                # Indian agricultural institution sources
+                ├── kb_manifest.csv                          # Source metadata & licensing
+                ├── icar-cicr-pest-disease-advisory-2024.pdf # ICAR-CICR comprehensive ETLs
+                ├── pau-package-of-practices-kharif-2024.pdf # Punjab Agricultural Univ
+                ├── niphm-cotton-advisory-2022.pdf           # National IPM Centre
+                ├── nriipm-crop-sap-book.pdf                 # NRIIPM sustainable practices
+                ├── ipm-cotton-2024.pdf                      # General IPM (ResearchGate)
+                ├── ipm-bt-cotton.pdf                        # Bt cotton IPM (ResearchGate)
+                └── rajendran-2018-cotton-pests.pdf          # Cotton pests reference (ResearchGate)
 ```
+
+**Note on Sources**: The `fao-pdfs` directory name is historical. It now contains both FAO manuals and Indian agricultural research institution documents (ICAR, NIPHM, PAU, NRIIPM). See `kb_manifest.csv` for source URLs, licensing, and ETL threshold information.
 
 ### Next Steps: Week 2
 
