@@ -1,0 +1,11 @@
+{
+  "Comment": "Behavioral Nudge Workflow - Send nudges when weather conditions are favorable",
+  "StartAt": "SendNudgeToFarmers",
+  "States": {
+    "SendNudgeToFarmers": {
+      "Type": "Task",
+      "Resource": "${NudgeSenderArn}",
+      "End": true
+    }
+  }
+}
