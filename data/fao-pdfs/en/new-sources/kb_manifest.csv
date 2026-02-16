@@ -1,0 +1,30 @@
+filename,title,source_url,year,license,region,crop,pests,etl_thresholds
+rajendran-2018-cotton-pests.pdf,Insect Pests of Cotton,https://www.researchgate.net/publication/326762536,2018,Academic Use Only,India,Cotton,Aphids;Whitefly;Bollworms;Jassids;Thrips;Mealybugs,ETL tables included
+ipm-cotton-2024.pdf,Integrated Pest Management in Cotton,https://www.researchgate.net/publication/381605032,2024,Academic Use Only,Global,Cotton,Multiple Pests,General IPM
+ipm-bt-cotton.pdf,Integrated Pest Management in Bt Cotton,https://www.researchgate.net/publication/268630163,2012,Academic Use Only,India,Cotton,Bollworms;Sucking Pests,Bt cotton specific
+niphm-cotton-advisory-2022.pdf,NIPHM Cotton Pest Advisory,https://niphm.gov.in/,2022,Public Domain,India,Cotton,Multiple Pests,Current season
+icar-cicr-pest-disease-advisory-2024.pdf,ICAR-CICR Pest & Disease Management 2024,https://nsai.co.in/storage/app/media/uploaded-files/ICAR-CICR_Advisory%20Pest%20and%20Disease%20Management%202024.pdf,2024,Public Domain,India,Cotton,Multiple,Comprehensive ETLs
+pau-package-of-practices-kharif-2024.pdf,PAU Package of Practices Kharif 2024,https://pauwp.pau.edu/wp-content/uploads/2025/11/RIB-2024.pdf,2024,Public Domain,Punjab,Cotton,Multiple,Regional ETLs
+nriipm-crop-sap-book.pdf,NRIIPM Crop-wise SAP Book,https://nriipm.res.in/NCIPMPDFs/FOLDERS/CROPSAPBookforWEB_.pdf,2024,Public Domain,India,Multiple Crops,Comprehensive,Sustainable practices
+#,,,,,,,,
+# Status: 6 documents ready for upload,,,,,,,,
+# - 3 ResearchGate papers (Academic Use Only - verify before production),,,,,,,,
+# - 3 Government sources (Public Domain - production ready),,,,,,,,
+#,,,,,,,,
+# TODO - Manual Download Required:,,,,,,,,
+# 1. PPQS Pink Bollworm Advisory (403 error - download via browser),,,,,,,,
+#    URL: https://ppqs.gov.in/sites/default/files/cotton_pbw_advisory.pdf,,,,,,,,
+#    Save as: ppqs-pink-bollworm-advisory.pdf,,,,,,,,
+#,,,,,,,,
+# 2. PPQS Whitefly Advisory (not attempted yet),,,,,,,,
+#    URL: https://ppqs.gov.in/sites/default/files/white_fly_advisory_in_cotton.pdf,,,,,,,,
+#    Save as: ppqs-whitefly-advisory.pdf,,,,,,,,
+#,,,,,,,,
+# 3. NIPHM 2021 Cotton Advisory (requires portal navigation),,,,,,,,
+#    URL: https://nriipm.res.in/pestalert.aspx,,,,,,,,
+#    Navigate to Sept 2021 cotton advisory,,,,,,,,
+#    Save as: niphm-cotton-advisory-2021-09.pdf,,,,,,,,
+#,,,,,,,,
+# 4. PAU Pink Bollworm Vigilance (not attempted yet),,,,,,,,
+#    URL: https://www.pau.edu/content/sandesh/7.pdf,,,,,,,,
+#    Save as: pau-pink-bollworm-vigilance.pdf,,,,,,,,
