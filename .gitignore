@@ -49,6 +49,12 @@ htmlcov/
 data/fao-pdfs/*.pdf
 *.bak
 
+# Audio files (test outputs)
+*.mp3
+*.m4a
+*.wav
+*.ogg
+
 # Development notes and status files (not for repo)
 output.json
 *.bak

@@ -50,8 +50,9 @@ def text_to_speech(text: str, dialect: str, phone_number: str) -> Optional[str]:
             Text=text,
             OutputFormat='mp3',
             VoiceId=voice_id,
-            LanguageCode=language_code,
-            Engine='neural'  # Use neural engine for better quality
+            LanguageCode=language_code
+            # Note: Not using Engine='neural' as Aditi/Raveena don't support it
+            # Standard engine quality is sufficient for agricultural advice
         )
         
         # Upload to S3
