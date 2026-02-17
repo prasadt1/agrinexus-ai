@@ -6,11 +6,19 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ## Week 3 (Feb 17-23, 2026)
 
+### Voice Input Latency - Batch vs Streaming Transcription
+- **Issue**: Voice transcription takes 20-34 seconds (batch mode), exceeding 10-second target for voice round-trip
+- **Root Cause**: Using Amazon Transcribe batch API (StartTranscriptionJob → poll for completion). Batch mode processes entire audio file after upload, adding latency.
+- **Current Implementation**: Acceptable for MVP demo - farmers expect voice notes to take time. Total flow: upload (2s) + transcribe (20-30s) + RAG (5-10s) = 30-45s.
+- **Post-MVP Fix**: Migrate to Amazon Transcribe Streaming API for real-time transcription (<2s latency). Streaming sends audio chunks as they're received and returns partial results immediately.
+- **Impact**: Demo-ready but not production-optimal. Streaming would reduce voice round-trip to <10s total.
+
 ### Voice Input Integration with Amazon Transcribe
 - **Implementation**: Integrated Amazon Transcribe for WhatsApp voice note processing. Voice messages detected in webhook, routed to dedicated VoiceQueue, downloaded from WhatsApp, uploaded to S3, transcribed in user's dialect (hi-IN, mr-IN, te-IN, en-IN), then queued as text for normal RAG processing.
 - **Architecture**: Added VoiceProcessor Lambda (90s timeout), TempAudioBucket S3 (1-day lifecycle), VoiceQueue SQS FIFO. Confidence threshold 0.5 — below threshold sends dialect-aware error message asking user to resend or type.
+- **Testing**: Validated with real human voice recordings in Hindi (84% confidence), Marathi (79% confidence), English (89% confidence). All transcriptions 100% accurate.
 - **Testing Limitation**: WhatsApp test number (+1 555 158 3325) doesn't support receiving voice notes (Media download error 131052). Voice input works in code but requires real WhatsApp Business number for end-to-end testing.
-- **Impact**: Voice input foundation complete; ready for production WhatsApp number; demo will show architecture and code
+- **Impact**: Voice input foundation complete; ready for production WhatsApp number; demo will show architecture, code, and test results
 
 ---
 

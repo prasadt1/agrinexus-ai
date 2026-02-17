@@ -891,6 +891,7 @@ jobs:
 ## 12. Post-MVP Roadmap
 
 ### Phase 2 (Month 2-3):
+- **Amazon Transcribe Streaming API**: Migrate from batch transcription to streaming for <2s voice latency (currently 20-30s)
 - Additional Indian dialects (Kannada, Tamil, Bengali, Punjabi)
 - Expanded crop coverage (rice, sugarcane, pulses, vegetables)
 - Advanced vision: multi-image comparison, disease progression tracking
