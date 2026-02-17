@@ -6,6 +6,16 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ## Week 3 (Feb 17-23, 2026)
 
+### Vision - Claude 3 Sonnet for Pest/Disease Identification
+- **Implementation**: Integrated Claude 3 Sonnet Vision for crop image analysis via WhatsApp
+- **Features**: Identifies pests (aphids, bollworm, whitefly), diseases (leaf curl, wilt), and nutrient deficiencies from farmer photos
+- **Multi-language**: Responds in Hindi, Marathi, Telugu, English with actionable recommendations
+- **Recommendations**: Provides specific pesticides with dosages, cultural practices, timing, and prevention tips
+- **Architecture**: Downloads image from WhatsApp → Saves to S3 → Analyzes with Claude Vision → Returns diagnosis
+- **Testing**: Validated with cotton aphid image in English, Hindi, Marathi - all working correctly
+- **Limitation**: WhatsApp test numbers don't support image messages - requires real WhatsApp Business number for end-to-end testing
+- **Impact**: Farmers can send crop photos and get instant expert diagnosis in their language
+
 ### Voice Output - Polly Language Support Clarification
 - **Correction**: Amazon Polly DOES support Hindi (hi-IN) with Aditi voice (both standard and neural engines)
 - **Supported Languages**: Hindi (Aditi, hi-IN) ✅, English (Kajal/Raveena, en-IN) ✅

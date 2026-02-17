@@ -13,6 +13,10 @@ import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../voice')
 from output import text_to_speech, should_send_voice_response
 
+# Import vision module
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../vision')
+from analyzer import process_image_message
+
 dynamodb = boto3.resource('dynamodb')
 bedrock_agent = boto3.client('bedrock-agent-runtime')
 secrets = boto3.client('secretsmanager')
@@ -580,11 +584,29 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 send_whatsapp_message(from_number, result['text'])
         
         elif message_type == 'image':
-            # TODO: Implement Claude Vision processing
-            send_whatsapp_message(from_number, "Image processing coming soon!")
+            # Process image with Claude Vision
+            print(f"Processing image message from {from_number}")
+            
+            # Send acknowledgment
+            ack_messages = {
+                'hi': '✓ फोटो मिली। विश्लेषण कर रहे हैं...',
+                'mr': '✓ फोटो मिळाला. विश्लेषण करत आहे...',
+                'te': '✓ ఫోటో అందింది. విశ్లేషిస్తున్నాము...',
+                'en': '✓ Photo received. Analyzing...'
+            }
+            send_whatsapp_message(from_number, ack_messages.get(dialect, ack_messages['hi']))
+            
+            # Analyze image
+            analysis = process_image_message(message, profile)
+            
+            # Save to DynamoDB
+            save_message(from_number, wamid, message, analysis, 'vision_analysis')
+            
+            # Send response (text only - no voice for image responses)
+            send_whatsapp_message(from_number, analysis)
         
         elif message_type == 'audio':
-            # TODO: Implement Transcribe processing
-            send_whatsapp_message(from_number, "Voice processing coming soon!")
+            # Audio messages are handled by VoiceProcessor Lambda
+            print(f"Audio message - should be handled by VoiceProcessor")
     
     return {'statusCode': 200}
