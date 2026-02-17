@@ -14,7 +14,7 @@ A chronological record of bugs, issues, and debugging sessions from project ince
 ### Issue #015: WhatsApp Test Number Rejects Voice Notes 🟡
 **Date**: Feb 17, 2026  
 **Severity**: Major  
-**Symptom**: Sent voice note from +49 176 47009148 to test number +1 555 158 3325, received WhatsApp error 131052 "Media download error - Incoming media file validation failed"  
+**Symptom**: Sent voice note from real phone number to test number (+1 555 xxx), received WhatsApp error 131052 "Media download error - Incoming media file validation failed"  
 **Attempts**:
 1. Checked webhook logs - received status update, not message
 2. Checked voice processor logs - no invocation (never received audio message)
@@ -132,12 +132,12 @@ A chronological record of bugs, issues, and debugging sessions from project ince
 ### Issue #006: WhatsApp Test Number Can't Be Added as Contact 🟢
 **Date**: Feb 14, 2026  
 **Severity**: Minor (confusion)  
-**Symptom**: Tried to add +1 555 158 3325 as WhatsApp contact, doesn't exist  
+**Symptom**: Tried to add test number (+1 555 xxx) as WhatsApp contact, doesn't exist  
 **Attempts**:
 1. Tried different formats (+1, 001, etc.) - none work
 2. Checked Meta docs
 **Root Cause**: Test numbers are API-only, not real WhatsApp accounts. Can't be messaged from WhatsApp app.  
-**Solution**: Use curl/API for inbound message simulation, send outbound to real phone number (+49 xxx). This pattern works for demo.  
+**Solution**: Use curl/API for inbound message simulation, send outbound to real phone number. This pattern works for demo.  
 **Time**: 15 min  
 **Impact**: Understood test number limitations, adjusted testing approach
 
