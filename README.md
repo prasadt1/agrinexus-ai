@@ -103,15 +103,37 @@ aws bedrock-runtime invoke-model \
 ```
 .
 ├── template.yaml                    # SAM template (Week 1)
+├── template-week2.yaml              # SAM template (Week 2)
 ├── README.md                        # This file
 ├── requirements.md                  # EARS requirements
 ├── architecture.md                  # Architecture design
 ├── design.md                        # Technical design
 ├── scripts/
 │   ├── setup-week1.sh              # Week 1 deployment script
+│   ├── deploy-week2.sh             # Week 2 deployment script
 │   ├── upload-fao-pdfs.sh          # Upload FAO manuals
 │   ├── download-official-sources.sh # Download Indian govt sources
 │   └── prepare-pest-management-docs.sh # Prepare knowledge base docs
+├── src/
+│   ├── webhook/                    # WhatsApp webhook handler
+│   │   ├── handler.py
+│   │   └── requirements.txt
+│   ├── processor/                  # Message processor with RAG
+│   │   ├── handler.py
+│   │   └── requirements.txt
+│   ├── dlq/                        # Dead letter queue handler
+│   │   ├── handler.py
+│   │   └── requirements.txt
+│   ├── weather/                    # Weather poller
+│   │   ├── handler.py
+│   │   └── requirements.txt
+│   └── nudge/                      # Nudge engine
+│       ├── sender.py               # Nudge sender
+│       ├── reminder.py             # Reminder sender
+│       ├── detector.py             # Response detector
+│       └── requirements.txt
+├── statemachine/
+│   └── nudge-workflow.asl.json     # Step Functions definition
 ├── tests/
 │   ├── test_golden_questions.py    # 20 golden questions
 │   ├── test_golden_questions_realistic.py # Realistic test scenarios
@@ -137,27 +159,162 @@ aws bedrock-runtime invoke-model \
 
 **Note on Sources**: The `fao-pdfs` directory name is historical. It now contains both FAO manuals and Indian agricultural research institution documents (ICAR, NIPHM, PAU, NRIIPM). See `kb_manifest.csv` for source URLs, licensing, and ETL threshold information.
 
-### Next Steps: Week 2
+### Next Steps: Week 2 ✓
 
-- WhatsApp webhook handler with signature validation
-- Onboarding flow with Interactive Buttons
-- Weather poller + Step Functions (short-lived)
-- EventBridge Scheduler for reminders (T+24h, T+48h, T+72h)
-- Response detector (DynamoDB Streams)
-- Closed-loop testing: nudge → reminder → DONE
+Week 2 is now complete! See below for WhatsApp integration details.
 
-### Cost Breakdown (Week 1)
+## Week 2: WhatsApp Integration + Behavioral Nudge Engine ✓
+
+### What's Included
+
+1. **WhatsApp Business API Integration**
+   - Webhook handler with Meta signature validation
+   - Idempotency using DynamoDB (prevents duplicate message processing)
+   - SQS FIFO queue for reliable message processing
+   - Message processor with Bedrock RAG integration
+
+2. **Onboarding Flow**
+   - Multi-step state machine (language → location → crop → consent)
+   - Support for Hindi, Marathi, Telugu
+   - User profile storage in DynamoDB
+   - Validation for districts (Aurangabad, Jalna, Nagpur) and crops (Cotton, Soybean, Maize)
+
+3. **Behavioral Nudge Engine**
+   - Weather poller (runs every 6 hours)
+   - Step Functions workflow for nudge orchestration
+   - EventBridge Scheduler for T+24h and T+48h reminders
+   - Response detector using DynamoDB Streams (detects DONE/NOT YET responses)
+
+4. **SAM Template** (`template-week2.yaml`)
+   - API Gateway for WhatsApp webhook
+   - 7 Lambda functions (webhook, processor, DLQ, weather, nudge sender, reminder, response detector)
+   - SQS FIFO queue with DLQ
+   - Step Functions state machine
+   - EventBridge Scheduler integration
+
+### Prerequisites
+
+In addition to Week 1 prerequisites:
+
+```bash
+# Meta Developer Account
+# 1. Create WhatsApp Business App at developers.facebook.com
+# 2. Get Phone Number ID and Access Token
+# 3. Configure webhook URL
+
+# Store WhatsApp credentials in AWS Secrets Manager
+aws secretsmanager create-secret \
+  --name agrinexus/whatsapp/verify-token \
+  --secret-string "your-verify-token"
+
+aws secretsmanager create-secret \
+  --name agrinexus/whatsapp/access-token \
+  --secret-string "your-permanent-access-token"
+
+aws secretsmanager create-secret \
+  --name agrinexus/whatsapp/phone-number-id \
+  --secret-string "your-phone-number-id"
+```
+
+### Deployment
+
+```bash
+# Deploy Week 2 (requires Week 1 to be deployed first)
+bash scripts/deploy-week2.sh
+
+# This will:
+# 1. Verify Week 1 resources exist
+# 2. Get Knowledge Base ID and Guardrail ID
+# 3. Build Lambda functions
+# 4. Deploy Week 2 SAM template
+# 5. Output webhook URL for Meta configuration
+```
+
+### Meta Webhook Configuration
+
+1. Go to Meta Developer Portal → Your App → WhatsApp → Configuration
+2. Set Callback URL to your webhook URL (from deployment output)
+3. Set Verify Token (same as in Secrets Manager)
+4. Subscribe to webhook field: `messages`
+5. Generate permanent access token from System User (not temporary token)
+
+### Testing WhatsApp Integration
+
+```bash
+# Test webhook verification (GET request)
+curl "https://YOUR_API_ID.execute-api.us-east-1.amazonaws.com/dev/webhook?hub.mode=subscribe&hub.verify_token=YOUR_TOKEN&hub.challenge=test123"
+
+# Send test message via Meta API
+curl -X POST "https://graph.facebook.com/v22.0/YOUR_PHONE_NUMBER_ID/messages" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messaging_product": "whatsapp",
+    "to": "YOUR_TEST_NUMBER",
+    "type": "text",
+    "text": {"body": "Hello from AgriNexus AI"}
+  }'
+
+# Check CloudWatch logs
+aws logs tail /aws/lambda/agrinexus-webhook-dev --follow
+aws logs tail /aws/lambda/agrinexus-processor-dev --follow
+```
+
+### Week 2 User Flow
+
+1. **Onboarding** (first-time user):
+   - User sends any message to WhatsApp Business number
+   - Bot asks for language preference (Hindi/Marathi/Telugu)
+   - Bot asks for location (district)
+   - Bot asks for crop type
+   - Bot asks for weather nudge consent
+   - Profile saved to DynamoDB
+
+2. **RAG Queries** (after onboarding):
+   - User asks farming question in their language
+   - Message queued to SQS
+   - Processor queries Bedrock Knowledge Base
+   - Response generated in user's dialect with citations
+   - Response sent via WhatsApp API
+
+3. **Weather Nudges** (if consent given):
+   - Weather poller runs every 6 hours
+   - Checks weather conditions for user's location
+   - Triggers Step Functions workflow if action needed
+   - Sends nudge via WhatsApp
+   - Schedules T+24h and T+48h reminders
+   - Response detector monitors for DONE/NOT YET replies
+
+### Week 2 Acceptance Criteria
+
+- [x] WhatsApp webhook receives and validates messages
+- [x] Idempotency prevents duplicate processing
+- [x] Onboarding flow completes in Hindi/Marathi/Telugu
+- [x] User profile stored in DynamoDB
+- [x] RAG queries return responses with citations
+- [x] Messages sent via WhatsApp API successfully
+- [x] Weather poller triggers nudge workflow
+- [x] Reminders scheduled via EventBridge Scheduler
+- [x] Response detector processes DONE/NOT YET replies
+- [x] DLQ handles failed messages with dialect-aware errors
+
+### Cost Breakdown (Week 1 + Week 2)
 
 | Service | Usage | Free Tier | Cost |
 |---------|-------|-----------|------|
 | DynamoDB | 1M reads, 500K writes | 25 GB, 25 WCU/RCU | $0 |
+| DynamoDB Streams | 1M stream reads | Pay-as-you-go | ~$0.50 |
 | S3 | 100 MB PDFs | 5 GB | $0 |
 | Bedrock KB | 1K queries | Pay-as-you-go | ~$5 |
-| OpenSearch Serverless | 1 OCU (indexing + search) | Pay-as-you-go | ~$20 |
-| Lambda | 10K invocations | 1M free | $0 |
-| **Total** | | | **~$25/month** |
+| OpenSearch Serverless | 1 OCU | Pay-as-you-go | ~$20 |
+| Lambda | 50K invocations | 1M free | $0 |
+| API Gateway | 10K requests | 1M free | $0 |
+| SQS | 100K messages | 1M free | $0 |
+| Step Functions | 100 executions | 4K free | $0 |
+| EventBridge Scheduler | 1K schedules | Pay-as-you-go | ~$1 |
+| **Total** | | | **~$26.50/month** |
 
-**Note**: OpenSearch Serverless is the primary cost driver for Week 1. This is a fixed minimum cost (~$0.24/hour per OCU) even with low usage. For production at scale, consider Aurora Serverless v2 as an alternative vector store.
+**Note**: Costs scale with usage. WhatsApp API calls are free for first 1,000 conversations/month, then $0.005-0.009 per conversation depending on region.
 
 ### Troubleshooting
 
