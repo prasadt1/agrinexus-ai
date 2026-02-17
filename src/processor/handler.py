@@ -222,6 +222,28 @@ def save_message(phone_number: str, wamid: str, message_data: Dict[str, Any], re
 
 def query_bedrock(query: str, dialect: str = 'hi') -> Dict[str, Any]:
     """Query Bedrock Knowledge Base with RAG"""
+    # Build generation configuration
+    generation_config = {
+        'promptTemplate': {
+            'textPromptTemplate': f'''You are an agricultural extension agent helping smallholder farmers in India. 
+Respond in {dialect} dialect (hi=Hindi, mr=Marathi, te=Telugu).
+Use simple, practical language. Include source citations.
+
+Question: $query$
+
+Context: $search_results$
+
+Provide actionable advice with source references.'''
+        }
+    }
+    
+    # Only add guardrail if it's configured
+    if GUARDRAIL_ID and GUARDRAIL_ID.strip():
+        generation_config['guardrailConfiguration'] = {
+            'guardrailId': GUARDRAIL_ID,
+            'guardrailVersion': GUARDRAIL_VERSION
+        }
+    
     response = bedrock_agent.retrieve_and_generate(
         input={'text': query},
         retrieveAndGenerateConfiguration={
@@ -229,23 +251,7 @@ def query_bedrock(query: str, dialect: str = 'hi') -> Dict[str, Any]:
             'knowledgeBaseConfiguration': {
                 'knowledgeBaseId': KB_ID,
                 'modelArn': 'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0',
-                'generationConfiguration': {
-                    'promptTemplate': {
-                        'textPromptTemplate': f'''You are an agricultural extension agent helping smallholder farmers in India. 
-Respond in {dialect} dialect (hi=Hindi, mr=Marathi, te=Telugu).
-Use simple, practical language. Include source citations.
-
-Question: {{input}}
-
-Context: {{context}}
-
-Provide actionable advice with source references.'''
-                    },
-                    'guardrailConfiguration': {
-                        'guardrailId': GUARDRAIL_ID,
-                        'guardrailVersion': GUARDRAIL_VERSION
-                    }
-                }
+                'generationConfiguration': generation_config
             }
         }
     )
@@ -258,13 +264,41 @@ Provide actionable advice with source references.'''
 
 def send_whatsapp_message(phone_number: str, message: str):
     """Send message via WhatsApp Business API"""
-    # Get WhatsApp credentials
-    secret_response = secrets.get_secret_value(SecretId='agrinexus-whatsapp-dev')
-    creds = json.loads(secret_response['SecretString'])
+    import requests
     
-    # TODO: Implement WhatsApp API call
-    # For now, just log
-    print(f"Sending to {phone_number}: {message}")
+    # Get WhatsApp credentials from environment variables (secret names)
+    access_token_secret = os.environ.get('ACCESS_TOKEN_SECRET', 'agrinexus/whatsapp/access-token')
+    phone_id_secret = os.environ.get('PHONE_NUMBER_ID_SECRET', 'agrinexus/whatsapp/phone-number-id')
+    
+    # Get secret values
+    access_token_response = secrets.get_secret_value(SecretId=access_token_secret)
+    access_token = access_token_response['SecretString']
+    
+    phone_id_response = secrets.get_secret_value(SecretId=phone_id_secret)
+    phone_number_id = phone_id_response['SecretString']
+    
+    # Send via WhatsApp Business API
+    url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": phone_number,
+        "type": "text",
+        "text": {
+            "body": message
+        }
+    }
+    
+    print(f"Sending to {phone_number}: {message[:50]}...")
+    response = requests.post(url, headers=headers, json=payload)
+    
+    if response.status_code == 200:
+        print(f"Message sent successfully: {response.json()}")
+    else:
+        print(f"Failed to send message: {response.status_code} - {response.text}")
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
