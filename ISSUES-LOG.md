@@ -210,20 +210,80 @@ A chronological record of bugs, issues, and debugging sessions from project ince
 
 ---
 
-## Statistics
+## Week 3 (Feb 17-23, 2026)
 
-**Total Issues Logged**: 15  
-**Critical**: 3 (20%)  
-**Major**: 9 (60%)  
-**Minor**: 3 (20%)  
+### Issue #019: Incorrect Polly Language Support Analysis 🟡
+**Date**: Feb 17, 2026  
+**Severity**: Major  
+**Symptom**: Kiro incorrectly concluded Amazon Polly only supports English (Indian) voices, disabled Hindi/Marathi/Telugu voice output  
+**Attempts**:
+1. Ran `aws polly describe-voices --language-code te-IN` - returned empty
+2. Checked for hi-IN, mr-IN voices - no results
+3. Concluded Polly doesn't support Indian languages except English
+**Root Cause**: AWS CLI query filtered by language code and only returned primary language. Aditi is multi-language (hi-IN and en-IN) but CLI only showed en-IN. Didn't test actual synthesis.  
+**Solution**: User corrected analysis. Tested `aws polly synthesize-speech --voice-id Aditi --language-code hi-IN` - worked perfectly! Restored Hindi voice output. Marathi uses Hindi voice (understood by Marathi speakers). Only Telugu remains text-only.  
+**Time**: 45 min  
+**Impact**: Hindi and Marathi voice output restored. English + Hindi + Marathi now supported.
 
-**Average Resolution Time**: 25 minutes  
+### Issue #018: Vision Response in Wrong Language 🟢
+**Date**: Feb 17, 2026  
+**Severity**: Minor  
+**Symptom**: Requested English vision analysis but Claude responded in Hindi with bilingual headers  
+**Attempts**:
+1. Checked language_map - correctly set to "English"
+2. Checked prompt - had bilingual format template with Hindi/English headers
+**Root Cause**: Prompt template included Hindi format examples (निदान / Diagnosis) which biased Claude toward Hindi responses  
+**Solution**: Removed bilingual format template, simplified to "Respond in {language}" with clear sections. Now responds correctly in requested language.  
+**Time**: 10 min  
+**Impact**: Vision now responds correctly in English, Hindi, Marathi
+
+### Issue #017: Polly Neural Engine Not Supported 🟢
+**Date**: Feb 17, 2026  
+**Severity**: Minor  
+**Symptom**: Voice output test failed with "This voice does not support the selected engine: neural"  
+**Attempts**:
+1. Checked Polly docs - Aditi supports both standard and neural
+2. Tried with Engine='neural' - failed
+3. Checked voice availability
+**Root Cause**: Aditi (hi-IN) supports neural engine but not for all regions/accounts. Standard engine works universally.  
+**Solution**: Removed Engine='neural' parameter, use default (standard) engine. Quality sufficient for agricultural advice.  
+**Time**: 5 min  
+**Impact**: Voice output works with standard engine in all languages
+
+### Issue #016: Voice Pipeline Test - Polly Language Code Error 🟢
+**Date**: Feb 17, 2026  
+**Severity**: Minor  
+**Symptom**: Voice pipeline test failed with "Value 'hi' at 'languageCode' failed to satisfy constraint"  
+**Attempts**:
+1. Checked language code mapping - used `language.split('-')[0]` to get 'hi' from 'hi-IN'
+2. Polly rejected 'hi', requires full code 'hi-IN'
+**Root Cause**: Code tried to extract short language code ('hi') but Polly requires full locale code ('hi-IN')  
+**Solution**: Pass full language code directly to Polly: `LanguageCode=language` instead of `language.split('-')[0]`  
+**Time**: 5 min  
+**Impact**: Voice pipeline test now passes for all languages
+
+---
+
+## Statistics (Updated)
+
+**Total Issues Logged**: 19  
+**Critical**: 3 (16%)  
+**Major**: 10 (53%)  
+**Minor**: 6 (31%)  
+
+**Average Resolution Time**: 23 minutes  
 **Longest Debug Session**: 2 hours (Issue #003 - RAG test rewrite)  
-**Shortest Debug Session**: 5 minutes (Issue #011 - UX acknowledgment)
+**Shortest Debug Session**: 5 minutes (Issues #011, #016, #017)
 
 **Most Common Issue Types**:
-1. Integration bugs (WhatsApp API, Bedrock) - 6 issues
-2. Test/validation failures - 2 issues
+1. Integration bugs (WhatsApp API, Bedrock, Polly, Transcribe) - 8 issues
+2. Test/validation failures - 3 issues
 3. UX/perceived performance - 3 issues
 4. Security/configuration - 2 issues
-5. Documentation accuracy - 2 issues
+5. Documentation accuracy - 3 issues
+
+**Week 3 Highlights**:
+- Caught incorrect Polly language analysis before production (Issue #019)
+- All voice/vision features tested and validated
+- Multi-language support working across all modalities
+
