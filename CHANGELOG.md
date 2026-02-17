@@ -6,12 +6,13 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ## Week 3 (Feb 17-23, 2026)
 
-### Voice Output Limitation - Amazon Polly Language Support
-- **Issue**: Amazon Polly doesn't support Hindi, Marathi, or Telugu voices. Only English (Indian) voices available (Aditi, Raveena, Kajal).
-- **Impact**: Voice output for Hindi/Marathi/Telugu uses English voice attempting to pronounce Devanagari/Telugu script phonetically. Results are poor quality or silent.
-- **Workaround for MVP**: Voice output only enabled for English dialect. Hindi/Marathi/Telugu users receive text responses only.
-- **Post-MVP Fix**: Migrate to Google Cloud Text-to-Speech which natively supports hi-IN, mr-IN, te-IN with high-quality voices. Or use Amazon Polly with transliterated text (Devanagari → Latin script).
-- **Decision**: For competition demo, showcase English voice output only. Mention multi-language voice as post-MVP enhancement.
+### Voice Output - Polly Language Support Clarification
+- **Correction**: Amazon Polly DOES support Hindi (hi-IN) with Aditi voice (both standard and neural engines)
+- **Supported Languages**: Hindi (Aditi, hi-IN) ✅, English (Kajal/Raveena, en-IN) ✅
+- **Marathi Fallback**: Uses Hindi voice (Aditi, hi-IN) - Marathi farmers understand Hindi ⚠️
+- **Telugu Limitation**: No native voice support - text-only responses ⚠️
+- **Implementation**: Voice output enabled for Hindi, Marathi (Hindi fallback), and English users
+- **Post-MVP**: Add Telugu support via Google Cloud TTS or transliteration
 
 ### Voice Input Latency - Batch vs Streaming Transcription
 - **Issue**: Voice transcription takes 20-34 seconds (batch mode), exceeding 10-second target for voice round-trip

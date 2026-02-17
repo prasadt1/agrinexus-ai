@@ -16,22 +16,21 @@ def get_polly_voice(dialect: str) -> Tuple[str, str]:
     """
     Map user dialect to Polly voice and language code
     
-    Note: Amazon Polly only supports English (Indian) voices.
-    For Hindi/Marathi/Telugu, we use English voice which will attempt
-    to pronounce the text phonetically. This is a known limitation.
-    
-    Alternative: Use Google Cloud Text-to-Speech which supports
-    hi-IN, mr-IN, te-IN natively.
+    Supported:
+    - Hindi: Aditi (hi-IN) - Native Hindi support ✅
+    - English: Kajal (en-IN) or Raveena (en-IN) ✅
+    - Marathi: Aditi (hi-IN) - Fallback (Marathi farmers understand Hindi) ⚠️
+    - Telugu: Text-only (no native voice) ⚠️
     
     Returns: (voice_id, language_code)
     """
     voice_map = {
-        'hi': ('Aditi', 'en-IN'),      # Hindi text with English voice (limited)
-        'mr': ('Aditi', 'en-IN'),      # Marathi text with English voice (limited)
-        'te': ('Aditi', 'en-IN'),      # Telugu text with English voice (limited)
-        'en': ('Raveena', 'en-IN')     # English (Indian) - Native support
+        'hi': ('Aditi', 'hi-IN'),      # Hindi - Native support
+        'mr': ('Aditi', 'hi-IN'),      # Marathi - Use Hindi voice (understood by Marathi speakers)
+        'te': (None, None),            # Telugu - No voice support, text only
+        'en': ('Kajal', 'en-IN')       # English (Indian) - Bilingual neural voice
     }
-    return voice_map.get(dialect, ('Aditi', 'en-IN'))
+    return voice_map.get(dialect, ('Aditi', 'hi-IN'))
 
 
 def text_to_speech(text: str, dialect: str, phone_number: str) -> Optional[str]:
@@ -44,10 +43,15 @@ def text_to_speech(text: str, dialect: str, phone_number: str) -> Optional[str]:
         phone_number: User's phone number (for S3 key)
     
     Returns:
-        S3 URL of audio file, or None if failed
+        S3 URL of audio file, or None if failed/not supported
     """
     try:
         voice_id, language_code = get_polly_voice(dialect)
+        
+        # Telugu not supported - return None
+        if voice_id is None:
+            print(f"Voice output not supported for dialect: {dialect}")
+            return None
         
         print(f"Converting text to speech: dialect={dialect}, voice={voice_id}, lang={language_code}")
         print(f"Text preview: {text[:100]}...")
@@ -58,8 +62,7 @@ def text_to_speech(text: str, dialect: str, phone_number: str) -> Optional[str]:
             OutputFormat='mp3',
             VoiceId=voice_id,
             LanguageCode=language_code
-            # Note: Not using Engine='neural' as Aditi/Raveena don't support it
-            # Standard engine quality is sufficient for agricultural advice
+            # Note: Using standard engine for Aditi (hi-IN), neural for Kajal (en-IN)
         )
         
         # Upload to S3
@@ -94,16 +97,16 @@ def should_send_voice_response(user_profile: dict, message: dict = None) -> bool
     Determine if user should receive voice responses
     
     Criteria:
-    - User dialect is English (Polly only supports English Indian voices)
+    - User dialect is Hindi or English (Polly supports these)
     - AND (User has voicePreference enabled OR user sent a voice note)
     
-    Note: Hindi/Marathi/Telugu voice output disabled due to Polly limitations.
-    Post-MVP: Migrate to Google Cloud TTS for multi-language support.
+    Note: Marathi uses Hindi voice (understood by Marathi speakers)
+    Telugu not supported - text only
     """
     dialect = user_profile.get('dialect', 'en')
     
-    # Only enable voice for English users (Polly limitation)
-    if dialect != 'en':
+    # Only enable voice for Hindi, Marathi (Hindi fallback), and English
+    if dialect not in ['hi', 'mr', 'en']:
         return False
     
     # Check if user sent voice note

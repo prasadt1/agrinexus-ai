@@ -68,26 +68,33 @@ def test_voice_output(text, dialect, description):
 
 
 if __name__ == '__main__':
-    # Test cases - Only English supported by Amazon Polly
-    # Hindi/Marathi/Telugu require Google Cloud TTS (post-MVP)
+    # Test cases - Hindi and English supported by Amazon Polly
+    # Marathi uses Hindi voice (understood by Marathi speakers)
+    # Telugu not supported (text only)
     test_cases = [
+        {
+            'text': 'कपास में कीट नियंत्रण के लिए नीम का तेल या इमिडाक्लोप्रिड का छिड़काव करें। सुबह या शाम के समय छिड़काव करना सबसे अच्छा है।',
+            'dialect': 'hi',
+            'description': 'Hindi: Cotton pest control advice'
+        },
+        {
+            'text': 'कापसाच्या किडींच्या नियंत्रणासाठी कडुलिंबाचे तेल किंवा इमिडाक्लोप्रिड फवारणी करा. सकाळी किंवा संध्याकाळी फवारणी करणे चांगले.',
+            'dialect': 'mr',
+            'description': 'Marathi: Cotton pest control (using Hindi voice)'
+        },
         {
             'text': 'For cotton pest control, spray neem oil or imidacloprid. The best time to spray is early morning or evening when temperatures are cooler.',
             'dialect': 'en',
             'description': 'English: Cotton pest control advice'
-        },
-        {
-            'text': 'Apply fertilizer when the cotton plant reaches 30 days after sowing. Use a balanced NPK fertilizer at the rate of 120 kg per hectare.',
-            'dialect': 'en',
-            'description': 'English: Fertilizer application advice'
         }
     ]
     
     print("\n" + "="*70)
     print("VOICE OUTPUT TEST SUITE")
     print("Testing Amazon Polly text-to-speech")
-    print("\nNOTE: Only English supported by Amazon Polly")
-    print("Hindi/Marathi/Telugu require Google Cloud TTS (post-MVP)")
+    print("\nSupported: Hindi (Aditi), English (Kajal)")
+    print("Marathi uses Hindi voice (understood by Marathi speakers)")
+    print("Telugu not supported (text only)")
     print("="*70)
     
     results = []
