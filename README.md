@@ -4,10 +4,88 @@ Behavioral intervention engine for smallholder farmers. AWS 10,000 AIdeas Compet
 
 ## Architecture
 
-- **Serverless**: Lambda, DynamoDB, EventBridge Scheduler
-- **AI**: Amazon Bedrock (Claude 3 Sonnet + Vision), Transcribe, Polly
+- **Serverless**: Lambda, DynamoDB, EventBridge Scheduler, Step Functions
+- **AI**: Amazon Bedrock (Claude 3 Sonnet + RAG), Transcribe, Polly
+- **Messaging**: WhatsApp Business API
 - **Storage**: DynamoDB single-table design, S3 for knowledge base
-- **Cost**: ~$50/month for 1,000 users (free-tier-leaning with pay-as-you-go Bedrock + OpenSearch Serverless)
+- **Cost**: ~$76/month for 1,000 users (includes WhatsApp, Bedrock, OpenSearch Serverless)
+
+## Week 2: WhatsApp Integration + Behavioral Nudges ✓
+
+### What's Included
+
+1. **WhatsApp Integration**
+   - Webhook handler with Meta signature validation
+   - Message deduplication (DynamoDB-based)
+   - Multi-dialect support (Hindi, Marathi, Telugu)
+   - Onboarding flow (language → location → crop → consent)
+
+2. **RAG Query System**
+   - Bedrock Knowledge Base integration
+   - Source citations in responses
+   - Immediate acknowledgment + async processing
+   - Response time: <2s perceived (acknowledgment), ~13s actual
+
+3. **Behavioral Nudge Engine**
+   - Weather-triggered nudges (mock weather for demo)
+   - Response detection (DONE/NOT YET keywords)
+   - Reminder scheduling (T+24h, T+48h via EventBridge Scheduler)
+   - Closed-loop tracking (nudge → response → status update → reminder cancellation)
+   - Confirmation messages in user's dialect
+
+4. **Architecture Components**
+   - `src/webhook/` - WhatsApp webhook handler
+   - `src/processor/` - Message processor (onboarding + RAG)
+   - `src/nudge/` - Nudge sender, reminder sender, response detector
+   - `src/weather/` - Weather poller (triggers nudge workflow)
+   - `statemachine/` - Step Functions workflow for nudges
+
+### Deployment
+
+```bash
+# Deploy Week 2 (includes Week 1 + WhatsApp + Nudges)
+sam build --template-file template-week2.yaml
+sam deploy --template-file .aws-sam/build/template.yaml \
+  --stack-name agrinexus-week2 \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --region us-east-1 \
+  --resolve-s3
+
+# Configure WhatsApp secrets in AWS Secrets Manager
+aws secretsmanager create-secret \
+  --name agrinexus/whatsapp/verify-token \
+  --secret-string "YOUR_VERIFY_TOKEN"
+
+aws secretsmanager create-secret \
+  --name agrinexus/whatsapp/access-token \
+  --secret-string "YOUR_PERMANENT_ACCESS_TOKEN"
+
+aws secretsmanager create-secret \
+  --name agrinexus/whatsapp/phone-number-id \
+  --secret-string "YOUR_PHONE_NUMBER_ID"
+```
+
+### Testing the Complete Flow
+
+1. **Onboarding**: Send "Namaste" to WhatsApp number
+2. **RAG Query**: Ask "कपास में कीट कैसे नियंत्रित करें?"
+3. **Nudge**: Trigger weather poller: `aws lambda invoke --function-name agrinexus-weather-dev`
+4. **Response**: Reply "हो गया" (done) or "अभी नहीं" (not yet)
+
+### Week 2 Acceptance Criteria
+
+- [x] WhatsApp webhook receives messages from Meta
+- [x] Onboarding flow works (language → location → crop → consent)
+- [x] RAG queries return answers with source citations
+- [x] Multi-dialect support (Hindi, Marathi, Telugu)
+- [x] Weather poller triggers nudge workflow
+- [x] Nudges sent via WhatsApp in user's dialect
+- [x] Reminders scheduled at T+24h and T+48h
+- [x] Response detector identifies DONE/NOT YET keywords
+- [x] Nudge status updates to DONE on completion
+- [x] Reminders cancelled when task completed
+- [x] Confirmation messages sent in user's dialect
+- [x] Immediate acknowledgment improves perceived response time
 
 ## Week 1: Foundation + Knowledge Base ✓
 

@@ -6,6 +6,7 @@ import json
 import os
 import boto3
 from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import Dict, Any
 
 dynamodb = boto3.resource('dynamodb')
@@ -32,12 +33,27 @@ NUDGE_TEMPLATES = {
 }
 
 
+def convert_floats_to_decimal(obj):
+    """Convert float values to Decimal for DynamoDB"""
+    if isinstance(obj, float):
+        return Decimal(str(obj))
+    elif isinstance(obj, dict):
+        return {k: convert_floats_to_decimal(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_floats_to_decimal(item) for item in obj]
+    return obj
+
+
 def create_reminder_schedule(phone_number: str, nudge_id: str, hours_offset: int, dialect: str):
     """Create EventBridge Scheduler for reminder"""
     schedule_time = datetime.utcnow() + timedelta(hours=hours_offset)
     
+    # Create valid schedule name (alphanumeric, hyphens, underscores only)
+    safe_nudge_id = nudge_id.replace(':', '-').replace('#', '-')
+    schedule_name = f'reminder-{safe_nudge_id}-{hours_offset}h'
+    
     scheduler.create_schedule(
-        Name=f'reminder-{nudge_id}-{hours_offset}h',
+        Name=schedule_name,
         ScheduleExpression=f'at({schedule_time.strftime("%Y-%m-%dT%H:%M:%S")})',
         Target={
             'Arn': os.environ['REMINDER_LAMBDA_ARN'],
@@ -53,10 +69,48 @@ def create_reminder_schedule(phone_number: str, nudge_id: str, hours_offset: int
     )
 
 
+def send_whatsapp_message(phone_number: str, message: str):
+    """Send message via WhatsApp Business API"""
+    import requests
+    
+    # Get WhatsApp credentials
+    access_token_secret = os.environ.get('ACCESS_TOKEN_SECRET', 'agrinexus/whatsapp/access-token')
+    phone_id_secret = os.environ.get('PHONE_NUMBER_ID_SECRET', 'agrinexus/whatsapp/phone-number-id')
+    
+    access_token_response = secrets.get_secret_value(SecretId=access_token_secret)
+    access_token = access_token_response['SecretString']
+    
+    phone_id_response = secrets.get_secret_value(SecretId=phone_id_secret)
+    phone_number_id = phone_id_response['SecretString']
+    
+    # Send via WhatsApp Business API
+    url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": phone_number,
+        "type": "text",
+        "text": {
+            "body": message
+        }
+    }
+    
+    print(f"Sending nudge to {phone_number}: {message[:50]}...")
+    response = requests.post(url, headers=headers, json=payload)
+    
+    if response.status_code == 200:
+        print(f"Nudge sent successfully: {response.json()}")
+    else:
+        print(f"Failed to send nudge: {response.status_code} - {response.text}")
+
+
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """Send nudge and schedule reminders"""
     location = event.get('location')
-    weather = event.get('weather', {})
+    weather = convert_floats_to_decimal(event.get('weather', {}))
     activity = event.get('activity', 'spray')
     
     # Query farmers in this location
@@ -76,7 +130,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     for farmer in farmers:
         phone_number = farmer.get('phone_number')
         dialect = farmer.get('dialect', 'hi')
-        wind_speed = weather.get('wind_speed', 0)
+        wind_speed = float(weather.get('wind_speed', 0))
         
         # Generate nudge message
         template = NUDGE_TEMPLATES.get(dialect, NUDGE_TEMPLATES['hi'])
@@ -103,8 +157,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         )
         
         # Send WhatsApp message
-        # TODO: Implement WhatsApp API call
-        print(f"Sending nudge to {phone_number}: {message}")
+        send_whatsapp_message(phone_number, message)
         
         # Schedule reminders at T+24h and T+48h
         create_reminder_schedule(phone_number, nudge_id, 24, dialect)

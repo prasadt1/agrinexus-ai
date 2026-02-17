@@ -317,6 +317,11 @@ Resources:
                 - dynamodb:DescribeStream
                 - dynamodb:ListStreams
               Resource: !Ref TableStreamArn
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus/whatsapp/*'
 
   # ============================================================================
   # Step Functions: Nudge Workflow

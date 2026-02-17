@@ -24,6 +24,27 @@ VERIFY_TOKEN_SECRET = os.environ.get('VERIFY_TOKEN_SECRET', 'agrinexus/whatsapp/
 
 table = dynamodb.Table(TABLE_NAME)
 
+# DONE/NOT YET keywords - skip RAG processing for these
+SKIP_RAG_KEYWORDS = [
+    # Hindi
+    'हो गया', 'कर दिया', 'हो गया है', 'कर लिया', 'done', 'completed',
+    'अभी नहीं', 'बाद में', 'नहीं किया', 'not yet', 'later',
+    # Marathi
+    'झाला', 'केला', 'पूर्ण झाला',
+    'नाही झाला', 'नंतर', 'अजून नाही',
+    # Telugu
+    'అయ్యింది', 'చేశాను', 'పూర్తయింది',
+    'ఇంకా లేదు', 'తర్వాత', 'చేయలేదు'
+]
+
+
+def should_skip_rag(text: str) -> bool:
+    """Check if message contains DONE/NOT YET keywords that should skip RAG"""
+    if not text:
+        return False
+    text_lower = text.lower().strip()
+    return any(keyword.lower() in text_lower for keyword in SKIP_RAG_KEYWORDS)
+
 
 def get_verify_token() -> str:
     """Retrieve WhatsApp verify token from Secrets Manager"""
@@ -147,6 +168,33 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             except Exception as e:
                 logger.error(f"Error checking idempotency: {e}")
                 # Continue processing even if dedup check fails
+            
+            # Store message in DynamoDB for response detector (via DynamoDB Streams)
+            import time
+            message_ttl = int(time.time()) + (7 * 24 * 60 * 60)  # 7 days
+            try:
+                table.put_item(
+                    Item={
+                        'PK': f'USER#{from_number}',
+                        'SK': f'MSG#{datetime.utcnow().isoformat()}',
+                        'wamid': wamid,
+                        'message': message,
+                        'ttl': message_ttl
+                    }
+                )
+                logger.info(f"Message stored in DynamoDB for response detector")
+            except Exception as e:
+                logger.error(f"Error storing message in DynamoDB: {e}")
+            
+            # Check if message should skip RAG processing (DONE/NOT YET keywords)
+            message_text = ''
+            if message_type == 'text':
+                message_text = message.get('text', {}).get('body', '')
+            
+            if should_skip_rag(message_text):
+                logger.info(f"Message contains DONE/NOT YET keyword - skipping RAG, will be handled by response detector: {message_text}")
+                # Don't send to SQS - response detector will handle it via DynamoDB Streams
+                continue
             
             # Queue message for processing (FIFO queue requires MessageGroupId and MessageDeduplicationId)
             try:

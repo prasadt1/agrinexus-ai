@@ -332,7 +332,15 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             # Check for DONE/NOT YET keywords (handled by response detector)
             # Just process as normal query
             
-            # Query Bedrock
+            # Send immediate acknowledgment (improves perceived response time)
+            ack_messages = {
+                'hi': '✓ आपका सवाल मिल गया। जवाब तैयार कर रहे हैं...',
+                'mr': '✓ तुमचा प्रश्न मिळाला. उत्तर तयार करत आहे...',
+                'te': '✓ మీ ప్రశ్న అందింది. సమాధానం తయారు చేస్తున్నాము...'
+            }
+            send_whatsapp_message(from_number, ack_messages.get(dialect, ack_messages['hi']))
+            
+            # Query Bedrock (this takes ~13 seconds)
             result = query_bedrock(text, dialect)
             
             # Save to DynamoDB

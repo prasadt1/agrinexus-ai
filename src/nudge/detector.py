@@ -10,6 +10,7 @@ import re
 
 dynamodb = boto3.resource('dynamodb')
 scheduler = boto3.client('scheduler')
+secrets = boto3.client('secretsmanager')
 
 TABLE_NAME = os.environ['TABLE_NAME']
 table = dynamodb.Table(TABLE_NAME)
@@ -26,6 +27,54 @@ NOT_YET_KEYWORDS = {
     'mr': ['नाही झाला', 'नंतर', 'अजून नाही', 'not yet'],
     'te': ['ఇంకా లేదు', 'తర్వాత', 'చేయలేదు', 'not yet']
 }
+
+# Confirmation messages by dialect
+CONFIRMATION_MESSAGES = {
+    'hi': 'बहुत अच्छा! आपका काम पूरा हो गया। धन्यवाद! 🎉',
+    'mr': 'खूप छान! तुमचे काम पूर्ण झाले. धन्यवाद! 🎉',
+    'te': 'చాలా బాగుంది! మీ పని పూర్తయింది. ధన్యవాదాలు! 🎉'
+}
+
+# NOT YET acknowledgment messages by dialect
+NOT_YET_MESSAGES = {
+    'hi': 'कोई बात नहीं। मैं आपको बाद में याद दिलाऊंगा। 👍',
+    'mr': 'काही हरकत नाही. मी तुम्हाला नंतर आठवण करून देईन. 👍',
+    'te': 'పర్వాలేదు. నేను మీకు తర్వాత గుర్తు చేస్తాను. 👍'
+}
+
+
+def send_whatsapp_message(phone_number: str, message: str):
+    """Send message via WhatsApp Business API"""
+    import requests
+    
+    access_token_secret = os.environ.get('ACCESS_TOKEN_SECRET', 'agrinexus/whatsapp/access-token')
+    phone_id_secret = os.environ.get('PHONE_ID_SECRET', 'agrinexus/whatsapp/phone-number-id')
+    
+    access_token_response = secrets.get_secret_value(SecretId=access_token_secret)
+    access_token = access_token_response['SecretString']
+    
+    phone_id_response = secrets.get_secret_value(SecretId=phone_id_secret)
+    phone_number_id = phone_id_response['SecretString']
+    
+    url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": phone_number,
+        "type": "text",
+        "text": {
+            "body": message
+        }
+    }
+    
+    response = requests.post(url, headers=headers, json=payload)
+    if response.status_code == 200:
+        print(f"Confirmation sent to {phone_number}")
+    else:
+        print(f"Failed to send confirmation: {response.status_code} - {response.text}")
 
 
 def detect_keyword(text: str, keywords: List[str]) -> bool:
@@ -51,50 +100,104 @@ def get_active_nudges(phone_number: str) -> List[Dict[str, Any]]:
     ]
 
 
+def get_user_dialect(phone_number: str) -> str:
+    """Get user's dialect from profile"""
+    try:
+        response = table.get_item(
+            Key={
+                'PK': f'USER#{phone_number}',
+                'SK': 'PROFILE'
+            }
+        )
+        return response.get('Item', {}).get('dialect', 'hi')
+    except:
+        return 'hi'  # Default to Hindi
+
+
 def delete_scheduled_reminders(nudge_id: str):
     """Delete EventBridge Scheduler reminders"""
-    try:
-        scheduler.delete_schedule(Name=f'reminder-{nudge_id}-24h')
-    except:
-        pass
+    # Apply same transformation as sender: replace : and # with -
+    safe_nudge_id = nudge_id.replace(':', '-').replace('#', '-')
     
     try:
-        scheduler.delete_schedule(Name=f'reminder-{nudge_id}-48h')
-    except:
-        pass
+        schedule_name = f'reminder-{safe_nudge_id}-24h'
+        scheduler.delete_schedule(Name=schedule_name)
+        print(f"Deleted schedule: {schedule_name}")
+    except Exception as e:
+        print(f"Failed to delete 24h schedule: {e}")
+    
+    try:
+        schedule_name = f'reminder-{safe_nudge_id}-48h'
+        scheduler.delete_schedule(Name=schedule_name)
+        print(f"Deleted schedule: {schedule_name}")
+    except Exception as e:
+        print(f"Failed to delete 48h schedule: {e}")
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """Process DynamoDB Stream events"""
+    print(f"Received {len(event['Records'])} records")
+    
     for record in event['Records']:
+        print(f"Processing record: eventName={record['eventName']}")
+        
         if record['eventName'] != 'INSERT':
+            print(f"Skipping non-INSERT event: {record['eventName']}")
             continue
         
         new_image = record['dynamodb']['NewImage']
         
         # Only process message records
         sk = new_image.get('SK', {}).get('S', '')
+        print(f"Record SK: {sk}")
+        
         if not sk.startswith('MSG#'):
+            print(f"Skipping non-message record: {sk}")
             continue
         
         pk = new_image.get('PK', {}).get('S', '')
         phone_number = pk.replace('USER#', '')
+        print(f"Processing message for user: {phone_number}")
         
-        # Extract message text
-        message_data = json.loads(new_image.get('message', {}).get('S', '{}'))
-        text = message_data.get('text', {}).get('body', '')
+        # Extract message text from DynamoDB Stream format
+        # The 'message' field is a Map (M) in DynamoDB Streams, not a String (S)
+        message_map = new_image.get('message', {}).get('M', {})
+        text_map = message_map.get('text', {}).get('M', {})
+        text = text_map.get('body', {}).get('S', '')
+        print(f"Message text: {text}")
         
         if not text:
+            print("No text found in message")
             continue
+        
+        # Check for NOT YET keywords FIRST (more specific than DONE)
+        all_not_yet_keywords = []
+        for keywords in NOT_YET_KEYWORDS.values():
+            all_not_yet_keywords.extend(keywords)
         
         # Check for DONE keywords
         all_done_keywords = []
         for keywords in DONE_KEYWORDS.values():
             all_done_keywords.extend(keywords)
         
-        if detect_keyword(text, all_done_keywords):
+        print(f"Checking keywords in: {text}")
+        
+        # Check NOT YET first (more specific)
+        if detect_keyword(text, all_not_yet_keywords):
+            print(f"NOT YET keyword detected!")
+            
+            # Send acknowledgment message (reminders will continue)
+            dialect = get_user_dialect(phone_number)
+            acknowledgment = NOT_YET_MESSAGES.get(dialect, NOT_YET_MESSAGES['hi'])
+            send_whatsapp_message(phone_number, acknowledgment)
+        
+        # Only check DONE if NOT YET wasn't detected
+        elif detect_keyword(text, all_done_keywords):
+            print(f"DONE keyword detected!")
+            
             # Get active nudges
             active_nudges = get_active_nudges(phone_number)
+            print(f"Found {len(active_nudges)} active nudges")
             
             # Mark most recent nudge as DONE
             if active_nudges:
@@ -120,14 +223,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 delete_scheduled_reminders(nudge_id)
                 
                 print(f"Marked nudge {nudge_id} as DONE for {phone_number}")
-        
-        # Check for NOT YET keywords
-        all_not_yet_keywords = []
-        for keywords in NOT_YET_KEYWORDS.values():
-            all_not_yet_keywords.extend(keywords)
-        
-        if detect_keyword(text, all_not_yet_keywords):
-            # Just log, reminders will continue
-            print(f"User {phone_number} responded NOT YET")
+                
+                # Send confirmation message
+                dialect = get_user_dialect(phone_number)
+                confirmation = CONFIRMATION_MESSAGES.get(dialect, CONFIRMATION_MESSAGES['hi'])
+                send_whatsapp_message(phone_number, confirmation)
     
     return {'statusCode': 200}
