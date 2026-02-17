@@ -330,12 +330,22 @@ def save_message(phone_number: str, wamid: str, message_data: Dict[str, Any], re
 
 def query_bedrock(query: str, dialect: str = 'hi') -> Dict[str, Any]:
     """Query Bedrock Knowledge Base with RAG"""
+    # Map dialect to language instruction
+    language_instructions = {
+        'hi': 'Respond in Hindi (Devanagari script). Use simple, practical language.',
+        'mr': 'Respond in Marathi (Devanagari script). Use simple, practical language.',
+        'te': 'Respond in Telugu script. Use simple, practical language.',
+        'en': 'Respond in English. Use simple, practical language suitable for Indian farmers.'
+    }
+    
+    language_instruction = language_instructions.get(dialect, language_instructions['hi'])
+    
     # Build generation configuration
     generation_config = {
         'promptTemplate': {
             'textPromptTemplate': f'''You are an agricultural extension agent helping smallholder farmers in India. 
-Respond in {dialect} dialect (hi=Hindi, mr=Marathi, te=Telugu).
-Use simple, practical language. Include source citations.
+{language_instruction}
+Include source citations.
 
 Question: $query$
 
