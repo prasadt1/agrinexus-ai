@@ -180,9 +180,12 @@ Resources:
           QUEUE_URL: !Ref MessageQueue
           ACCESS_TOKEN_SECRET: agrinexus/whatsapp/access-token
           PHONE_NUMBER_ID_SECRET: agrinexus/whatsapp/phone-number-id
+          TEMP_AUDIO_BUCKET: !Ref TempAudioBucket
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TableName
+        - S3CrudPolicy:
+            BucketName: !Ref TempAudioBucket
         - Statement:
             - Effect: Allow
               Action:
@@ -192,6 +195,10 @@ Resources:
                 - bedrock:Retrieve
                 - bedrock-agent:Retrieve
                 - bedrock-agent:RetrieveAndGenerate
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - polly:SynthesizeSpeech
               Resource: '*'
             - Effect: Allow
               Action:

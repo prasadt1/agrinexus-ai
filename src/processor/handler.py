@@ -8,6 +8,11 @@ import boto3
 from typing import Dict, Any, Optional
 from datetime import datetime
 
+# Import voice output module
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../voice')
+from output import text_to_speech, should_send_voice_response
+
 dynamodb = boto3.resource('dynamodb')
 bedrock_agent = boto3.client('bedrock-agent-runtime')
 secrets = boto3.client('secretsmanager')
@@ -380,8 +385,16 @@ Provide actionable advice with source references.'''
     }
 
 
-def send_whatsapp_message(phone_number: str, message: str):
-    """Send plain text message via WhatsApp Business API"""
+def send_whatsapp_message(phone_number: str, message: str, audio_url: Optional[str] = None):
+    """
+    Send message via WhatsApp Business API
+    Supports both text and audio messages
+    
+    Args:
+        phone_number: Recipient phone number
+        message: Text message to send
+        audio_url: Optional audio URL for voice message
+    """
     import requests
     
     # Get WhatsApp credentials from environment variables (secret names)
@@ -401,16 +414,30 @@ def send_whatsapp_message(phone_number: str, message: str):
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json"
     }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": phone_number,
-        "type": "text",
-        "text": {
-            "body": message
-        }
-    }
     
-    print(f"Sending to {phone_number}: {message[:50]}...")
+    # If audio URL provided, send audio message
+    if audio_url:
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": phone_number,
+            "type": "audio",
+            "audio": {
+                "link": audio_url
+            }
+        }
+        print(f"Sending voice message to {phone_number}: {audio_url}")
+    else:
+        # Send text message
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": phone_number,
+            "type": "text",
+            "text": {
+                "body": message
+            }
+        }
+        print(f"Sending text to {phone_number}: {message[:50]}...")
+    
     response = requests.post(url, headers=headers, json=payload)
     
     if response.status_code == 200:
@@ -535,8 +562,21 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             # Save to DynamoDB
             save_message(from_number, wamid, message, result['text'], str(result['citations']))
             
-            # Send response
-            send_whatsapp_message(from_number, result['text'])
+            # Check if user wants voice response
+            send_voice = message.get('_source') == 'voice' or profile.get('voicePreference', False)
+            
+            if send_voice:
+                # Generate voice output
+                audio_url = text_to_speech(result['text'], dialect, from_number)
+                if audio_url:
+                    # Send voice message
+                    send_whatsapp_message(from_number, result['text'], audio_url=audio_url)
+                else:
+                    # Fallback to text if voice generation fails
+                    send_whatsapp_message(from_number, result['text'])
+            else:
+                # Send text response
+                send_whatsapp_message(from_number, result['text'])
         
         elif message_type == 'image':
             # TODO: Implement Claude Vision processing
