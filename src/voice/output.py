@@ -16,15 +16,22 @@ def get_polly_voice(dialect: str) -> Tuple[str, str]:
     """
     Map user dialect to Polly voice and language code
     
+    Note: Amazon Polly only supports English (Indian) voices.
+    For Hindi/Marathi/Telugu, we use English voice which will attempt
+    to pronounce the text phonetically. This is a known limitation.
+    
+    Alternative: Use Google Cloud Text-to-Speech which supports
+    hi-IN, mr-IN, te-IN natively.
+    
     Returns: (voice_id, language_code)
     """
     voice_map = {
-        'hi': ('Aditi', 'hi-IN'),      # Hindi - Female
-        'mr': ('Aditi', 'hi-IN'),      # Marathi - Use Hindi voice (closest)
-        'te': ('Aditi', 'hi-IN'),      # Telugu - Use Hindi voice (closest)
-        'en': ('Raveena', 'en-IN')     # English (Indian) - Female
+        'hi': ('Aditi', 'en-IN'),      # Hindi text with English voice (limited)
+        'mr': ('Aditi', 'en-IN'),      # Marathi text with English voice (limited)
+        'te': ('Aditi', 'en-IN'),      # Telugu text with English voice (limited)
+        'en': ('Raveena', 'en-IN')     # English (Indian) - Native support
     }
-    return voice_map.get(dialect, ('Aditi', 'hi-IN'))
+    return voice_map.get(dialect, ('Aditi', 'en-IN'))
 
 
 def text_to_speech(text: str, dialect: str, phone_number: str) -> Optional[str]:
@@ -82,17 +89,29 @@ def text_to_speech(text: str, dialect: str, phone_number: str) -> Optional[str]:
         return None
 
 
-def should_send_voice_response(user_profile: dict) -> bool:
+def should_send_voice_response(user_profile: dict, message: dict = None) -> bool:
     """
     Determine if user should receive voice responses
     
     Criteria:
-    - User has voicePreference enabled, OR
-    - User sent a voice note (indicated by _source: 'voice' in message)
+    - User dialect is English (Polly only supports English Indian voices)
+    - AND (User has voicePreference enabled OR user sent a voice note)
+    
+    Note: Hindi/Marathi/Telugu voice output disabled due to Polly limitations.
+    Post-MVP: Migrate to Google Cloud TTS for multi-language support.
     """
+    dialect = user_profile.get('dialect', 'en')
+    
+    # Only enable voice for English users (Polly limitation)
+    if dialect != 'en':
+        return False
+    
+    # Check if user sent voice note
+    if message and message.get('_source') == 'voice':
+        return True
+    
     # Check user preference
     if user_profile.get('voicePreference', False):
         return True
     
-    # Default: no voice output unless explicitly requested
     return False

@@ -562,8 +562,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             # Save to DynamoDB
             save_message(from_number, wamid, message, result['text'], str(result['citations']))
             
-            # Check if user wants voice response
-            send_voice = message.get('_source') == 'voice' or profile.get('voicePreference', False)
+            # Check if user wants voice response (English only due to Polly limitations)
+            send_voice = (dialect == 'en' and 
+                         (message.get('_source') == 'voice' or profile.get('voicePreference', False)))
             
             if send_voice:
                 # Generate voice output

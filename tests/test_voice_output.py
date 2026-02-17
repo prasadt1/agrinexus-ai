@@ -68,33 +68,26 @@ def test_voice_output(text, dialect, description):
 
 
 if __name__ == '__main__':
-    # Test cases for all 4 languages
+    # Test cases - Only English supported by Amazon Polly
+    # Hindi/Marathi/Telugu require Google Cloud TTS (post-MVP)
     test_cases = [
-        {
-            'text': 'कपास में कीट नियंत्रण के लिए नीम का तेल या इमिडाक्लोप्रिड का छिड़काव करें। सुबह या शाम के समय छिड़काव करना सबसे अच्छा है।',
-            'dialect': 'hi',
-            'description': 'Hindi: Cotton pest control advice'
-        },
-        {
-            'text': 'कापसाच्या किडींच्या नियंत्रणासाठी कडुलिंबाचे तेल किंवा इमिडाक्लोप्रिड फवारणी करा. सकाळी किंवा संध्याकाळी फवारणी करणे चांगले.',
-            'dialect': 'mr',
-            'description': 'Marathi: Cotton pest control advice'
-        },
-        {
-            'text': 'పత్తి తెగుళ్ల నియంత్రణకు వేప నూనె లేదా ఇమిడాక్లోప్రిడ్ స్ప్రే చేయండి. ఉదయం లేదా సాయంత్రం స్ప్రే చేయడం మంచిది.',
-            'dialect': 'te',
-            'description': 'Telugu: Cotton pest control advice'
-        },
         {
             'text': 'For cotton pest control, spray neem oil or imidacloprid. The best time to spray is early morning or evening when temperatures are cooler.',
             'dialect': 'en',
             'description': 'English: Cotton pest control advice'
+        },
+        {
+            'text': 'Apply fertilizer when the cotton plant reaches 30 days after sowing. Use a balanced NPK fertilizer at the rate of 120 kg per hectare.',
+            'dialect': 'en',
+            'description': 'English: Fertilizer application advice'
         }
     ]
     
     print("\n" + "="*70)
     print("VOICE OUTPUT TEST SUITE")
-    print("Testing Amazon Polly text-to-speech in 4 languages")
+    print("Testing Amazon Polly text-to-speech")
+    print("\nNOTE: Only English supported by Amazon Polly")
+    print("Hindi/Marathi/Telugu require Google Cloud TTS (post-MVP)")
     print("="*70)
     
     results = []
