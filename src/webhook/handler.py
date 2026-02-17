@@ -186,6 +186,32 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             except Exception as e:
                 logger.error(f"Error storing message in DynamoDB: {e}")
             
+            # Route audio messages to voice processor queue
+            if message_type == 'audio':
+                logger.info(f"Audio message detected - routing to voice processor")
+                try:
+                    voice_queue_url = os.environ.get('VOICE_QUEUE_URL')
+                    if voice_queue_url:
+                        sqs.send_message(
+                            QueueUrl=voice_queue_url,
+                            MessageBody=json.dumps({
+                                'wamid': wamid,
+                                'from': from_number,
+                                'message': message,
+                                'metadata': value.get('metadata', {})
+                            }),
+                            MessageGroupId=from_number,
+                            MessageDeduplicationId=wamid
+                        )
+                        logger.info(f"Audio message queued for voice processing - wamid: {wamid}")
+                        continue
+                    else:
+                        logger.warning("VOICE_QUEUE_URL not configured - skipping audio message")
+                        continue
+                except Exception as e:
+                    logger.error(f"Error queuing audio message: {e}")
+                    continue
+            
             # Check if message should skip RAG processing (DONE/NOT YET keywords)
             message_text = ''
             if message_type == 'text':

@@ -17,6 +17,8 @@ sqs = boto3.client('sqs')
 TEMP_BUCKET = os.environ['TEMP_AUDIO_BUCKET']
 QUEUE_URL = os.environ['QUEUE_URL']
 TABLE_NAME = os.environ['TABLE_NAME']
+ACCESS_TOKEN_SECRET = os.environ.get('ACCESS_TOKEN_SECRET', 'agrinexus/whatsapp/access-token')
+PHONE_NUMBER_ID_SECRET = os.environ.get('PHONE_NUMBER_ID_SECRET', 'agrinexus/whatsapp/phone-number-id')
 
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(TABLE_NAME)
@@ -24,14 +26,36 @@ table = dynamodb.Table(TABLE_NAME)
 
 def get_whatsapp_credentials():
     """Get WhatsApp credentials from Secrets Manager"""
-    access_token_secret = os.environ.get('ACCESS_TOKEN_SECRET', 'agrinexus/whatsapp/access-token')
-    response = secrets.get_secret_value(SecretId=access_token_secret)
-    return response['SecretString']
+    token_response = secrets.get_secret_value(SecretId=ACCESS_TOKEN_SECRET)
+    phone_response = secrets.get_secret_value(SecretId=PHONE_NUMBER_ID_SECRET)
+    return token_response['SecretString'], phone_response['SecretString']
+
+
+def send_whatsapp_message(to: str, message: str):
+    """Send WhatsApp message"""
+    access_token, phone_number_id = get_whatsapp_credentials()
+    
+    url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "text",
+        "text": {"body": message}
+    }
+    
+    req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers=headers, method='POST')
+    with urllib.request.urlopen(req) as response:
+        return json.loads(response.read())
 
 
 def get_whatsapp_media_url(media_id: str) -> str:
     """Get media URL from WhatsApp"""
-    access_token = get_whatsapp_credentials()
+    access_token, _ = get_whatsapp_credentials()
     
     url = f"https://graph.facebook.com/v22.0/{media_id}"
     headers = {"Authorization": f"Bearer {access_token}"}
@@ -44,7 +68,7 @@ def get_whatsapp_media_url(media_id: str) -> str:
 
 def download_media(media_url: str) -> bytes:
     """Download media from WhatsApp"""
-    access_token = get_whatsapp_credentials()
+    access_token, _ = get_whatsapp_credentials()
     
     headers = {"Authorization": f"Bearer {access_token}"}
     req = urllib.request.Request(media_url, headers=headers)
@@ -215,8 +239,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             print(f"Queued transcribed text for processing: {result['text']}")
         else:
             # Send error message
-            from src.processor.handler import send_whatsapp_message
-            
             error_messages = {
                 'low_confidence': {
                     'hi': f"माफ़ करें, आपकी आवाज़ साफ़ नहीं सुनाई दी। कृपया फिर से बोलें या टाइप करें।\n\n(सुना गया: {result.get('text', '')})",

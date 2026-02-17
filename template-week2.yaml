@@ -79,6 +79,36 @@ Resources:
       MessageRetentionPeriod: 1209600  # 14 days
 
   # ============================================================================
+  # SQS Queue for Voice Processing
+  # ============================================================================
+  VoiceQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub agrinexus-voice-${Environment}.fifo
+      FifoQueue: true
+      ContentBasedDeduplication: true
+      VisibilityTimeout: 180
+      MessageRetentionPeriod: 345600  # 4 days
+
+  # ============================================================================
+  # S3 Bucket for Temporary Audio Storage
+  # ============================================================================
+  TempAudioBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub agrinexus-temp-audio-${Environment}-${AWS::AccountId}
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldAudio
+            Status: Enabled
+            ExpirationInDays: 1  # Delete after 1 day
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # ============================================================================
   # API Gateway for WhatsApp Webhook
   # ============================================================================
   WhatsAppApi:
@@ -104,10 +134,13 @@ Resources:
       Environment:
         Variables:
           QUEUE_URL: !Ref MessageQueue
+          VOICE_QUEUE_URL: !Ref VoiceQueue
           VERIFY_TOKEN_SECRET: agrinexus/whatsapp/verify-token
       Policies:
         - SQSSendMessagePolicy:
             QueueName: !GetAtt MessageQueue.QueueName
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt VoiceQueue.QueueName
         - DynamoDBCrudPolicy:
             TableName: !Ref TableName
         - Statement:
@@ -172,6 +205,50 @@ Resources:
           Properties:
             Queue: !GetAtt MessageQueue.Arn
             BatchSize: 10
+
+  # ============================================================================
+  # Lambda: Voice Processor (Amazon Transcribe)
+  # ============================================================================
+  VoiceProcessor:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-voice-${Environment}
+      CodeUri: src/voice/
+      Handler: processor.lambda_handler
+      Description: Process WhatsApp voice notes using Amazon Transcribe
+      Timeout: 90
+      Environment:
+        Variables:
+          TEMP_AUDIO_BUCKET: !Ref TempAudioBucket
+          QUEUE_URL: !Ref MessageQueue
+          ACCESS_TOKEN_SECRET: agrinexus/whatsapp/access-token
+          PHONE_NUMBER_ID_SECRET: agrinexus/whatsapp/phone-number-id
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TableName
+        - S3CrudPolicy:
+            BucketName: !Ref TempAudioBucket
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt MessageQueue.QueueName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - transcribe:StartTranscriptionJob
+                - transcribe:GetTranscriptionJob
+                - transcribe:DeleteTranscriptionJob
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus/whatsapp/*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus-whatsapp-*
+      Events:
+        VoiceQueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt VoiceQueue.Arn
+            BatchSize: 1  # Process one voice note at a time
 
   # ============================================================================
   # Lambda: DLQ Handler (Dialect-Aware Error Messages)
@@ -385,6 +462,14 @@ Outputs:
   MessageQueueUrl:
     Description: SQS queue URL for message processing
     Value: !Ref MessageQueue
+
+  VoiceQueueUrl:
+    Description: SQS queue URL for voice processing
+    Value: !Ref VoiceQueue
+
+  TempAudioBucketName:
+    Description: S3 bucket for temporary audio storage
+    Value: !Ref TempAudioBucket
 
   NudgeStateMachineArn:
     Description: Step Functions state machine ARN
