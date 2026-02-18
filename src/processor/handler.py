@@ -9,12 +9,9 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 
 # Import voice output module
-import sys
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../voice')
 from output import text_to_speech, should_send_voice_response
 
 # Import vision module
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../vision')
 from analyzer import process_image_message
 
 dynamodb = boto3.resource('dynamodb')
@@ -352,15 +349,21 @@ def query_bedrock(query: str, dialect: str = 'hi') -> Dict[str, Any]:
     # Build generation configuration
     generation_config = {
         'promptTemplate': {
-            'textPromptTemplate': f'''You are an agricultural extension agent helping smallholder farmers in India. 
+            'textPromptTemplate': f'''You are an agricultural extension agent helping smallholder farmers in India with FARMING questions ONLY.
 {language_instruction}
 Include source citations.
+
+IMPORTANT RESTRICTIONS:
+- ONLY answer questions about agriculture, farming, crops, pests, diseases, fertilizers, weather, and farm management
+- If the question is about human health, medical issues, personal problems, or non-farming topics, respond: "I can only help with farming questions. Please ask about crops, pests, fertilizers, or farm management."
+- Do NOT provide medical advice, health recommendations, or personal counseling
+- Stay strictly within agricultural domain
 
 Question: $query$
 
 Context: $search_results$
 
-Provide actionable advice with source references.'''
+Provide actionable farming advice with source references.'''
         }
     }
     
@@ -547,6 +550,89 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Process based on message type
         if message_type == 'text':
             text = message.get('text', {}).get('body', '')
+            
+            # Check for HELP command
+            if text.strip().upper() in ['HELP', 'मदद', 'मदत', 'సహాయం']:
+                help_messages = {
+                    'hi': '''🌾 AgriNexus AI - मदद
+
+मैं आपकी खेती में मदद कर सकता हूं:
+
+📝 सवाल पूछें:
+• "कपास में कीट कैसे नियंत्रित करें?"
+• "गेहूं में खाद कब डालें?"
+• "मौसम के अनुसार क्या करें?"
+
+📸 फोटो भेजें:
+• पत्तियों की फोटो
+• कीट/रोग की फोटो
+• मैं पहचान करूंगा और सलाह दूंगा
+
+🎤 आवाज़ में पूछें:
+• वॉइस नोट भेजें
+• मैं समझूंगा और जवाब दूंगा
+
+बस अपना सवाल टाइप करें या फोटो भेजें!''',
+                    'mr': '''🌾 AgriNexus AI - मदत
+
+मी तुमच्या शेतीत मदत करू शकतो:
+
+📝 प्रश्न विचारा:
+• "कापसात किडे कसे नियंत्रित करावे?"
+• "गहूमध्ये खत कधी घालावे?"
+• "हवामानानुसार काय करावे?"
+
+📸 फोटो पाठवा:
+• पानांचा फोटो
+• किडे/रोगाचा फोटो
+• मी ओळखेन आणि सल्ला देईन
+
+🎤 आवाजात विचारा:
+• व्हॉइस नोट पाठवा
+• मी समजेन आणि उत्तर देईन
+
+फक्त तुमचा प्रश्न टाइप करा किंवा फोटो पाठवा!''',
+                    'te': '''🌾 AgriNexus AI - సహాయం
+
+నేను మీ వ్యవసాయంలో సహాయం చేయగలను:
+
+📝 ప్రశ్నలు అడగండి:
+• "పత్తిలో పురుగులను ఎలా నియంత్రించాలి?"
+• "గోధుమలో ఎరువులు ఎప్పుడు వేయాలి?"
+• "వాతావరణం ప్రకారం ఏమి చేయాలి?"
+
+📸 ఫోటో పంపండి:
+• ఆకుల ఫోటో
+• పురుగు/వ్యాధి ఫోటో
+• నేను గుర్తించి సలహా ఇస్తాను
+
+🎤 వాయిస్‌లో అడగండి:
+• వాయిస్ నోట్ పంపండి
+• నేను అర్థం చేసుకుని సమాధానం ఇస్తాను
+
+మీ ప్రశ్న టైప్ చేయండి లేదా ఫోటో పంపండి!''',
+                    'en': '''🌾 AgriNexus AI - Help
+
+I can help you with your farming:
+
+📝 Ask Questions:
+• "How to control cotton pests?"
+• "When to apply fertilizer to wheat?"
+• "What to do based on weather?"
+
+📸 Send Photos:
+• Leaf photos
+• Pest/disease photos
+• I'll identify and advise
+
+🎤 Ask by Voice:
+• Send voice note
+• I'll understand and respond
+
+Just type your question or send a photo!'''
+                }
+                send_whatsapp_message(from_number, help_messages.get(dialect, help_messages['hi']))
+                continue
             
             # Check for DONE/NOT YET keywords (handled by response detector)
             # Just process as normal query

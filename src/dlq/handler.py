@@ -16,7 +16,8 @@ table = dynamodb.Table(TABLE_NAME)
 ERROR_MESSAGES = {
     'hi': 'माफ कीजिए, सिस्टम में तकलीफ है। कृपया थोड़ी देर बाद फिर से कोशिश करें।',
     'mr': 'माफ करा, सिस्टम मध्ये अपघात आला आहे। कृपया थोड्या वेळाने पुन्हा प्रयत्न करा.',
-    'te': 'క్షమించండి, సిస్టమ్‌లో సమస్య వచ్చింది। దయచేసి కొంత సమయం తర్వాత మళ్లీ ప్రయత్నించండి.'
+    'te': 'క్షమించండి, సిస్టమ్‌లో సమస్య వచ్చింది. దయచేసి కొంత సమయం తర్వాత మళ్లీ ప్రయత్నించండి.',
+    'en': 'Sorry, there was a system error. Please try again in a few moments.'
 }
 
 
@@ -37,10 +38,42 @@ def get_user_dialect(phone_number: str) -> str:
 
 def send_error_message(phone_number: str, dialect: str):
     """Send error message in user's dialect"""
+    import requests
+    
     message = ERROR_MESSAGES.get(dialect, ERROR_MESSAGES['hi'])
     
-    # TODO: Implement WhatsApp API call
-    print(f"Sending error message to {phone_number} in {dialect}: {message}")
+    # Get WhatsApp credentials
+    access_token_secret = os.environ.get('ACCESS_TOKEN_SECRET', 'agrinexus/whatsapp/access-token')
+    phone_id_secret = os.environ.get('PHONE_NUMBER_ID_SECRET', 'agrinexus/whatsapp/phone-number-id')
+    
+    try:
+        access_token_response = secrets.get_secret_value(SecretId=access_token_secret)
+        access_token = access_token_response['SecretString']
+        
+        phone_id_response = secrets.get_secret_value(SecretId=phone_id_secret)
+        phone_number_id = phone_id_response['SecretString']
+        
+        # Send via WhatsApp Business API
+        url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": phone_number,
+            "type": "text",
+            "text": {"body": message}
+        }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        
+        if response.status_code == 200:
+            print(f"Error message sent successfully to {phone_number} in {dialect}")
+        else:
+            print(f"Failed to send error message: {response.status_code} - {response.text}")
+    except Exception as e:
+        print(f"Exception sending error message to {phone_number}: {str(e)}")
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:

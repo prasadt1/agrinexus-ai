@@ -6,6 +6,38 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ## Week 3 (Feb 17-23, 2026)
 
+### HELP Command Implementation
+- **Feature**: Added HELP command in all 4 languages (HELP, मदद, मदत, సహాయం)
+- **Response**: Shows capabilities (text questions, photo analysis, voice input) with examples in user's dialect
+- **Impact**: Judges and users can quickly discover bot features during demo
+
+### Domain Restriction - Agricultural Scope Only
+- **Issue**: System was answering medical/health questions (e.g., "I have fever, what can I take?")
+- **Risk**: Liability and scope creep - agricultural advisory should not provide medical advice
+- **Fix**: Updated RAG prompt with explicit domain restrictions - only answers farming questions
+- **Behavior**: Non-farming questions now receive: "I can only help with farming questions. Please ask about crops, pests, fertilizers, or farm management."
+- **Impact**: Prevents liability issues and keeps system focused on agricultural domain
+
+### Duplicate Nudge Prevention
+- **Issue**: Weather poller runs every 6 hours, creating new spray nudge each time even if farmer already has pending nudge
+- **Symptom**: Farmers receiving 3-4 identical nudges per day despite replying "हो गया" (done)
+- **Root Cause**: Nudge sender didn't check for existing pending nudges before creating new ones
+- **Fix**: Added `has_pending_nudge()` function that checks for existing pending nudges for same activity on same day
+- **Behavior**: Now skips farmers who already have pending nudges, preventing spam
+- **Impact**: Farmers receive max 1 nudge per activity per day, plus T+24h and T+48h reminders if not completed
+
+### Guardrail Configuration Fix
+- **Issue**: Processor Lambda failing with "Invalid guardrail identifier" error
+- **Root Cause**: Passing "1" as guardrail ID instead of empty string (guardrails are optional)
+- **Fix**: Updated Lambda environment variable to empty string, added check in code to only include guardrail config if ID is non-empty
+- **Impact**: RAG queries now work correctly without requiring Bedrock Guardrails
+
+### Lambda Module Import Fix
+- **Issue**: Processor Lambda failing with "No module named 'output'" error
+- **Root Cause**: Processor handler imports voice/vision modules from separate Lambda packages (different CodeUri)
+- **Fix**: Copied `output.py` and `analyzer.py` to processor directory, updated imports to use local modules
+- **Impact**: Voice output and vision analysis now work correctly from processor Lambda
+
 ### Vision - Claude 3 Sonnet for Pest/Disease Identification
 - **Implementation**: Integrated Claude 3 Sonnet Vision for crop image analysis via WhatsApp
 - **Features**: Identifies pests (aphids, bollworm, whitefly), diseases (leaf curl, wilt), and nutrient deficiencies from farmer photos

@@ -107,6 +107,34 @@ def send_whatsapp_message(phone_number: str, message: str):
         print(f"Failed to send nudge: {response.status_code} - {response.text}")
 
 
+def has_pending_nudge(phone_number: str, activity: str) -> bool:
+    """Check if user has a pending nudge for this activity today"""
+    today = datetime.utcnow().date().isoformat()
+    
+    # Query nudges for this user
+    response = table.query(
+        KeyConditionExpression='PK = :pk AND begins_with(SK, :sk)',
+        ExpressionAttributeValues={
+            ':pk': f'USER#{phone_number}',
+            ':sk': 'NUDGE#'
+        }
+    )
+    
+    # Check if any nudge is pending and from today
+    for item in response.get('Items', []):
+        nudge_id = item.get('SK', '').replace('NUDGE#', '')
+        nudge_date = nudge_id.split('T')[0] if 'T' in nudge_id else ''
+        nudge_activity = nudge_id.split('#')[-1] if '#' in nudge_id else ''
+        status = item.get('status', 'pending')
+        
+        # Check if it's today's nudge for this activity and still pending
+        if nudge_date == today and nudge_activity == activity and status == 'pending':
+            print(f"Found existing pending {activity} nudge for {phone_number}: {nudge_id}")
+            return True
+    
+    return False
+
+
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """Send nudge and schedule reminders"""
     location = event.get('location')
@@ -126,11 +154,18 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     print(f"Found {len(farmers)} farmers in {location}")
     
     nudges_sent = 0
+    nudges_skipped = 0
     
     for farmer in farmers:
         phone_number = farmer.get('phone_number')
         dialect = farmer.get('dialect', 'hi')
         wind_speed = float(weather.get('wind_speed', 0))
+        
+        # Check if user already has a pending nudge for this activity today
+        if has_pending_nudge(phone_number, activity):
+            print(f"Skipping {phone_number} - already has pending {activity} nudge today")
+            nudges_skipped += 1
+            continue
         
         # Generate nudge message
         template = NUDGE_TEMPLATES.get(dialect, NUDGE_TEMPLATES['hi'])
@@ -168,5 +203,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     return {
         'statusCode': 200,
         'nudges_sent': nudges_sent,
+        'nudges_skipped': nudges_skipped,
         'location': location
     }

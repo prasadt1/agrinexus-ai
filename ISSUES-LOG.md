@@ -11,7 +11,49 @@ A chronological record of bugs, issues, and debugging sessions from project ince
 
 ## Week 3 (Feb 17-23, 2026)
 
-### Issue #015: WhatsApp Test Number Rejects Voice Notes 🟡
+### Issue #020: System Providing Medical Advice 🔴
+**Date**: Feb 18, 2026  
+**Severity**: Critical  
+**Symptom**: User asked "I have fever, what can I take?" and system provided medical advice (paracetamol, ibuprofen, hydration, etc.)  
+**Risk**: Liability issue - agricultural advisory system should NOT provide medical/health advice  
+**Root Cause**: RAG prompt had no domain restrictions. Bedrock model answered any question using general knowledge, not just farming topics.  
+**Solution**: Updated `query_bedrock()` prompt with explicit restrictions: "ONLY answer questions about agriculture, farming, crops, pests, diseases, fertilizers, weather, and farm management. If the question is about human health, medical issues, or non-farming topics, respond: 'I can only help with farming questions.'"  
+**Testing**: Asked "I have fever, what can i take?" - system correctly refused and redirected to farming questions  
+**Time**: 10 min  
+**Impact**: System now stays within agricultural domain, preventing liability issues
+
+### Issue #019: Duplicate Nudges Every 6 Hours 🟡
+**Date**: Feb 18, 2026  
+**Severity**: Major  
+**Symptom**: Farmer receiving spray nudges every 6 hours (5:19 PM, 11:19 PM, 5:19 AM) despite replying "हो गया" (done) each time  
+**Attempts**:
+1. Checked response detector logs - "हो गया" correctly detected and marked nudges as DONE
+2. Checked nudge sender logs - new nudge created every 6 hours when weather poller runs
+3. Checked DynamoDB - multiple nudges with different timestamps, all marked DONE after user response
+**Root Cause**: Weather poller runs every 6 hours. Each time it finds good spray conditions, nudge sender creates NEW nudge without checking if farmer already has pending nudge for that activity today.  
+**Solution**: Added `has_pending_nudge()` function that queries DynamoDB for existing pending nudges for same activity on same day. Nudge sender now skips farmers who already have pending nudges. Added `nudges_skipped` counter to track.  
+**Time**: 25 min  
+**Impact**: Farmers now receive max 1 nudge per activity per day (plus T+24h, T+48h reminders if not completed)
+
+### Issue #018: Processor Lambda Module Import Error 🟡
+**Date**: Feb 18, 2026  
+**Severity**: Major  
+**Symptom**: Processor Lambda failing with "No module named 'output'" error when trying to send voice responses  
+**Root Cause**: Processor handler imports `from output import text_to_speech` and `from analyzer import process_image_message`, but these modules are in separate Lambda packages (src/voice/ and src/vision/ with different CodeUri in template). SAM packages each Lambda separately, so processor can't access voice/vision modules.  
+**Solution**: Copied `src/voice/output.py` and `src/vision/analyzer.py` to `src/processor/` directory. Updated imports in processor handler to use local modules instead of sys.path manipulation.  
+**Time**: 15 min  
+**Impact**: Voice output and vision analysis now work correctly from processor Lambda
+
+### Issue #017: Invalid Guardrail Identifier Error 🟡
+**Date**: Feb 18, 2026  
+**Severity**: Major  
+**Symptom**: Processor Lambda failing with "ValidationException: The provided guardrail identifier is invalid" when calling Bedrock RetrieveAndGenerate  
+**Root Cause**: Deployment passed GuardrailId="1" as parameter override (placeholder value). Code checks `if GUARDRAIL_ID and GUARDRAIL_ID.strip()` but "1" passes this check, then Bedrock rejects it as invalid.  
+**Solution**: Updated Lambda environment variable to empty string using `aws lambda update-function-configuration`. Code already had proper check to skip guardrail config if empty.  
+**Time**: 10 min  
+**Impact**: RAG queries now work without requiring Bedrock Guardrails (which are optional)
+
+### Issue #016: WhatsApp Test Number Rejects Voice Notes 🟡
 **Date**: Feb 17, 2026  
 **Severity**: Major  
 **Symptom**: Sent voice note from real phone number to test number (+1 555 xxx), received WhatsApp error 131052 "Media download error - Incoming media file validation failed"  
