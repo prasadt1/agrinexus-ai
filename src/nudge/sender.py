@@ -12,6 +12,7 @@ from typing import Dict, Any
 dynamodb = boto3.resource('dynamodb')
 scheduler = boto3.client('scheduler')
 secrets = boto3.client('secretsmanager')
+cloudwatch = boto3.client('cloudwatch')
 
 TABLE_NAME = os.environ['TABLE_NAME']
 table = dynamodb.Table(TABLE_NAME)
@@ -172,6 +173,23 @@ def send_whatsapp_template(phone_number: str, template_name: str, language_code:
     return False
 
 
+def emit_metric(name: str, value: float = 1.0):
+    """Emit custom CloudWatch metric for nudges"""
+    try:
+        cloudwatch.put_metric_data(
+            Namespace='AgriNexus',
+            MetricData=[
+                {
+                    'MetricName': name,
+                    'Value': value,
+                    'Unit': 'Count'
+                }
+            ]
+        )
+    except Exception as e:
+        print(f"Failed to emit metric {name}: {e}")
+
+
 def has_pending_nudge(phone_number: str, activity: str) -> bool:
     """Check if user has a pending nudge for this activity today"""
     today = datetime.utcnow().date().isoformat()
@@ -268,6 +286,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             sent = send_whatsapp_template(phone_number, NUDGE_TEMPLATE_NAME, language_code)
         if not sent:
             send_whatsapp_message(phone_number, message)
+
+        emit_metric('NudgesSent', 1)
         
         # Schedule reminders at T+24h and T+48h
         create_reminder_schedule(phone_number, nudge_id, 24, dialect)

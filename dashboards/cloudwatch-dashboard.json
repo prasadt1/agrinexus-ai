@@ -159,12 +159,14 @@
       "height": 6,
       "properties": {
         "metrics": [
-          ["AgriNexus", "NudgesCompleted"]
+          [{ "expression": "100*completed/sent", "label": "Nudge Completion Rate (%)", "id": "rate" }],
+          ["AgriNexus", "NudgesCompleted", { "id": "completed" }],
+          ["AgriNexus", "NudgesSent", { "id": "sent" }]
         ],
         "stat": "Sum",
         "period": 300,
         "region": "${REGION}",
-        "title": "Nudges Completed (Custom Metric)"
+        "title": "Nudge Completion Rate (%)"
       }
     }
   ]

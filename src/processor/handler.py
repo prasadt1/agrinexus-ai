@@ -30,6 +30,13 @@ VALID_DISTRICTS = ['Aurangabad', 'Jalna', 'Nagpur']
 VALID_CROPS = ['Cotton', 'Wheat', 'Soybean', 'Maize']
 VALID_LANGUAGES = ['Hindi', 'Marathi', 'Telugu', 'English']
 
+# District -> coordinates (approximate; for geo-based nudges)
+DISTRICT_COORDS = {
+    'Aurangabad': {'lat': 19.8762, 'lon': 75.3433},
+    'Jalna': {'lat': 19.8347, 'lon': 75.8816},
+    'Nagpur': {'lat': 21.1458, 'lon': 79.0882}
+}
+
 # Onboarding messages by dialect
 ONBOARDING_MESSAGES = {
     'welcome': {
@@ -102,6 +109,7 @@ def create_user_profile(phone_number: str, dialect: str, location: str, crop: st
             'phone_number': phone_number,
             'dialect': dialect,
             'location': location,
+            'location_coords': DISTRICT_COORDS.get(location),
             'crop': crop,
             'consent': consent,
             'onboarding_complete': True,
@@ -214,6 +222,7 @@ Please choose your language / कृपया अपनी भाषा चु�
         if location:
             update_user_profile(phone_number, {
                 'location': location,
+                'location_coords': DISTRICT_COORDS.get(location),
                 'onboarding_state': 'crop'
             })
             # Ask for crop with buttons in user's dialect

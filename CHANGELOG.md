@@ -26,6 +26,21 @@ A living record of significant fixes, architectural decisions, and system evolut
 - **Implementation**: Added CloudWatch `put_metric_data` in response detector; dashboard includes widget
 - **Impact**: Enables live tracking of behavioral completion rate
 
+### Nudge Sent Metric
+- **Feature**: Emit `AgriNexus/NudgesSent` custom CloudWatch metric on nudge creation
+- **Implementation**: Added CloudWatch `put_metric_data` in nudge sender; dashboard now computes completion rate
+- **Impact**: True completion rate is visible as a percentage
+
+### Geo-Location Stored on Profiles
+- **Feature**: Save district coordinates on user profiles during onboarding
+- **Implementation**: `location_coords` stored from district mapping in `src/processor/handler.py`
+- **Impact**: Stronger geo-based narrative and readiness for grid-based weather APIs
+
+### Real Weather API Toggle
+- **Feature**: Added optional OpenWeatherMap ingestion behind `USE_REAL_WEATHER` and `WEATHER_API_KEY`
+- **Implementation**: `check_weather_real()` now calls the API with coordinates and metric units
+- **Impact**: MVP can remain mocked, while real weather is one flag away
+
 ### Demo Scenario Script
 - **Feature**: Added `scripts/demo-scenario.sh` to exercise onboarding and basic flow via webhook
 - **Usage**: Requires `WEBHOOK_URL`, `FROM_NUMBER`, and optional `APP_SECRET`

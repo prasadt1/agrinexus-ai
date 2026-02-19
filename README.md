@@ -286,7 +286,40 @@ Create the CloudWatch dashboard (dev example):
 ./scripts/create-cloudwatch-dashboard.sh dev us-east-1
 ```
 
-**Custom Metric**: The nudge completion rate is emitted as `AgriNexus/NudgesCompleted`.
+**Custom Metrics**:
+- `AgriNexus/NudgesSent`
+- `AgriNexus/NudgesCompleted`
+
+The dashboard includes a completion rate widget based on these metrics.
+
+## Real Weather API (Optional)
+
+By default, the system uses mocked weather for demo reliability. To use real weather:
+
+```bash
+USE_REAL_WEATHER=true
+WEATHER_API_KEY="YOUR_OPENWEATHER_API_KEY"
+```
+
+These are configured via Lambda environment variables (see `template-week2.yaml`).
+
+## Real-Time Multi-Language Nudge Testing
+
+1. Complete onboarding in each language:
+   - Hindi: send `हिंदी`
+   - Marathi: send `मराठी`
+   - Telugu: send `తెలుగు`
+   - English: send `English`
+2. Use the same district (e.g., Aurangabad) to keep demo deterministic.
+3. Trigger the weather poller:
+   ```bash
+   aws lambda invoke --function-name agrinexus-weather-dev --payload '{}' /tmp/response.json
+   ```
+4. Reply with:
+   - DONE: `हो गया`, `झाला`, `అయ్యింది`, or `DONE`
+   - NOT YET: `अभी नहीं`, `नाही झाला`, `ఇంకా లేదు`, or `NOT YET`
+
+You can automate this with `scripts/demo-nudge-flow.sh`.
 
 ## Demo Scenario Script
 
