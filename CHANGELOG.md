@@ -6,6 +6,11 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ## Week 4 (Feb 18-23, 2026)
 
+### WhatsApp Template Nudges
+- **Feature**: Added template-based nudge sending with language-specific templates under the same `weather_nudge_spray` name
+- **Implementation**: Nudge sender now uses template messages by default, with text fallback if template send fails
+- **Impact**: Approved templates can be used for out-of-window nudges across Hindi, Marathi, Telugu, and English
+
 ### Webhook Security & Idempotency Hardening
 - **Issue**: Webhook signature verification was disabled, allowing unauthenticated POSTs to enqueue messages
 - **Fix**: Implemented HMAC verification with WhatsApp app secret (Secrets Manager) and added `VERIFY_SIGNATURE` flag for dev

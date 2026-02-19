@@ -334,6 +334,8 @@ Resources:
           SCHEDULER_ROLE_ARN: !GetAtt SchedulerRole.Arn
           ACCESS_TOKEN_SECRET: agrinexus/whatsapp/access-token
           PHONE_NUMBER_ID_SECRET: agrinexus/whatsapp/phone-number-id
+          NUDGE_TEMPLATE_NAME: weather_nudge_spray
+          USE_NUDGE_TEMPLATE: "true"
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TableName
