@@ -9,6 +9,37 @@ A chronological record of bugs, issues, and debugging sessions from project ince
 
 ---
 
+## Week 4 (Feb 18-23, 2026)
+
+### Issue #021: Nudge Duplicate-Prevention Status Mismatch 🟡
+**Date**: Feb 19, 2026  
+**Severity**: Major  
+**Symptom**: Code review found `has_pending_nudge()` checks for status='pending' but nudges are created with status='SENT', allowing duplicate nudges  
+**Root Cause**: Status value mismatch - function checked for 'pending' but actual status values are 'SENT', 'REMINDED', 'DONE'  
+**Solution**: Updated `has_pending_nudge()` to check for status in ['SENT', 'REMINDED'] instead of 'pending'. This correctly identifies pending nudges (not yet DONE).  
+**Time**: 5 min  
+**Impact**: Duplicate nudge prevention now works correctly
+
+### Issue #022: Reminder Sender Not Sending Messages 🔴
+**Date**: Feb 19, 2026  
+**Severity**: Critical  
+**Symptom**: Code review found reminder.py had TODO placeholder instead of actual WhatsApp API call - reminders never sent  
+**Root Cause**: Incomplete implementation - function only printed message instead of calling WhatsApp API  
+**Solution**: Implemented full `send_whatsapp_message()` function in reminder.py with WhatsApp Business API integration (same pattern as other modules)  
+**Time**: 10 min  
+**Impact**: T+24h and T+48h reminders now actually send to farmers
+
+### Issue #023: Response Detector Secret Name Mismatch 🟡
+**Date**: Feb 19, 2026  
+**Severity**: Major  
+**Symptom**: Code review found detector.py uses PHONE_ID_SECRET instead of standard PHONE_NUMBER_ID_SECRET  
+**Root Cause**: Inconsistent environment variable naming across modules  
+**Solution**: Updated detector.py to use PHONE_NUMBER_ID_SECRET to match other modules  
+**Time**: 2 min  
+**Impact**: Response detector now works correctly in all environments
+
+---
+
 ## Week 3 (Feb 17-23, 2026)
 
 ### Issue #020: System Providing Medical Advice 🔴
