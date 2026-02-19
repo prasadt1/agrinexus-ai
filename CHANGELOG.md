@@ -46,6 +46,11 @@ A living record of significant fixes, architectural decisions, and system evolut
 - **Implementation**: `docs/NUDGE-DEMO-RUNBOOK.md`
 - **Impact**: Faster, consistent demos without ad-hoc steps
 
+### Multi-Language Nudge Demo Script
+- **Feature**: Added a multi-language nudge demo script
+- **Implementation**: `scripts/demo-nudge-multilang.sh` (supports per-language phone numbers)
+- **Impact**: Quick validation across Hindi, Marathi, Telugu, and English
+
 ### Demo Scenario Script
 - **Feature**: Added `scripts/demo-scenario.sh` to exercise onboarding and basic flow via webhook
 - **Usage**: Requires `WEBHOOK_URL`, `FROM_NUMBER`, and optional `APP_SECRET`

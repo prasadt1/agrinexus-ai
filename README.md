@@ -321,6 +321,19 @@ These are configured via Lambda environment variables (see `template-week2.yaml`
 
 You can automate this with `scripts/demo-nudge-flow.sh`.
 
+### Multi-Language Nudge Demo (Optional)
+
+Use one number per language (recommended):
+
+```bash
+WEBHOOK_URL="https://YOUR_API.execute-api.us-east-1.amazonaws.com/dev/webhook" \
+FROM_NUMBERS="+91_hi,+91_mr,+91_te,+91_en" \
+APP_SECRET="YOUR_APP_SECRET" \
+./scripts/demo-nudge-multilang.sh
+```
+
+If you only have one number, set `FROM_NUMBER` and the script will reuse it.
+
 ## Demo Scenario Script
 
 Run an end-to-end demo flow (onboarding + HELP + sample question + DONE):
