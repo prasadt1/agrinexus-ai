@@ -1,8 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 
+if [[ -f "$(dirname "$0")/demo.env" ]]; then
+  # shellcheck disable=SC1091
+  source "$(dirname "$0")/demo.env"
+fi
+
 WEBHOOK_URL="${WEBHOOK_URL:-}"
-FROM_NUMBER="${FROM_NUMBER:-}"
+FROM_NUMBER="${PHONE_NUMBER:-${FROM_NUMBER:-}}"
 FROM_NUMBERS="${FROM_NUMBERS:-}"
 APP_SECRET="${APP_SECRET:-}"
 ENVIRONMENT="${ENVIRONMENT:-dev}"

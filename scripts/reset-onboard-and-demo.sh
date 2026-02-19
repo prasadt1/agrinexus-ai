@@ -1,11 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
-PHONE=""
+if [[ -f "$(dirname "$0")/demo.env" ]]; then
+  # shellcheck disable=SC1091
+  source "$(dirname "$0")/demo.env"
+fi
+
+PHONE="${PHONE_NUMBER:-}"
 LANG="hi"
-DISTRICT="Aurangabad"
-CROP="Cotton"
-CONSENT="Yes"
+DISTRICT="${DISTRICT:-Aurangabad}"
+CROP="${CROP:-Cotton}"
+CONSENT="${CONSENT:-Yes}"
 WEBHOOK_URL="${WEBHOOK_URL:-}"
 APP_SECRET="${APP_SECRET:-}"
 TABLE_NAME="${TABLE_NAME:-agrinexus-data}"

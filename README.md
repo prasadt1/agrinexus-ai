@@ -344,6 +344,14 @@ APP_SECRET="YOUR_APP_SECRET" \
 ./scripts/reset-onboard-and-demo.sh --phone +4917647009148 --lang hi
 ```
 
+**Tip**: Create `scripts/demo.env` once and the scripts will auto-load it:
+
+```bash
+WEBHOOK_URL="https://YOUR_API.execute-api.us-east-1.amazonaws.com/dev/webhook"
+APP_SECRET="YOUR_APP_SECRET"
+PHONE_NUMBER="+4917647009148"
+```
+
 ## Demo Scenario Script
 
 Run an end-to-end demo flow (onboarding + HELP + sample question + DONE):

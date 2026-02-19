@@ -79,3 +79,5 @@ NEXT-ACTIONS.md
 *-STATUS.md
 *-COMPLETE.md
 *-TEST-PLAN.md
+.env
+scripts/demo.env

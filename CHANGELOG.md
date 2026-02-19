@@ -56,6 +56,11 @@ A living record of significant fixes, architectural decisions, and system evolut
 - **Implementation**: `scripts/reset-onboard-and-demo.sh`
 - **Impact**: Easy language-by-language testing without multiple WhatsApp numbers
 
+### Demo Config File
+- **Feature**: Added `scripts/demo.env` to avoid retyping webhook URL and app secret
+- **Implementation**: Demo scripts auto-load `scripts/demo.env` if present
+- **Impact**: One-command language-by-language testing with a single phone number
+
 ### Demo Scenario Script
 - **Feature**: Added `scripts/demo-scenario.sh` to exercise onboarding and basic flow via webhook
 - **Usage**: Requires `WEBHOOK_URL`, `FROM_NUMBER`, and optional `APP_SECRET`
