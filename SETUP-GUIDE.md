@@ -350,6 +350,20 @@ Create the prebuilt dashboard for ops visibility:
 ./scripts/create-cloudwatch-dashboard.sh dev us-east-1
 ```
 
+## Real Weather API (Optional)
+
+To enable real weather ingestion (post-MVP):
+
+1. Create an OpenWeatherMap API key.
+2. Update Lambda environment variables:
+
+```bash
+USE_REAL_WEATHER=true
+WEATHER_API_KEY="YOUR_OPENWEATHER_API_KEY"
+```
+
+**Note**: Keep `MOCK_WEATHER=true` for deterministic demos.
+
 ## Week 2 WhatsApp Prerequisite (Webhook Signature)
 
 Create the WhatsApp app secret in Secrets Manager so webhook signature verification can be enabled:

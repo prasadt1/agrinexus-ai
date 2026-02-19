@@ -338,6 +338,10 @@ APP_SECRET="YOUR_APP_SECRET" \\
 
 See `docs/NUDGE-TEST-CHECKLIST.md` for the MVP test matrix and demo steps.
 
+## Nudge Demo Runbook
+
+See `docs/NUDGE-DEMO-RUNBOOK.md` for a judge-friendly 3-minute demo script.
+
 ### Common Issues
 
 **"No module named 'output'" error:**

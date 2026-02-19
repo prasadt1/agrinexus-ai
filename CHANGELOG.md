@@ -41,6 +41,11 @@ A living record of significant fixes, architectural decisions, and system evolut
 - **Implementation**: `check_weather_real()` now calls the API with coordinates and metric units
 - **Impact**: MVP can remain mocked, while real weather is one flag away
 
+### Nudge Demo Runbook
+- **Feature**: Added a judge-friendly nudge demo runbook
+- **Implementation**: `docs/NUDGE-DEMO-RUNBOOK.md`
+- **Impact**: Faster, consistent demos without ad-hoc steps
+
 ### Demo Scenario Script
 - **Feature**: Added `scripts/demo-scenario.sh` to exercise onboarding and basic flow via webhook
 - **Usage**: Requires `WEBHOOK_URL`, `FROM_NUMBER`, and optional `APP_SECRET`
