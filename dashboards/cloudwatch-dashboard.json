@@ -1,0 +1,155 @@
+{
+  "widgets": [
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 0,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["AWS/Lambda", "Invocations", "FunctionName", "agrinexus-webhook-${ENV}"],
+          ["AWS/Lambda", "Invocations", "FunctionName", "agrinexus-processor-${ENV}"],
+          ["AWS/Lambda", "Invocations", "FunctionName", "agrinexus-voice-${ENV}"],
+          ["AWS/Lambda", "Invocations", "FunctionName", "agrinexus-weather-${ENV}"],
+          ["AWS/Lambda", "Invocations", "FunctionName", "agrinexus-nudge-sender-${ENV}"],
+          ["AWS/Lambda", "Invocations", "FunctionName", "agrinexus-reminder-${ENV}"],
+          ["AWS/Lambda", "Invocations", "FunctionName", "agrinexus-response-detector-${ENV}"],
+          ["AWS/Lambda", "Invocations", "FunctionName", "agrinexus-dlq-${ENV}"]
+        ],
+        "stat": "Sum",
+        "period": 300,
+        "region": "${REGION}",
+        "title": "Lambda Invocations (5m)"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 0,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["AWS/Lambda", "Errors", "FunctionName", "agrinexus-webhook-${ENV}"],
+          ["AWS/Lambda", "Errors", "FunctionName", "agrinexus-processor-${ENV}"],
+          ["AWS/Lambda", "Errors", "FunctionName", "agrinexus-voice-${ENV}"],
+          ["AWS/Lambda", "Errors", "FunctionName", "agrinexus-weather-${ENV}"],
+          ["AWS/Lambda", "Errors", "FunctionName", "agrinexus-nudge-sender-${ENV}"],
+          ["AWS/Lambda", "Errors", "FunctionName", "agrinexus-reminder-${ENV}"],
+          ["AWS/Lambda", "Errors", "FunctionName", "agrinexus-response-detector-${ENV}"],
+          ["AWS/Lambda", "Errors", "FunctionName", "agrinexus-dlq-${ENV}"]
+        ],
+        "stat": "Sum",
+        "period": 300,
+        "region": "${REGION}",
+        "title": "Lambda Errors (5m)"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 6,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["AWS/Lambda", "Duration", "FunctionName", "agrinexus-processor-${ENV}", {"stat": "p95"}],
+          ["AWS/Lambda", "Duration", "FunctionName", "agrinexus-voice-${ENV}", {"stat": "p95"}],
+          ["AWS/Lambda", "Duration", "FunctionName", "agrinexus-webhook-${ENV}", {"stat": "p95"}]
+        ],
+        "stat": "p95",
+        "period": 300,
+        "region": "${REGION}",
+        "title": "Lambda Duration p95 (ms)"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 6,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", "agrinexus-messages-${ENV}.fifo"],
+          ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", "agrinexus-voice-${ENV}.fifo"],
+          ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", "agrinexus-messages-dlq-${ENV}.fifo"]
+        ],
+        "stat": "Average",
+        "period": 300,
+        "region": "${REGION}",
+        "title": "SQS Queue Depth"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 12,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["AWS/ApiGateway", "4XXError", "ApiName", "agrinexus-whatsapp-${ENV}", "Stage", "${ENV}"],
+          ["AWS/ApiGateway", "5XXError", "ApiName", "agrinexus-whatsapp-${ENV}", "Stage", "${ENV}"],
+          ["AWS/ApiGateway", "Count", "ApiName", "agrinexus-whatsapp-${ENV}", "Stage", "${ENV}"]
+        ],
+        "stat": "Sum",
+        "period": 300,
+        "region": "${REGION}",
+        "title": "API Gateway Errors & Count"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 12,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "agrinexus-data"],
+          ["AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", "agrinexus-data"],
+          ["AWS/DynamoDB", "ThrottledRequests", "TableName", "agrinexus-data"]
+        ],
+        "stat": "Sum",
+        "period": 300,
+        "region": "${REGION}",
+        "title": "DynamoDB Capacity & Throttles"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 18,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["AWS/States", "ExecutionsSucceeded", "StateMachineArn", "arn:aws:states:${REGION}:${ACCOUNT_ID}:stateMachine:agrinexus-nudge-workflow-${ENV}"],
+          ["AWS/States", "ExecutionsFailed", "StateMachineArn", "arn:aws:states:${REGION}:${ACCOUNT_ID}:stateMachine:agrinexus-nudge-workflow-${ENV}"]
+        ],
+        "stat": "Sum",
+        "period": 300,
+        "region": "${REGION}",
+        "title": "Step Functions Executions"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 18,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["AWS/States", "ExecutionTime", "StateMachineArn", "arn:aws:states:${REGION}:${ACCOUNT_ID}:stateMachine:agrinexus-nudge-workflow-${ENV}", {"stat": "p95"}]
+        ],
+        "stat": "p95",
+        "period": 300,
+        "region": "${REGION}",
+        "title": "Step Functions Duration p95 (ms)"
+      }
+    }
+  ]
+}

@@ -6,6 +6,11 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ## Week 4 (Feb 18-23, 2026)
 
+### CloudWatch Dashboard (Ops Visibility)
+- **Feature**: Added a reusable CloudWatch dashboard template and creation script
+- **Implementation**: `dashboards/cloudwatch-dashboard.json` + `scripts/create-cloudwatch-dashboard.sh`
+- **Impact**: One-command setup for Lambda, SQS, API Gateway, DynamoDB, and Step Functions metrics
+
 ### WhatsApp Template Nudges
 - **Feature**: Added template-based nudge sending with language-specific templates under the same `weather_nudge_spray` name
 - **Implementation**: Nudge sender now uses template messages by default, with text fallback if template send fails

@@ -278,6 +278,14 @@ aws lambda invoke --function-name agrinexus-voice-dev --payload '{}' /tmp/respon
 aws lambda invoke --function-name agrinexus-weather-dev --payload '{}' /tmp/response.json
 ```
 
+## Monitoring
+
+Create the CloudWatch dashboard (dev example):
+
+```bash
+./scripts/create-cloudwatch-dashboard.sh dev us-east-1
+```
+
 ### Common Issues
 
 **"No module named 'output'" error:**
