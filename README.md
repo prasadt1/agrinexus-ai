@@ -18,7 +18,7 @@ All core features implemented and tested:
 - **AI**: Amazon Bedrock (Claude 3 Sonnet + RAG), Transcribe, Polly, Claude Vision
 - **Messaging**: WhatsApp Business API
 - **Storage**: DynamoDB single-table design, S3 for knowledge base + temp audio
-- **Cost**: ~$30-50/month for 1,000 users (includes WhatsApp, Bedrock, OpenSearch Serverless)
+- **Cost**: ~$50/month for 1,000 users (includes WhatsApp, Bedrock, OpenSearch Serverless)
 
 ## Features
 
@@ -81,6 +81,10 @@ sam deploy --template-file .aws-sam/build/template.yaml \
 aws secretsmanager create-secret \
   --name agrinexus/whatsapp/verify-token \
   --secret-string "YOUR_VERIFY_TOKEN"
+
+aws secretsmanager create-secret \
+  --name agrinexus/whatsapp/app-secret \
+  --secret-string "YOUR_APP_SECRET"
 
 aws secretsmanager create-secret \
   --name agrinexus/whatsapp/access-token \
