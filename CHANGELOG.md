@@ -6,6 +6,30 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ## Week 4 (Feb 18-23, 2026)
 
+### Webhook Security & Idempotency Hardening
+- **Issue**: Webhook signature verification was disabled, allowing unauthenticated POSTs to enqueue messages
+- **Fix**: Implemented HMAC verification with WhatsApp app secret (Secrets Manager) and added `VERIFY_SIGNATURE` flag for dev
+- **Impact**: Public webhook now authenticated; unauthorized requests are rejected
+
+- **Issue**: Deduplication used get-then-put, allowing concurrent race duplicates
+- **Fix**: Switched to conditional `PutItem` with `attribute_not_exists(PK)` and handled ConditionalCheckFailedException
+- **Impact**: Exactly-once processing for webhook deliveries under concurrency
+
+### Weather Poller Reliability
+- **Issue**: Demo mock weather was hard-coded on, and location scan did not paginate
+- **Fix**: Added `MOCK_WEATHER` env toggle and full DynamoDB scan pagination for locations
+- **Impact**: Prod no longer stuck in demo mode; all farmer locations are evaluated
+
+### WhatsApp API Resilience
+- **Issue**: Outbound WhatsApp requests had no timeout or retry strategy
+- **Fix**: Added 5s timeout and exponential backoff retries for text and button sends across modules
+- **Impact**: Reduced Lambda hang risk and improved delivery resilience on transient failures
+
+### Vision Temp Bucket Safety
+- **Issue**: Vision analyzer defaulted to a hard-coded dev S3 bucket when env var missing
+- **Fix**: Removed fallback and require `TEMP_AUDIO_BUCKET` at startup
+- **Impact**: Prevents silent misrouting of images in misconfigured environments
+
 ### Code Review Fixes - Critical Issues
 - **Issue**: Nudge duplicate-prevention broken - checked for status='pending' but nudges are created with status='SENT'
 - **Fix**: Updated `has_pending_nudge()` to check for status in ['SENT', 'REMINDED'] instead of 'pending'

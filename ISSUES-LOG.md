@@ -11,6 +11,60 @@ A chronological record of bugs, issues, and debugging sessions from project ince
 
 ## Week 4 (Feb 18-23, 2026)
 
+### Issue #024: Webhook Signature Verification Disabled 🔴
+**Date**: Feb 19, 2026  
+**Severity**: Critical  
+**Symptom**: Code review found `verify_signature()` always returned true; unauthenticated POSTs could enqueue messages  
+**Root Cause**: Signature check stubbed out during early dev and never re-enabled  
+**Solution**: Implemented HMAC verification with WhatsApp app secret in Secrets Manager; added `VERIFY_SIGNATURE` env flag for dev  
+**Time**: 20 min  
+**Impact**: Webhook is authenticated; invalid signatures are rejected
+
+### Issue #025: Webhook Dedup Race Condition 🟡
+**Date**: Feb 19, 2026  
+**Severity**: Major  
+**Symptom**: Duplicate message processing under concurrent webhook retries  
+**Root Cause**: Dedup used get-then-put, which is not atomic  
+**Solution**: Switched to conditional `PutItem` with `attribute_not_exists(PK)` and handled ConditionalCheckFailedException  
+**Time**: 15 min  
+**Impact**: Exactly-once processing under concurrent deliveries
+
+### Issue #026: Weather Poller Stuck in Demo Mode 🟡
+**Date**: Feb 19, 2026  
+**Severity**: Major  
+**Symptom**: Weather poller always used mock data due to hard-coded `MOCK_WEATHER = True`  
+**Root Cause**: Demo shortcut not gated by environment  
+**Solution**: Added `MOCK_WEATHER` env toggle and defaulted to false  
+**Time**: 10 min  
+**Impact**: Production uses real weather logic; demo mode remains optional
+
+### Issue #027: Weather Poller Missing Locations at Scale 🟡
+**Date**: Feb 19, 2026  
+**Severity**: Major  
+**Symptom**: Some districts never received nudges once profile count grew  
+**Root Cause**: DynamoDB scan did not paginate, only first page of profiles processed  
+**Solution**: Implemented scan pagination using `LastEvaluatedKey`  
+**Time**: 10 min  
+**Impact**: All locations consistently evaluated
+
+### Issue #028: WhatsApp Requests Hanging Lambdas 🟡
+**Date**: Feb 19, 2026  
+**Severity**: Major  
+**Symptom**: Occasional Lambda timeouts when WhatsApp API stalled  
+**Root Cause**: No request timeouts/retries on outbound API calls  
+**Solution**: Added 5s timeout and exponential backoff retries across WhatsApp senders  
+**Time**: 20 min  
+**Impact**: Improved reliability; reduced hanging invocations
+
+### Issue #029: Vision Analyzer Used Dev Bucket Fallback 🟡
+**Date**: Feb 19, 2026  
+**Severity**: Major  
+**Symptom**: Image uploads could go to a hard-coded dev bucket if env var missing  
+**Root Cause**: `TEMP_AUDIO_BUCKET` had a default fallback  
+**Solution**: Removed fallback and require env var at startup  
+**Time**: 5 min  
+**Impact**: Prevents misrouted uploads in prod
+
 ### Issue #021: Nudge Duplicate-Prevention Status Mismatch 🟡
 **Date**: Feb 19, 2026  
 **Severity**: Major  
@@ -359,4 +413,3 @@ A chronological record of bugs, issues, and debugging sessions from project ince
 - Caught incorrect Polly language analysis before production (Issue #019)
 - All voice/vision features tested and validated
 - Multi-language support working across all modalities
-

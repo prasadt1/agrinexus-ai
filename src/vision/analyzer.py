@@ -12,7 +12,9 @@ bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
 s3 = boto3.client('s3', region_name='us-east-1')
 secrets = boto3.client('secretsmanager', region_name='us-east-1')
 
-TEMP_BUCKET = os.environ.get('TEMP_AUDIO_BUCKET', 'agrinexus-temp-audio-dev-043624892076')
+TEMP_BUCKET = os.environ.get('TEMP_AUDIO_BUCKET')
+if not TEMP_BUCKET:
+    raise RuntimeError('TEMP_AUDIO_BUCKET is required but not set')
 
 
 def download_whatsapp_image(media_id: str) -> bytes:

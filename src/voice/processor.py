@@ -49,7 +49,7 @@ def send_whatsapp_message(to: str, message: str):
     }
     
     req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers=headers, method='POST')
-    with urllib.request.urlopen(req) as response:
+    with urllib.request.urlopen(req, timeout=5) as response:
         return json.loads(response.read())
 
 

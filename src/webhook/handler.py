@@ -21,6 +21,8 @@ secrets = boto3.client('secretsmanager')
 QUEUE_URL = os.environ['QUEUE_URL']
 TABLE_NAME = os.environ['TABLE_NAME']
 VERIFY_TOKEN_SECRET = os.environ.get('VERIFY_TOKEN_SECRET', 'agrinexus/whatsapp/verify-token')
+APP_SECRET_NAME = os.environ.get('APP_SECRET_NAME', 'agrinexus/whatsapp/app-secret')
+VERIFY_SIGNATURE = os.environ.get('VERIFY_SIGNATURE', 'true').lower() == 'true'
 
 table = dynamodb.Table(TABLE_NAME)
 
@@ -52,11 +54,38 @@ def get_verify_token() -> str:
     return response['SecretString']
 
 
+def get_app_secret() -> str:
+    """Retrieve WhatsApp app secret from Secrets Manager"""
+    response = secrets.get_secret_value(SecretId=APP_SECRET_NAME)
+    return response['SecretString']
+
+
 def verify_signature(payload: str, signature: str) -> bool:
     """Verify X-Hub-Signature-256 from WhatsApp"""
-    # For now, skip signature verification in development
-    # TODO: Implement proper signature verification with app secret
-    return True
+    if not VERIFY_SIGNATURE:
+        logger.info("Signature verification disabled via VERIFY_SIGNATURE=false")
+        return True
+    if not signature:
+        logger.warning("Missing X-Hub-Signature-256 header")
+        return False
+
+    try:
+        app_secret = get_app_secret()
+    except Exception as e:
+        logger.error(f"Failed to load app secret: {e}")
+        return False
+
+    try:
+        provided = signature.replace('sha256=', '')
+        expected = hmac.new(
+            app_secret.encode('utf-8'),
+            payload.encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()
+        return hmac.compare_digest(expected, provided)
+    except Exception as e:
+        logger.error(f"Signature verification error: {e}")
+        return False
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -137,20 +166,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             logger.info(f"Message - wamid: {wamid}, from: {from_number}, type: {message_type}")
             
-            # Idempotency check: Check if wamid already exists in DynamoDB
+            # Idempotency check: Conditional write to avoid race
             try:
-                response = table.get_item(
-                    Key={
-                        'PK': f'WAMID#{wamid}',
-                        'SK': 'DEDUP'
-                    }
-                )
-                
-                if 'Item' in response:
-                    # Message already processed, return 200 immediately
-                    logger.info(f"Duplicate message detected: {wamid} - skipping")
-                    continue
-                
                 # Store wamid for deduplication (with 24h TTL)
                 import time
                 ttl = int(time.time()) + (24 * 60 * 60)
@@ -161,10 +178,14 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         'from': from_number,
                         'processed_at': datetime.utcnow().isoformat(),
                         'ttl': ttl
-                    }
+                    },
+                    ConditionExpression='attribute_not_exists(PK)'
                 )
                 logger.info(f"Stored deduplication record for wamid: {wamid}")
-                
+            
+            except dynamodb.meta.client.exceptions.ConditionalCheckFailedException:
+                logger.info(f"Duplicate message detected: {wamid} - skipping")
+                continue
             except Exception as e:
                 logger.error(f"Error checking idempotency: {e}")
                 # Continue processing even if dedup check fails

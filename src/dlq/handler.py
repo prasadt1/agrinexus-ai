@@ -39,6 +39,7 @@ def get_user_dialect(phone_number: str) -> str:
 def send_error_message(phone_number: str, dialect: str):
     """Send error message in user's dialect"""
     import requests
+    import time
     
     message = ERROR_MESSAGES.get(dialect, ERROR_MESSAGES['hi'])
     
@@ -66,12 +67,22 @@ def send_error_message(phone_number: str, dialect: str):
             "text": {"body": message}
         }
         
-        response = requests.post(url, headers=headers, json=payload)
+        response = None
+        for attempt in range(3):
+            try:
+                response = requests.post(url, headers=headers, json=payload, timeout=5)
+                if response.status_code < 500 and response.status_code != 429:
+                    break
+            except requests.RequestException as e:
+                print(f"WhatsApp DLQ request error (attempt {attempt + 1}): {e}")
+            time.sleep(0.5 * (2 ** attempt))
         
-        if response.status_code == 200:
+        if response and response.status_code == 200:
             print(f"Error message sent successfully to {phone_number} in {dialect}")
         else:
-            print(f"Failed to send error message: {response.status_code} - {response.text}")
+            status = response.status_code if response else 'no_response'
+            text = response.text if response else 'no_response_body'
+            print(f"Failed to send error message: {status} - {text}")
     except Exception as e:
         print(f"Exception sending error message to {phone_number}: {str(e)}")
 

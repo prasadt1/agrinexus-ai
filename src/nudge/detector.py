@@ -46,6 +46,7 @@ NOT_YET_MESSAGES = {
 def send_whatsapp_message(phone_number: str, message: str):
     """Send message via WhatsApp Business API"""
     import requests
+    import time
     
     access_token_secret = os.environ.get('ACCESS_TOKEN_SECRET', 'agrinexus/whatsapp/access-token')
     phone_id_secret = os.environ.get('PHONE_NUMBER_ID_SECRET', 'agrinexus/whatsapp/phone-number-id')
@@ -70,11 +71,21 @@ def send_whatsapp_message(phone_number: str, message: str):
         }
     }
     
-    response = requests.post(url, headers=headers, json=payload)
-    if response.status_code == 200:
+    response = None
+    for attempt in range(3):
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=5)
+            if response.status_code < 500 and response.status_code != 429:
+                break
+        except requests.RequestException as e:
+            print(f"WhatsApp detector request error (attempt {attempt + 1}): {e}")
+        time.sleep(0.5 * (2 ** attempt))
+    if response and response.status_code == 200:
         print(f"Confirmation sent to {phone_number}")
     else:
-        print(f"Failed to send confirmation: {response.status_code} - {response.text}")
+        status = response.status_code if response else 'no_response'
+        text = response.text if response else 'no_response_body'
+        print(f"Failed to send confirmation: {status} - {text}")
 
 
 def detect_keyword(text: str, keywords: List[str]) -> bool:

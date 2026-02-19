@@ -136,6 +136,8 @@ Resources:
           QUEUE_URL: !Ref MessageQueue
           VOICE_QUEUE_URL: !Ref VoiceQueue
           VERIFY_TOKEN_SECRET: agrinexus/whatsapp/verify-token
+          APP_SECRET_NAME: agrinexus/whatsapp/app-secret
+          VERIFY_SIGNATURE: "true"
       Policies:
         - SQSSendMessagePolicy:
             QueueName: !GetAtt MessageQueue.QueueName
@@ -302,6 +304,7 @@ Resources:
       Environment:
         Variables:
           STATE_MACHINE_ARN: !Ref NudgeStateMachine
+          MOCK_WEATHER: "false"
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref TableName

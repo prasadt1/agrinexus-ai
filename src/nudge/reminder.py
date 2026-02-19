@@ -80,6 +80,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 def send_whatsapp_message(phone_number: str, message: str):
     """Send message via WhatsApp Business API"""
     import requests
+    import time
     
     # Get WhatsApp credentials
     access_token_secret = os.environ.get('ACCESS_TOKEN_SECRET', 'agrinexus/whatsapp/access-token')
@@ -106,11 +107,21 @@ def send_whatsapp_message(phone_number: str, message: str):
         }
         
         print(f"Sending reminder to {phone_number}: {message[:50]}...")
-        response = requests.post(url, headers=headers, json=payload)
+        response = None
+        for attempt in range(3):
+            try:
+                response = requests.post(url, headers=headers, json=payload, timeout=5)
+                if response.status_code < 500 and response.status_code != 429:
+                    break
+            except requests.RequestException as e:
+                print(f"WhatsApp reminder request error (attempt {attempt + 1}): {e}")
+            time.sleep(0.5 * (2 ** attempt))
         
-        if response.status_code == 200:
+        if response and response.status_code == 200:
             print(f"Reminder sent successfully: {response.json()}")
         else:
-            print(f"Failed to send reminder: {response.status_code} - {response.text}")
+            status = response.status_code if response else 'no_response'
+            text = response.text if response else 'no_response_body'
+            print(f"Failed to send reminder: {status} - {text}")
     except Exception as e:
         print(f"Exception sending reminder to {phone_number}: {str(e)}")

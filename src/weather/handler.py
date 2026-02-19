@@ -17,22 +17,32 @@ STATE_MACHINE_ARN = os.environ.get('STATE_MACHINE_ARN')
 table = dynamodb.Table(TABLE_NAME)
 
 # DEMO MODE: Mock perfect weather for Aurangabad
-MOCK_WEATHER = True
+MOCK_WEATHER = os.environ.get('MOCK_WEATHER', 'false').lower() == 'true'
 
 
 def get_unique_locations() -> List[str]:
     """Get unique locations from user profiles"""
-    response = table.scan(
-        FilterExpression='begins_with(SK, :sk)',
-        ExpressionAttributeValues={':sk': 'PROFILE'}
-    )
-    
     locations = set()
-    for item in response.get('Items', []):
-        location = item.get('location')
-        if location:
-            locations.add(location)
-    
+    last_evaluated_key = None
+    while True:
+        scan_kwargs = {
+            'FilterExpression': 'begins_with(SK, :sk)',
+            'ExpressionAttributeValues': {':sk': 'PROFILE'}
+        }
+        if last_evaluated_key:
+            scan_kwargs['ExclusiveStartKey'] = last_evaluated_key
+
+        response = table.scan(**scan_kwargs)
+
+        for item in response.get('Items', []):
+            location = item.get('location')
+            if location:
+                locations.add(location)
+
+        last_evaluated_key = response.get('LastEvaluatedKey')
+        if not last_evaluated_key:
+            break
+
     return list(locations)
 
 
