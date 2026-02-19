@@ -6,6 +6,11 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ## Week 4 (Feb 18-23, 2026)
 
+### Demo Scenario Script
+- **Feature**: Added `scripts/demo-scenario.sh` to exercise onboarding and basic flow via webhook
+- **Usage**: Requires `WEBHOOK_URL`, `FROM_NUMBER`, and optional `APP_SECRET`
+- **Impact**: Faster, repeatable demo runs without manual WhatsApp typing
+
 ### CloudWatch Dashboard (Ops Visibility)
 - **Feature**: Added a reusable CloudWatch dashboard template and creation script
 - **Implementation**: `dashboards/cloudwatch-dashboard.json` + `scripts/create-cloudwatch-dashboard.sh`

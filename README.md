@@ -286,6 +286,19 @@ Create the CloudWatch dashboard (dev example):
 ./scripts/create-cloudwatch-dashboard.sh dev us-east-1
 ```
 
+## Demo Scenario Script
+
+Run an end-to-end demo flow (onboarding + HELP + sample question + DONE):
+
+```bash
+WEBHOOK_URL="https://YOUR_API.execute-api.us-east-1.amazonaws.com/dev/webhook" \\
+FROM_NUMBER="919876543210" \\
+APP_SECRET="YOUR_APP_SECRET" \\
+./scripts/demo-scenario.sh
+```
+
+**Note**: If `APP_SECRET` is omitted, the script will skip signature headers. In dev, you can set `VERIFY_SIGNATURE=false` on the webhook Lambda.
+
 ### Common Issues
 
 **"No module named 'output'" error:**
