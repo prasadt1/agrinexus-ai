@@ -6,6 +6,16 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ## Week 4 (Feb 18-23, 2026)
 
+### Nudge Test Coverage (MVP)
+- **Feature**: Added automated tests for nudge flow and a runnable demo script
+- **Implementation**: `tests/test_nudge_flow.py`, `scripts/demo-nudge-flow.sh`, `docs/NUDGE-TEST-CHECKLIST.md`
+- **Impact**: Repeatable validation of dedup, reminders, responses, and template behavior
+
+### Geo-Location Layer for Nudges
+- **Feature**: Added district -> lat/long mapping to anchor the geo-based nudge story
+- **Implementation**: `DISTRICT_COORDS` in `src/weather/handler.py` included in weather payload
+- **Impact**: Geo-location is explicit for demo even when using mocked weather
+
 ### Demo Scenario Script
 - **Feature**: Added `scripts/demo-scenario.sh` to exercise onboarding and basic flow via webhook
 - **Usage**: Requires `WEBHOOK_URL`, `FROM_NUMBER`, and optional `APP_SECRET`

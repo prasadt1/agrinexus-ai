@@ -19,6 +19,13 @@ table = dynamodb.Table(TABLE_NAME)
 # DEMO MODE: Mock perfect weather for Aurangabad
 MOCK_WEATHER = os.environ.get('MOCK_WEATHER', 'false').lower() == 'true'
 
+# District -> coordinates (approximate; used for geo-based story and weather lookup)
+DISTRICT_COORDS = {
+    'Aurangabad': {'lat': 19.8762, 'lon': 75.3433},
+    'Jalna': {'lat': 19.8347, 'lon': 75.8816},
+    'Nagpur': {'lat': 21.1458, 'lon': 79.0882}
+}
+
 
 def get_unique_locations() -> List[str]:
     """Get unique locations from user profiles"""
@@ -48,9 +55,11 @@ def get_unique_locations() -> List[str]:
 
 def check_weather_mock(location: str) -> Dict[str, Any]:
     """Mock weather for demo - always return perfect conditions for Aurangabad"""
+    coords = DISTRICT_COORDS.get(location)
     if location == 'Aurangabad':
         return {
             'location': location,
+            'coordinates': coords,
             'wind_speed': 8.5,  # km/h (< 10)
             'rain': 0,
             'temperature': 28,
@@ -62,6 +71,7 @@ def check_weather_mock(location: str) -> Dict[str, Any]:
         # For other locations, return unfavorable to focus demo on Aurangabad
         return {
             'location': location,
+            'coordinates': coords,
             'wind_speed': 15,
             'rain': 0,
             'favorable': False,

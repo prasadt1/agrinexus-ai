@@ -299,6 +299,10 @@ APP_SECRET="YOUR_APP_SECRET" \\
 
 **Note**: If `APP_SECRET` is omitted, the script will skip signature headers. In dev, you can set `VERIFY_SIGNATURE=false` on the webhook Lambda.
 
+## Nudge Test Checklist
+
+See `docs/NUDGE-TEST-CHECKLIST.md` for the MVP test matrix and demo steps.
+
 ### Common Issues
 
 **"No module named 'output'" error:**
