@@ -51,6 +51,11 @@ A living record of significant fixes, architectural decisions, and system evolut
 - **Implementation**: `scripts/demo-nudge-multilang.sh` (supports per-language phone numbers)
 - **Impact**: Quick validation across Hindi, Marathi, Telugu, and English
 
+### Single-Number Reset + Demo Script
+- **Feature**: Added a reset-and-demo script for single phone number testing
+- **Implementation**: `scripts/reset-onboard-and-demo.sh`
+- **Impact**: Easy language-by-language testing without multiple WhatsApp numbers
+
 ### Demo Scenario Script
 - **Feature**: Added `scripts/demo-scenario.sh` to exercise onboarding and basic flow via webhook
 - **Usage**: Requires `WEBHOOK_URL`, `FROM_NUMBER`, and optional `APP_SECRET`
