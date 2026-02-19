@@ -150,6 +150,22 @@
         "region": "${REGION}",
         "title": "Step Functions Duration p95 (ms)"
       }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 24,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["AgriNexus", "NudgesCompleted"]
+        ],
+        "stat": "Sum",
+        "period": 300,
+        "region": "${REGION}",
+        "title": "Nudges Completed (Custom Metric)"
+      }
     }
   ]
 }

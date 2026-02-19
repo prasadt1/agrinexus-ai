@@ -305,6 +305,9 @@ Resources:
         Variables:
           STATE_MACHINE_ARN: !Ref NudgeStateMachine
           MOCK_WEATHER: "false"
+          USE_REAL_WEATHER: "false"
+          WEATHER_API_KEY: ""
+          WEATHER_API_BASE: "https://api.openweathermap.org/data/2.5/weather"
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref TableName

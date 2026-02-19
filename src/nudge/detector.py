@@ -11,6 +11,7 @@ import re
 dynamodb = boto3.resource('dynamodb')
 scheduler = boto3.client('scheduler')
 secrets = boto3.client('secretsmanager')
+cloudwatch = boto3.client('cloudwatch')
 
 TABLE_NAME = os.environ['TABLE_NAME']
 table = dynamodb.Table(TABLE_NAME)
@@ -86,6 +87,23 @@ def send_whatsapp_message(phone_number: str, message: str):
         status = response.status_code if response else 'no_response'
         text = response.text if response else 'no_response_body'
         print(f"Failed to send confirmation: {status} - {text}")
+
+
+def emit_metric(name: str, value: float = 1.0):
+    """Emit custom CloudWatch metric for nudges"""
+    try:
+        cloudwatch.put_metric_data(
+            Namespace='AgriNexus',
+            MetricData=[
+                {
+                    'MetricName': name,
+                    'Value': value,
+                    'Unit': 'Count'
+                }
+            ]
+        )
+    except Exception as e:
+        print(f"Failed to emit metric {name}: {e}")
 
 
 def detect_keyword(text: str, keywords: List[str]) -> bool:
@@ -239,5 +257,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 dialect = get_user_dialect(phone_number)
                 confirmation = CONFIRMATION_MESSAGES.get(dialect, CONFIRMATION_MESSAGES['hi'])
                 send_whatsapp_message(phone_number, confirmation)
+                emit_metric('NudgesCompleted', 1)
     
     return {'statusCode': 200}

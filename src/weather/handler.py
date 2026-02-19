@@ -7,6 +7,8 @@ import json
 import os
 import boto3
 from typing import Dict, Any, List
+import urllib.request
+import urllib.parse
 
 dynamodb = boto3.resource('dynamodb')
 stepfunctions = boto3.client('stepfunctions')
@@ -18,6 +20,9 @@ table = dynamodb.Table(TABLE_NAME)
 
 # DEMO MODE: Mock perfect weather for Aurangabad
 MOCK_WEATHER = os.environ.get('MOCK_WEATHER', 'false').lower() == 'true'
+USE_REAL_WEATHER = os.environ.get('USE_REAL_WEATHER', 'false').lower() == 'true'
+WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY')
+WEATHER_API_BASE = os.environ.get('WEATHER_API_BASE', 'https://api.openweathermap.org/data/2.5/weather')
 
 # District -> coordinates (approximate; used for geo-based story and weather lookup)
 DISTRICT_COORDS = {
@@ -81,9 +86,46 @@ def check_weather_mock(location: str) -> Dict[str, Any]:
 
 def check_weather_real(location: str) -> Dict[str, Any]:
     """Real weather API call (disabled for demo)"""
-    # TODO: Implement real OpenWeatherMap API call
-    # For now, return mock data
-    return check_weather_mock(location)
+    coords = DISTRICT_COORDS.get(location)
+    if not coords or not WEATHER_API_KEY:
+        return check_weather_mock(location)
+
+    query = urllib.parse.urlencode({
+        'lat': coords['lat'],
+        'lon': coords['lon'],
+        'appid': WEATHER_API_KEY,
+        'units': 'metric'
+    })
+    url = f\"{WEATHER_API_BASE}?{query}\"
+
+    try:
+        req = urllib.request.Request(url, headers={'Accept': 'application/json'})
+        with urllib.request.urlopen(req, timeout=5) as response:
+            data = json.loads(response.read())
+    except Exception:
+        return check_weather_mock(location)
+
+    wind_mps = float(data.get('wind', {}).get('speed', 0))
+    wind_kmh = wind_mps * 3.6
+    rain_mm = 0
+    if 'rain' in data:
+        rain_mm = data['rain'].get('1h', data['rain'].get('3h', 0)) or 0
+
+    temperature = float(data.get('main', {}).get('temp', 0))
+    humidity = float(data.get('main', {}).get('humidity', 0))
+
+    favorable = wind_kmh < 10 and rain_mm == 0
+
+    return {
+        'location': location,
+        'coordinates': coords,
+        'wind_speed': round(wind_kmh, 1),
+        'rain': rain_mm,
+        'temperature': temperature,
+        'humidity': humidity,
+        'favorable': favorable,
+        'mock': False
+    }
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -98,6 +140,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     for location in locations:
         if MOCK_WEATHER:
             weather = check_weather_mock(location)
+        elif USE_REAL_WEATHER:
+            weather = check_weather_real(location)
         else:
             weather = check_weather_real(location)
         

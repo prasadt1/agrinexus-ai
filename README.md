@@ -286,6 +286,8 @@ Create the CloudWatch dashboard (dev example):
 ./scripts/create-cloudwatch-dashboard.sh dev us-east-1
 ```
 
+**Custom Metric**: The nudge completion rate is emitted as `AgriNexus/NudgesCompleted`.
+
 ## Demo Scenario Script
 
 Run an end-to-end demo flow (onboarding + HELP + sample question + DONE):

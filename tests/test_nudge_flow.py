@@ -4,9 +4,17 @@ from datetime import datetime
 
 import types
 
+import importlib
+
+os.environ.setdefault("TABLE_NAME", "agrinexus-data")
+
 import src.nudge.sender as sender
 import src.nudge.reminder as reminder
 import src.nudge.detector as detector
+
+sender = importlib.reload(sender)
+reminder = importlib.reload(reminder)
+detector = importlib.reload(detector)
 
 
 class FakeTable:
@@ -60,6 +68,8 @@ def test_has_pending_nudge_detects_sent_and_reminded(monkeypatch):
 def test_template_language_code_selection(monkeypatch):
     os.environ["NUDGE_TEMPLATE_NAME"] = "weather_nudge_spray"
     os.environ["USE_NUDGE_TEMPLATE"] = "true"
+    sender.NUDGE_TEMPLATE_NAME = "weather_nudge_spray"
+    sender.USE_NUDGE_TEMPLATE = True
 
     fake_table = FakeTable()
     fake_table.query_response = {
@@ -80,6 +90,7 @@ def test_template_language_code_selection(monkeypatch):
 
     monkeypatch.setattr(sender, "send_whatsapp_template", fake_template)
     monkeypatch.setattr(sender, "send_whatsapp_message", lambda *args, **kwargs: None)
+    monkeypatch.setattr(sender, "create_reminder_schedule", lambda *args, **kwargs: None)
 
     sender.lambda_handler({"location": "Aurangabad", "weather": {"wind_speed": 8.5}, "activity": "spray"}, None)
 

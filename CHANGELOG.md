@@ -16,6 +16,16 @@ A living record of significant fixes, architectural decisions, and system evolut
 - **Implementation**: `DISTRICT_COORDS` in `src/weather/handler.py` included in weather payload
 - **Impact**: Geo-location is explicit for demo even when using mocked weather
 
+### Real Weather API Toggle
+- **Feature**: Added optional OpenWeatherMap ingestion behind `USE_REAL_WEATHER` and `WEATHER_API_KEY`
+- **Implementation**: `check_weather_real()` now calls the API with coordinates and metric units
+- **Impact**: MVP can remain mocked, while real weather is one flag away
+
+### Nudge Completion Metric
+- **Feature**: Emit `AgriNexus/NudgesCompleted` custom CloudWatch metric on DONE responses
+- **Implementation**: Added CloudWatch `put_metric_data` in response detector; dashboard includes widget
+- **Impact**: Enables live tracking of behavioral completion rate
+
 ### Demo Scenario Script
 - **Feature**: Added `scripts/demo-scenario.sh` to exercise onboarding and basic flow via webhook
 - **Usage**: Requires `WEBHOOK_URL`, `FROM_NUMBER`, and optional `APP_SECRET`
