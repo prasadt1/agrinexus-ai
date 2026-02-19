@@ -48,7 +48,7 @@ def send_whatsapp_message(phone_number: str, message: str):
     import requests
     
     access_token_secret = os.environ.get('ACCESS_TOKEN_SECRET', 'agrinexus/whatsapp/access-token')
-    phone_id_secret = os.environ.get('PHONE_ID_SECRET', 'agrinexus/whatsapp/phone-number-id')
+    phone_id_secret = os.environ.get('PHONE_NUMBER_ID_SECRET', 'agrinexus/whatsapp/phone-number-id')
     
     access_token_response = secrets.get_secret_value(SecretId=access_token_secret)
     access_token = access_token_response['SecretString']

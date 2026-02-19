@@ -125,11 +125,11 @@ def has_pending_nudge(phone_number: str, activity: str) -> bool:
         nudge_id = item.get('SK', '').replace('NUDGE#', '')
         nudge_date = nudge_id.split('T')[0] if 'T' in nudge_id else ''
         nudge_activity = nudge_id.split('#')[-1] if '#' in nudge_id else ''
-        status = item.get('status', 'pending')
+        status = item.get('status', 'SENT')  # Default to SENT if not set
         
-        # Check if it's today's nudge for this activity and still pending
-        if nudge_date == today and nudge_activity == activity and status == 'pending':
-            print(f"Found existing pending {activity} nudge for {phone_number}: {nudge_id}")
+        # Check if it's today's nudge for this activity and still pending (SENT or REMINDED, not DONE)
+        if nudge_date == today and nudge_activity == activity and status in ['SENT', 'REMINDED']:
+            print(f"Found existing pending {activity} nudge for {phone_number}: {nudge_id} (status: {status})")
             return True
     
     return False

@@ -56,8 +56,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         message = template.get(reminder_type, template['T+24h'])
         
         # Send WhatsApp message
-        # TODO: Implement WhatsApp API call
-        print(f"Sending {reminder_type} reminder to {phone_number}: {message}")
+        send_whatsapp_message(phone_number, message)
         
         # Update nudge record
         table.update_item(
@@ -76,3 +75,42 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {'statusCode': 200, 'message': 'Reminder sent'}
     else:
         return {'statusCode': 200, 'message': 'Task already completed'}
+
+
+def send_whatsapp_message(phone_number: str, message: str):
+    """Send message via WhatsApp Business API"""
+    import requests
+    
+    # Get WhatsApp credentials
+    access_token_secret = os.environ.get('ACCESS_TOKEN_SECRET', 'agrinexus/whatsapp/access-token')
+    phone_id_secret = os.environ.get('PHONE_NUMBER_ID_SECRET', 'agrinexus/whatsapp/phone-number-id')
+    
+    try:
+        access_token_response = secrets.get_secret_value(SecretId=access_token_secret)
+        access_token = access_token_response['SecretString']
+        
+        phone_id_response = secrets.get_secret_value(SecretId=phone_id_secret)
+        phone_number_id = phone_id_response['SecretString']
+        
+        # Send via WhatsApp Business API
+        url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": phone_number,
+            "type": "text",
+            "text": {"body": message}
+        }
+        
+        print(f"Sending reminder to {phone_number}: {message[:50]}...")
+        response = requests.post(url, headers=headers, json=payload)
+        
+        if response.status_code == 200:
+            print(f"Reminder sent successfully: {response.json()}")
+        else:
+            print(f"Failed to send reminder: {response.status_code} - {response.text}")
+    except Exception as e:
+        print(f"Exception sending reminder to {phone_number}: {str(e)}")

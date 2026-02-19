@@ -4,6 +4,26 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## Week 4 (Feb 18-23, 2026)
+
+### Code Review Fixes - Critical Issues
+- **Issue**: Nudge duplicate-prevention broken - checked for status='pending' but nudges are created with status='SENT'
+- **Fix**: Updated `has_pending_nudge()` to check for status in ['SENT', 'REMINDED'] instead of 'pending'
+- **Impact**: Duplicate nudge prevention now works correctly
+
+- **Issue**: Reminder sender had TODO placeholder instead of actual WhatsApp API call
+- **Fix**: Implemented `send_whatsapp_message()` function in reminder.py with full WhatsApp API integration
+- **Impact**: T+24h and T+48h reminders now actually send to farmers
+
+- **Issue**: Response detector used wrong secret name (PHONE_ID_SECRET instead of PHONE_NUMBER_ID_SECRET)
+- **Fix**: Updated environment variable name to match standard convention
+- **Impact**: Response detector now works correctly in all environments
+
+### Cost Consistency Update
+- **Issue**: README showed ~$32/month but architecture.md and requirements.md showed ~$50/month
+- **Fix**: Updated README cost table to show ~$47/month (more realistic usage estimates)
+- **Impact**: All documentation now consistent at ~$50/month
+
 ## Week 3 (Feb 17-23, 2026)
 
 ### HELP Command Implementation
