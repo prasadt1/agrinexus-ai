@@ -6,6 +6,46 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ## Week 4 (Feb 18-23, 2026)
 
+### Language-Specific Onboarding Buttons (UX Enhancement)
+- **Issue**: After user selected language (e.g., Hindi), district and crop buttons still showed in English
+- **Fix**: Added button label mappings for all languages. Districts now show as औरंगाबाद/जालना/नागपुर (Hindi), औरंगाबाद/जालना/नागपूर (Marathi), ఔరంగాబాద్/జల్నా/నాగ్‌పూర్ (Telugu). Updated location detection to recognize district names in all scripts.
+- **Impact**: Consistent language experience throughout onboarding, better UX for non-English speakers
+- **Date**: Feb 27, 2026
+
+### Weather Mock for All Locations (Demo Reliability)
+- **Issue**: Mock weather only returned favorable conditions for Aurangabad, causing Jalna/Nagpur users to never receive nudges
+- **Fix**: Updated `check_weather_mock()` to return favorable conditions for all configured districts. Changed default MOCK_WEATHER to 'true' for easier demo testing.
+- **Impact**: Nudges now work for all locations in demo mode, more reliable testing
+- **Date**: Feb 27, 2026
+
+### Context-Aware Final Reminder Response (Behavioral Intelligence)
+- **Issue**: After T+48h reminder, user replies "अभी नहीं" (NOT YET) and gets "I'll remind you later" message, but no more reminders are scheduled (misleading)
+- **Fix**: Added logic to check `lastReminder` field in nudge record. If last reminder was T+48h, send final acknowledgment: "कोई बात नहीं। जब आप तैयार हों तो कर लें। अगली बार मौसम अच्छा होगा तो मैं फिर से याद दिलाऊंगा। 👍" (No problem. Do it when ready. Next time weather is good, I'll remind you again.)
+- **Impact**: Users get appropriate message after final reminder, sets correct expectations, more empathetic system
+- **Date**: Feb 27, 2026
+
+### DONE/NOT YET Keyword Filtering in Processor (Critical Fix)
+- **Issue**: When user replies "अभी नहीं" (NOT YET), system sends multiple confusing messages: acknowledgment from detector + RAG response from processor + farming-only message
+- **Root Cause**: Processor Lambda was processing ALL text messages including DONE/NOT YET keywords. Response detector handled them via DynamoDB Streams, but processor also tried to answer them with RAG.
+- **Fix**: Added keyword filter in processor to skip DONE/NOT YET messages. These are now ONLY handled by response detector.
+- **Impact**: Clean single response to DONE/NOT YET, no more duplicate/confusing messages
+- **Date**: Feb 27, 2026
+
+### Nudge Behavior Documentation
+- **Feature**: Added comprehensive guide explaining complete nudge flow, message templates, and behavioral logic
+- **Implementation**: `NUDGE-BEHAVIOR-GUIDE.md` with all scenarios, testing scripts, and design rationale
+- **Impact**: Clear documentation for judges and future developers on nudge system behavior
+- **Date**: Feb 27, 2026
+
+### Testing Scripts for Nudge System
+- **Feature**: Added scripts to test nudge system without waiting 24/48 hours
+- **Implementation**: 
+  - `scripts/reset-user-profile.sh` - Reset user for fresh onboarding
+  - `scripts/trigger-nudge-test.sh` - Manually trigger weather poller and verify nudge creation
+  - `scripts/test-reminder.sh` - Immediately send T+24h or T+48h reminder for testing
+- **Impact**: Fast iteration on nudge behavior, easier demo preparation
+- **Date**: Feb 27, 2026
+
 ### Nudge Test Coverage (MVP)
 - **Feature**: Added automated tests for nudge flow and a runnable demo script
 - **Implementation**: `tests/test_nudge_flow.py`, `scripts/demo-nudge-flow.sh`, `docs/NUDGE-TEST-CHECKLIST.md`
@@ -60,6 +100,11 @@ A living record of significant fixes, architectural decisions, and system evolut
 - **Feature**: Added `scripts/demo.env` to avoid retyping webhook URL and app secret
 - **Implementation**: Demo scripts auto-load `scripts/demo.env` if present
 - **Impact**: One-command language-by-language testing with a single phone number
+
+### Code Walkthrough Doc
+- **Feature**: Added a full code walkthrough covering architecture and core logic
+- **Implementation**: `docs/CODE-WALKTHROUGH.md`
+- **Impact**: Onboards new contributors and judges quickly
 
 ### Demo Scenario Script
 - **Feature**: Added `scripts/demo-scenario.sh` to exercise onboarding and basic flow via webhook

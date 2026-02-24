@@ -11,6 +11,96 @@ A chronological record of bugs, issues, and debugging sessions from project ince
 
 ## Week 4 (Feb 18-23, 2026)
 
+### Issue #030: Webhook 502 Error on GET Requests 🟡
+**Date**: Feb 19, 2026  
+**Severity**: Major  
+**Symptom**: Webhook returning 502 error when receiving GET requests (WhatsApp verification)  
+**Root Cause**: Code used `event.get('queryStringParameters', {})` but API Gateway returns `None` when no query params exist, causing `params.get('hub.mode')` to fail with AttributeError  
+**Solution**: Changed to `event.get('queryStringParameters') or {}` to handle None case  
+**Time**: 10 min  
+**Impact**: Webhook verification now works correctly
+
+### Issue #031: Knowledge Base Configuration Missing 🔴
+**Date**: Feb 19, 2026  
+**Severity**: Critical  
+**Symptom**: RAG queries failing with "ValidationException: The provided guardrail identifier is invalid" and placeholder KB ID  
+**Root Cause**: samconfig-week2.toml had placeholder values `REPLACE_WITH_YOUR_KB_ID` and `REPLACE_WITH_YOUR_GUARDRAIL_ID`  
+**Solution**: Updated samconfig with actual KB ID (H81XLD3YWY) and removed guardrail requirement (empty string)  
+**Time**: 15 min  
+**Impact**: RAG queries now work correctly
+
+### Issue #032: Phone Number Format Mismatch in DynamoDB 🟡
+**Date**: Feb 19, 2026  
+**Severity**: Major  
+**Symptom**: User data reset script couldn't find profile, but profile existed in DynamoDB  
+**Root Cause**: DynamoDB stores phone numbers WITHOUT + sign (`USER#4917647009148`) but reset script searched for `USER#+4917647009148`  
+**Solution**: Updated all scripts to use phone number without + sign when querying DynamoDB  
+**Time**: 20 min  
+**Impact**: User data management now works correctly
+
+### Issue #033: Onboarding Stuck After District Selection 🔴
+**Date**: Feb 19, 2026  
+**Severity**: Critical  
+**Symptom**: Onboarding flow stopped responding after user selected district  
+**Root Cause**: `DISTRICT_COORDS.get(location)` returns tuple `(lat, lon)` but DynamoDB can't serialize tuples, causing update_user_profile() to fail silently  
+**Solution**: Convert coordinates to list before storing: `list(coords) if coords else None`  
+**Time**: 15 min  
+**Impact**: Onboarding now completes successfully
+
+### Issue #034: Weather Poller Syntax Error 🔴
+**Date**: Feb 19, 2026  
+**Severity**: Critical  
+**Symptom**: Weather poller failing with "unexpected character after line continuation character" on line 99  
+**Root Cause**: F-string had escaped quotes: `f\"{WEATHER_API_BASE}?{query}\"` which is invalid Python syntax  
+**Solution**: Removed backslashes: `f"{WEATHER_API_BASE}?{query}"`  
+**Time**: 5 min  
+**Impact**: Weather poller now runs successfully, nudges are generated
+
+### Issue #035: Onboarding Buttons Not Language-Specific 🟡
+**Date**: Feb 27, 2026  
+**Severity**: Major  
+**Symptom**: User selects Hindi language but district/crop buttons show in English (Aurangabad, Jalna, Nagpur)  
+**Root Cause**: Button text was hardcoded in English, not using language-specific labels  
+**Solution**: Added district/crop button mappings for all languages (Hindi: औरंगाबाद, जालना, नागपुर; Marathi: औरंगाबाद, जालना, नागपूर; Telugu: ఔరంగాబాద్, జల్నా, నాగ్‌పూర్). Updated location detection to recognize district names in all scripts.  
+**Time**: 30 min  
+**Impact**: Onboarding now shows buttons in user's selected language, better UX
+
+### Issue #036: Weather Poller Only Favorable for Aurangabad 🟡
+**Date**: Feb 27, 2026  
+**Severity**: Major  
+**Symptom**: Users in Jalna/Nagpur not receiving nudges, only Aurangabad users getting them  
+**Root Cause**: Mock weather function hardcoded to return favorable conditions only for Aurangabad, unfavorable for other districts  
+**Solution**: Updated `check_weather_mock()` to return favorable conditions for all configured districts (Aurangabad, Jalna, Nagpur). Changed default MOCK_WEATHER to 'true' for easier demo testing.  
+**Time**: 15 min  
+**Impact**: Nudges now work for all locations in demo mode
+
+### Issue #037: NOT YET Response Doesn't Differentiate T+24h vs T+48h 🟡
+**Date**: Feb 27, 2026  
+**Severity**: Major  
+**Symptom**: After T+48h reminder, user replies "अभी नहीं" (NOT YET) and gets "I'll remind you later" message, but there are no more reminders scheduled (misleading)  
+**Root Cause**: Response detector sent same acknowledgment for all NOT YET responses, didn't check if this was after final reminder  
+**Solution**: Added logic to check `lastReminder` field in nudge record. If last reminder was T+48h, send final acknowledgment: "कोई बात नहीं। जब आप तैयार हों तो कर लें। अगली बार मौसम अच्छा होगा तो मैं फिर से याद दिलाऊंगा। 👍" (No problem. Do it when ready. Next time weather is good, I'll remind you again.)  
+**Time**: 25 min  
+**Impact**: Users get appropriate message after final reminder, sets correct expectations
+
+### Issue #038: Processor Treating DONE/NOT YET as RAG Queries 🔴
+**Date**: Feb 27, 2026  
+**Severity**: Critical  
+**Symptom**: When user replies "अभी नहीं" (NOT YET), system sends multiple messages: acknowledgment from detector + RAG response from processor + farming-only message  
+**Root Cause**: Processor Lambda was processing ALL text messages including DONE/NOT YET keywords. Response detector handled them via DynamoDB Streams, but processor also tried to answer them with RAG.  
+**Solution**: Added keyword filter in processor to skip DONE/NOT YET messages. These are now ONLY handled by response detector, preventing duplicate/confusing responses.  
+**Time**: 20 min  
+**Impact**: Clean single response to DONE/NOT YET, no more confusion
+
+---
+**Date**: Feb 19, 2026  
+**Severity**: Critical  
+**Symptom**: Weather poller failing with "unexpected character after line continuation character" on line 99  
+**Root Cause**: F-string had escaped quotes: `f\"{WEATHER_API_BASE}?{query}\"` which is invalid Python syntax  
+**Solution**: Removed backslashes: `f"{WEATHER_API_BASE}?{query}"`  
+**Time**: 5 min  
+**Impact**: Weather poller now runs successfully, nudges are generated
+
 ### Issue #024: Webhook Signature Verification Disabled 🔴
 **Date**: Feb 19, 2026  
 **Severity**: Critical  
@@ -393,23 +483,30 @@ A chronological record of bugs, issues, and debugging sessions from project ince
 
 ## Statistics (Updated)
 
-**Total Issues Logged**: 19  
-**Critical**: 3 (16%)  
-**Major**: 10 (53%)  
-**Minor**: 6 (31%)  
+**Total Issues Logged**: 38  
+**Critical**: 10 (26%)  
+**Major**: 19 (50%)  
+**Minor**: 9 (24%)  
 
-**Average Resolution Time**: 23 minutes  
+**Average Resolution Time**: 18 minutes  
 **Longest Debug Session**: 2 hours (Issue #003 - RAG test rewrite)  
-**Shortest Debug Session**: 5 minutes (Issues #011, #016, #017)
+**Shortest Debug Session**: 2 minutes (Issue #023)
 
 **Most Common Issue Types**:
-1. Integration bugs (WhatsApp API, Bedrock, Polly, Transcribe) - 8 issues
-2. Test/validation failures - 3 issues
-3. UX/perceived performance - 3 issues
-4. Security/configuration - 2 issues
-5. Documentation accuracy - 3 issues
+1. Integration bugs (WhatsApp API, Bedrock, Polly, Transcribe, DynamoDB) - 16 issues
+2. Configuration/deployment issues - 7 issues
+3. UX/language localization - 5 issues
+4. Test/validation failures - 4 issues
+5. Security/configuration - 3 issues
+6. Documentation accuracy - 2 issues
+7. Behavioral logic - 1 issue
 
-**Week 3 Highlights**:
-- Caught incorrect Polly language analysis before production (Issue #019)
-- All voice/vision features tested and validated
-- Multi-language support working across all modalities
+**Week 4 Highlights**:
+- Fixed critical onboarding flow blocker (tuple serialization)
+- Resolved configuration issues preventing RAG queries
+- Fixed weather poller syntax error enabling nudge generation
+- Corrected phone number format handling across system
+- Implemented language-specific buttons for better UX
+- Fixed weather mock to work for all locations
+- Enhanced nudge system with context-aware final reminder messages
+- Prevented duplicate responses from processor/detector conflict
