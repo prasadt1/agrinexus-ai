@@ -43,6 +43,13 @@ NOT_YET_MESSAGES = {
     'te': 'పర్వాలేదు. నేను మీకు తర్వాత గుర్తు చేస్తాను. 👍'
 }
 
+# NOT YET final acknowledgment (after T+48h reminder)
+NOT_YET_FINAL_MESSAGES = {
+    'hi': 'कोई बात नहीं। जब आप तैयार हों तो कर लें। अगली बार मौसम अच्छा होगा तो मैं फिर से याद दिलाऊंगा। 👍',
+    'mr': 'काही हरकत नाही. तुम्ही तयार असाल तेव्हा करा. पुढच्या वेळी हवामान चांगले असेल तर मी पुन्हा आठवण करून देईन. 👍',
+    'te': 'పర్వాలేదు. మీరు సిద్ధంగా ఉన్నప్పుడు చేయండి. తదుపరిసారి వాతావరణం మంచిగా ఉంటే నేను మళ్లీ గుర్తు చేస్తాను. 👍'
+}
+
 
 def send_whatsapp_message(phone_number: str, message: str):
     """Send message via WhatsApp Business API"""
@@ -191,8 +198,22 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Extract message text from DynamoDB Stream format
         # The 'message' field is a Map (M) in DynamoDB Streams, not a String (S)
         message_map = new_image.get('message', {}).get('M', {})
+        
+        # Try text message first
         text_map = message_map.get('text', {}).get('M', {})
         text = text_map.get('body', {}).get('S', '')
+        
+        # If no text, try interactive button reply (onboarding buttons)
+        if not text:
+            interactive_map = message_map.get('interactive', {}).get('M', {})
+            button_reply_map = interactive_map.get('button_reply', {}).get('M', {})
+            text = button_reply_map.get('title', {}).get('S', '')
+        
+        # If still no text, try template button (nudge response buttons)
+        if not text:
+            button_map = message_map.get('button', {}).get('M', {})
+            text = button_map.get('text', {}).get('S', '')
+        
         print(f"Message text: {text}")
         
         if not text:
@@ -215,9 +236,29 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if detect_keyword(text, all_not_yet_keywords):
             print(f"NOT YET keyword detected!")
             
-            # Send acknowledgment message (reminders will continue)
+            # Get active nudges to check reminder status
+            active_nudges = get_active_nudges(phone_number)
             dialect = get_user_dialect(phone_number)
-            acknowledgment = NOT_YET_MESSAGES.get(dialect, NOT_YET_MESSAGES['hi'])
+            
+            # Check if this is after the final (T+48h) reminder
+            is_final_reminder = False
+            if active_nudges:
+                latest_nudge = active_nudges[0]
+                last_reminder = latest_nudge.get('lastReminder')
+                print(f"Last reminder sent: {last_reminder}")
+                
+                # If last reminder was T+48h, this is the final response
+                if last_reminder == 'T+48h':
+                    is_final_reminder = True
+            
+            # Send appropriate acknowledgment
+            if is_final_reminder:
+                acknowledgment = NOT_YET_FINAL_MESSAGES.get(dialect, NOT_YET_FINAL_MESSAGES['hi'])
+                print("Sending final NOT YET acknowledgment (no more reminders)")
+            else:
+                acknowledgment = NOT_YET_MESSAGES.get(dialect, NOT_YET_MESSAGES['hi'])
+                print("Sending NOT YET acknowledgment (reminders will continue)")
+            
             send_whatsapp_message(phone_number, acknowledgment)
         
         # Only check DONE if NOT YET wasn't detected

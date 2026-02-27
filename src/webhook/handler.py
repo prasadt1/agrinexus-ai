@@ -102,7 +102,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     
     # GET: Webhook verification
     if http_method == 'GET':
-        params = event.get('queryStringParameters', {})
+        params = event.get('queryStringParameters') or {}
         mode = params.get('hub.mode')
         token = params.get('hub.verify_token')
         challenge = params.get('hub.challenge')

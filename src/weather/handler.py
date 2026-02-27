@@ -18,8 +18,8 @@ STATE_MACHINE_ARN = os.environ.get('STATE_MACHINE_ARN')
 
 table = dynamodb.Table(TABLE_NAME)
 
-# DEMO MODE: Mock perfect weather for Aurangabad
-MOCK_WEATHER = os.environ.get('MOCK_WEATHER', 'false').lower() == 'true'
+# DEMO MODE: Mock perfect weather for all configured locations
+MOCK_WEATHER = os.environ.get('MOCK_WEATHER', 'true').lower() == 'true'  # Default to true for demo
 USE_REAL_WEATHER = os.environ.get('USE_REAL_WEATHER', 'false').lower() == 'true'
 WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY')
 WEATHER_API_BASE = os.environ.get('WEATHER_API_BASE', 'https://api.openweathermap.org/data/2.5/weather')
@@ -59,9 +59,10 @@ def get_unique_locations() -> List[str]:
 
 
 def check_weather_mock(location: str) -> Dict[str, Any]:
-    """Mock weather for demo - always return perfect conditions for Aurangabad"""
+    """Mock weather for demo - always return perfect conditions for all configured locations"""
     coords = DISTRICT_COORDS.get(location)
-    if location == 'Aurangabad':
+    # Return favorable weather for all configured districts (Aurangabad, Jalna, Nagpur)
+    if location in DISTRICT_COORDS:
         return {
             'location': location,
             'coordinates': coords,
@@ -73,7 +74,7 @@ def check_weather_mock(location: str) -> Dict[str, Any]:
             'mock': True
         }
     else:
-        # For other locations, return unfavorable to focus demo on Aurangabad
+        # For other locations, return unfavorable
         return {
             'location': location,
             'coordinates': coords,
@@ -96,7 +97,7 @@ def check_weather_real(location: str) -> Dict[str, Any]:
         'appid': WEATHER_API_KEY,
         'units': 'metric'
     })
-    url = f\"{WEATHER_API_BASE}?{query}\"
+    url = f"{WEATHER_API_BASE}?{query}"
 
     try:
         req = urllib.request.Request(url, headers={'Accept': 'application/json'})

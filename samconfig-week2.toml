@@ -11,8 +11,8 @@ capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
 parameter_overrides = [
     "Environment=dev",
     "TableName=agrinexus-data",
-    "KnowledgeBaseId=REPLACE_WITH_YOUR_KB_ID",
-    "GuardrailId=REPLACE_WITH_YOUR_GUARDRAIL_ID",
+    "KnowledgeBaseId=H81XLD3YWY",
+    "GuardrailId=\"\"",
     "GuardrailVersion=1"
 ]
 

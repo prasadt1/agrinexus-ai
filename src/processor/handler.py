@@ -102,6 +102,7 @@ def update_user_profile(phone_number: str, updates: Dict[str, Any]):
 
 def create_user_profile(phone_number: str, dialect: str, location: str, crop: str, consent: bool):
     """Create complete user profile"""
+    coords = DISTRICT_COORDS.get(location)
     table.put_item(
         Item={
             'PK': f'USER#{phone_number}',
@@ -109,7 +110,7 @@ def create_user_profile(phone_number: str, dialect: str, location: str, crop: st
             'phone_number': phone_number,
             'dialect': dialect,
             'location': location,
-            'location_coords': DISTRICT_COORDS.get(location),
+            'location_coords': list(coords) if coords else None,
             'crop': crop,
             'consent': consent,
             'onboarding_complete': True,
@@ -174,17 +175,24 @@ Please choose your language / कृपया अपनी भाषा चु�
                 'dialect': dialect,
                 'onboarding_state': 'location'
             })
-            # Ask for location with buttons
+            # Ask for location with buttons in user's language
             location_prompt = {
                 'hi': 'बढ़िया! अब मुझे बताएं आप किस जिले में हैं?\n\n(या कोई भी जिला टाइप करें)',
                 'mr': 'छान! आता मला सांगा तुम्ही कोणत्या जिल्ह्यात आहात?\n\n(किंवा कोणताही जिल्हा टाइप करा)',
                 'te': 'బాగుంది! ఇప్పుడు మీరు ఏ జిల్లాలో ఉన్నారో చెప్పండి?\n\n(లేదా ఏదైనా జిల్లా టైప్ చేయండి)',
                 'en': 'Great! Now tell me which district you are in?\n\n(Or type any district name)'
             }
+            # District names in local script
+            district_buttons = {
+                'hi': ['औरंगाबाद', 'जालना', 'नागपुर'],
+                'mr': ['औरंगाबाद', 'जालना', 'नागपूर'],
+                'te': ['ఔరంగాబాద్', 'జల్నా', 'నాగ్‌పూర్'],
+                'en': ['Aurangabad', 'Jalna', 'Nagpur']
+            }
             return {
                 'type': 'buttons',
                 'content': location_prompt.get(dialect, location_prompt['hi']),
-                'buttons': ['Aurangabad', 'Jalna', 'Nagpur']
+                'buttons': district_buttons.get(dialect, district_buttons['en'])
             }
         else:
             # Invalid selection, resend buttons
@@ -208,21 +216,47 @@ Please choose your language / कृपया अपनी भाषा चु�
         # Check if message contains valid district
         location = None
         
-        # First check for our configured districts (for weather nudges)
-        for district in VALID_DISTRICTS:
-            if district.lower() in message_text.lower():
-                location = district
+        # District name mappings (local script -> English)
+        district_mappings = {
+            # Aurangabad
+            'aurangabad': 'Aurangabad',
+            'औरंगाबाद': 'Aurangabad',
+            'ఔరంగాబాద్': 'Aurangabad',
+            # Jalna
+            'jalna': 'Jalna',
+            'जालना': 'Jalna',
+            'జల్నా': 'Jalna',
+            # Nagpur
+            'nagpur': 'Nagpur',
+            'नागपुर': 'Nagpur',
+            'नागपूर': 'Nagpur',
+            'నాగ్‌పూర్': 'Nagpur'
+        }
+        
+        # Check for district in any language
+        text_lower = message_text.lower().strip()
+        for key, value in district_mappings.items():
+            if key.lower() in text_lower or key in message_text:
+                location = value
                 break
         
-        # If not a configured district, accept any district name (for demo flexibility)
+        # If not found in mappings, check English names
+        if not location:
+            for district in VALID_DISTRICTS:
+                if district.lower() in text_lower:
+                    location = district
+                    break
+        
+        # If still not found, accept any district name (for demo flexibility)
         if not location and len(message_text.strip()) > 2:
             # Accept the input as a district name
             location = message_text.strip().title()
         
         if location:
+            coords = DISTRICT_COORDS.get(location)
             update_user_profile(phone_number, {
                 'location': location,
-                'location_coords': DISTRICT_COORDS.get(location),
+                'location_coords': list(coords) if coords else None,
                 'onboarding_state': 'crop'
             })
             # Ask for crop with buttons in user's dialect
@@ -245,10 +279,17 @@ Please choose your language / कृपया अपनी भाषा चु�
                 'te': 'బాగుంది! ఇప్పుడు మీరు ఏ జిల్లాలో ఉన్నారో చెప్పండి?\n\n(లేదా ఏదైనా జిల్లా టైప్ చేయండి)',
                 'en': 'Great! Now tell me which district you are in?\n\n(Or type any district name)'
             }
+            # District names in local script
+            district_buttons = {
+                'hi': ['औरंगाबाद', 'जालना', 'नागपुर'],
+                'mr': ['औरंगाबाद', 'जालना', 'नागपूर'],
+                'te': ['ఔరంగాబాద్', 'జల్నా', 'నాగ్‌పూర్'],
+                'en': ['Aurangabad', 'Jalna', 'Nagpur']
+            }
             return {
                 'type': 'buttons',
                 'content': location_prompt.get(dialect, location_prompt['hi']),
-                'buttons': ['Aurangabad', 'Jalna', 'Nagpur']
+                'buttons': district_buttons.get(dialect, district_buttons['en'])
             }
     
     # State 4: Crop selection
@@ -553,6 +594,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         # Get user profile
         profile = get_user_profile(from_number)
+        print(f"DEBUG: profile={profile}, onboarding_complete={profile.get('onboarding_complete') if profile else None}")
         
         # Check if onboarding is complete
         if not profile or not profile.get('onboarding_complete', False):
@@ -581,6 +623,19 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Process based on message type
         if message_type == 'text':
             text = message.get('text', {}).get('body', '')
+            
+            # Check for DONE/NOT YET keywords - these are handled by response detector
+            done_keywords = ['हो गया', 'कर दिया', 'हो गया है', 'कर लिया', 'done', 'completed',
+                           'झाला', 'केला', 'पूर्ण झाला', 'అయ్యింది', 'చేశాను', 'పూర్తయింది']
+            not_yet_keywords = ['अभी नहीं', 'बाद में', 'नहीं किया', 'not yet', 'later',
+                              'नाही झाला', 'नंतर', 'अजून नाही', 'ఇంకా లేదు', 'తర్వాత', 'చేయలేదు']
+            
+            text_lower = text.lower()
+            is_done_or_not_yet = any(keyword.lower() in text_lower for keyword in done_keywords + not_yet_keywords)
+            
+            if is_done_or_not_yet:
+                print(f"Skipping DONE/NOT YET message - handled by response detector")
+                continue
             
             # Check for HELP command
             if text.strip().upper() in ['HELP', 'मदद', 'मदत', 'సహాయం']:
