@@ -444,9 +444,55 @@ See `docs/CODE-WALKTHROUGH.md` for a component-by-component architecture and log
 - `docs/E2E-TEST-GUIDE.md` - End-to-end testing (onboarding, voice, vision, nudges)
 - `docs/CODE-WALKTHROUGH.md` - Component-by-component walkthrough
 - `CHANGELOG.md` - Engineering changelog with all features and fixes
-- `ISSUES-LOG.md` - Debugging log with 20+ issues resolved
+- `ISSUES-LOG.md` - Debugging log with 38+ issues resolved
 - `design.md` - Technical design decisions
-- `requirements.md` - EARS requirements
+- `requirements.md` - EARS requirements specification
+
+### Requirements Methodology: EARS
+
+This project uses **EARS (Easy Approach to Requirements Syntax)** for all functional requirements. EARS provides a structured, unambiguous way to write requirements using five patterns:
+
+1. **Ubiquitous**: The [System] shall [Response]
+   - Example: "The system shall include source citations in every response"
+
+2. **Event-driven**: When [Event], the [System] shall [Response]
+   - Example: "When a farmer sends a voice note, the system shall transcribe it using Amazon Transcribe"
+
+3. **State-driven**: While [State], the [System] shall [Response]
+   - Example: "While onboarding is incomplete, the system shall resume onboarding before processing queries"
+
+4. **Optional**: Where [Feature], the [System] shall [Response]
+   - Example: "Where voice preference is enabled, the system shall respond with audio"
+
+5. **Unwanted**: If [Condition], then the [System] shall [Response]
+   - Example: "If transcription confidence is below 0.5, then the system shall fall back to text response"
+
+**Benefits:**
+- Clear, testable requirements (100+ requirements in requirements.md)
+- Easy traceability from requirements → design → code → tests
+- Unambiguous behavior specification for all scenarios (normal, error, edge cases)
+
+**Example Mapping:**
+
+```
+Requirement (EARS):
+REQ-NUDGE-008: When a farmer responds with DONE keywords 
+(Hindi: "ho gaya"), the system shall mark the task as 
+completed in DynamoDB and delete pending reminders.
+
+Implementation (src/nudge/detector.py):
+if is_done_response(message_text):
+    update_nudge_status(phone_number, 'DONE')
+    delete_scheduled_reminders()
+
+Test (tests/test_nudge_flow.py):
+def test_done_response_marks_complete():
+    send_message("हो गया")
+    assert get_nudge_status() == 'DONE'
+    assert get_scheduled_reminders() == []
+```
+
+See `requirements.md` for the complete EARS specification with 100+ requirements covering all features.
 
 ## Resources
 
