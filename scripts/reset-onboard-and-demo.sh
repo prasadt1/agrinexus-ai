@@ -106,43 +106,60 @@ JSON
 
 function reset_dynamodb_profile() {
   echo "Resetting onboarding state in DynamoDB for ${PHONE}"
-  python3 - <<PY
-import boto3
-from boto3.dynamodb.conditions import Key
-
-phone = "${PHONE}"
-table_name = "${TABLE_NAME}"
-region = "${REGION}"
-
-session = boto3.session.Session(region_name=region)
-dynamodb = session.resource('dynamodb')
-table = dynamodb.Table(table_name)
-
-# Delete PROFILE
-try:
-    table.delete_item(Key={'PK': f'USER#{phone}', 'SK': 'PROFILE'})
-except Exception as e:
-    print(f"PROFILE delete failed: {e}")
-
-# Delete all NUDGEs for user
-resp = table.query(
-    KeyConditionExpression=Key('PK').eq(f'USER#{phone}') & Key('SK').begins_with('NUDGE#')
-)
-items = resp.get('Items', [])
-while True:
-    for item in items:
-        table.delete_item(Key={'PK': item['PK'], 'SK': item['SK']})
-    if 'LastEvaluatedKey' in resp:
-        resp = table.query(
-            KeyConditionExpression=Key('PK').eq(f'USER#{phone}') & Key('SK').begins_with('NUDGE#'),
-            ExclusiveStartKey=resp['LastEvaluatedKey']
-        )
-        items = resp.get('Items', [])
-    else:
-        break
-
-print("Reset complete")
-PY
+  
+  # Delete PROFILE using AWS CLI
+  aws dynamodb delete-item \
+    --table-name "${TABLE_NAME}" \
+    --key "{\"PK\": {\"S\": \"USER#${PHONE}\"}, \"SK\": {\"S\": \"PROFILE\"}}" \
+    --region "${REGION}" 2>/dev/null || true
+  
+  # Query and delete all NUDGEs
+  local nudges
+  nudges=$(aws dynamodb query \
+    --table-name "${TABLE_NAME}" \
+    --key-condition-expression "PK = :pk AND begins_with(SK, :sk)" \
+    --expression-attribute-values "{\":pk\": {\"S\": \"USER#${PHONE}\"}, \":sk\": {\"S\": \"NUDGE#\"}}" \
+    --region "${REGION}" \
+    --output json 2>/dev/null || echo '{"Items":[]}')
+  
+  echo "$nudges" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+for item in data.get('Items', []):
+    pk = item['PK']['S']
+    sk = item['SK']['S']
+    print(f'{pk}|{sk}')
+" | while IFS='|' read -r pk sk; do
+    aws dynamodb delete-item \
+      --table-name "${TABLE_NAME}" \
+      --key "{\"PK\": {\"S\": \"${pk}\"}, \"SK\": {\"S\": \"${sk}\"}}" \
+      --region "${REGION}" 2>/dev/null || true
+  done
+  
+  # Delete all MSG records
+  local msgs
+  msgs=$(aws dynamodb query \
+    --table-name "${TABLE_NAME}" \
+    --key-condition-expression "PK = :pk AND begins_with(SK, :sk)" \
+    --expression-attribute-values "{\":pk\": {\"S\": \"USER#${PHONE}\"}, \":sk\": {\"S\": \"MSG#\"}}" \
+    --region "${REGION}" \
+    --output json 2>/dev/null || echo '{"Items":[]}')
+  
+  echo "$msgs" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+for item in data.get('Items', []):
+    pk = item['PK']['S']
+    sk = item['SK']['S']
+    print(f'{pk}|{sk}')
+" | while IFS='|' read -r pk sk; do
+    aws dynamodb delete-item \
+      --table-name "${TABLE_NAME}" \
+      --key "{\"PK\": {\"S\": \"${pk}\"}, \"SK\": {\"S\": \"${sk}\"}}" \
+      --region "${REGION}" 2>/dev/null || true
+  done
+  
+  echo "Reset complete"
 }
 
 function trigger_weather() {

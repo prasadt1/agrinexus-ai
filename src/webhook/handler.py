@@ -126,8 +126,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     
     # POST: Message processing
     elif http_method == 'POST':
-        # Verify signature
-        signature = event.get('headers', {}).get('X-Hub-Signature-256', '')
+        # Verify signature (case-insensitive header lookup)
+        headers = event.get('headers', {})
+        signature = headers.get('X-Hub-Signature-256') or headers.get('x-hub-signature-256', '')
         body = event.get('body', '')
         
         logger.info(f"POST request received - body length: {len(body)}")

@@ -616,6 +616,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     send_whatsapp_buttons(from_number, onboarding_response['content'], onboarding_response['buttons'])
                 else:
                     send_whatsapp_message(from_number, onboarding_response['content'])
+                
+                # Re-fetch profile to get updated state for next message in batch
+                profile = get_user_profile(from_number)
             continue
         
         dialect = profile.get('dialect', 'hi')

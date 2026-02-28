@@ -213,7 +213,7 @@ Resources:
           Type: SQS
           Properties:
             Queue: !GetAtt MessageQueue.Arn
-            BatchSize: 10
+            BatchSize: 1  # Process one message at a time to maintain strict ordering
 
   # ============================================================================
   # Lambda: Voice Processor (Amazon Transcribe)
