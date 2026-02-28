@@ -4,7 +4,30 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
-## Week 4 (Feb 18-23, 2026)
+## Week 4 (Feb 18-28, 2026)
+
+### Voice Output Engine Fix (Feb 28, 2026)
+- **Issue**: English voice output failing with error "This voice does not support the selected engine: standard"
+- **Root Cause**: Kajal (English Indian voice) requires 'neural' engine, but code was using 'standard' engine for all voices
+- **Fix**: Updated `get_polly_voice()` to return engine type. English (Kajal) uses 'neural', Hindi/Marathi (Aditi) uses 'standard'
+- **Impact**: English voice responses now work correctly, end-to-end voice testing complete
+- **Date**: Feb 28, 2026
+
+### Enhanced Onboarding with Direct Language Selection (Feb 28, 2026)
+- **Issue**: Users had to see welcome message before selecting language, causing 6 welcome messages during multi-language testing
+- **Fix**: Added `_parse_language_selection()` to detect language keywords (हिंदी/मराठी/తెలుగు/English) as first message. If detected, skip welcome and go directly to location prompt
+- **Impact**: Faster onboarding, better UX for users who know what language they want
+- **Date**: Feb 28, 2026
+
+### Testing Documentation and Audio Files (Feb 28, 2026)
+- **Feature**: Added comprehensive testing guides and test audio files
+- **Implementation**:
+  - `NUDGE-BEHAVIOR-GUIDE.md` - Complete nudge workflow documentation
+  - `WHATSAPP-SETUP-GUIDE.md` - WhatsApp Business API configuration
+  - `tests/test-audio/` - English and Hindi test audio files for voice testing
+  - `samconfig.toml` - SAM deployment configuration
+- **Impact**: Easier testing and onboarding for new developers, better documentation for judges
+- **Date**: Feb 28, 2026
 
 ### Language-Specific Onboarding Buttons (UX Enhancement)
 - **Issue**: After user selected language (e.g., Hindi), district and crop buttons still showed in English

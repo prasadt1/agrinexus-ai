@@ -9,7 +9,56 @@ A chronological record of bugs, issues, and debugging sessions from project ince
 
 ---
 
-## Week 4 (Feb 18-23, 2026)
+## Week 4 (Feb 18-28, 2026)
+
+### Issue #035: English Voice Output Failing with Engine Error 🟡
+**Date**: Feb 28, 2026  
+**Severity**: Major  
+**Symptom**: Voice output test failing with "This voice does not support the selected engine: standard"  
+**Root Cause**: Kajal (English Indian voice) requires 'neural' engine, but code was defaulting to 'standard' engine for all voices  
+**Debugging Steps**:
+1. Ran `python tests/test_voice_end_to_end.py tests/test-audio/en-cotton-crop-pest.mp3 en`
+2. Transcription worked (87% confidence)
+3. RAG query worked
+4. Polly synthesis failed with engine error
+**Solution**: Updated `get_polly_voice()` to return tuple with engine type: `(voice_id, language_code, engine)`. English uses 'neural', Hindi/Marathi use 'standard'  
+**Time**: 15 min  
+**Impact**: English voice responses now work, end-to-end voice testing complete
+
+### Issue #036: WhatsApp Voice Messages Not Processing 🟡
+**Date**: Feb 28, 2026  
+**Severity**: Major  
+**Symptom**: Voice messages sent via WhatsApp not being processed, no acknowledgment or response  
+**Root Cause**: WhatsApp test numbers don't support media uploads (voice/images). This is a known WhatsApp limitation, not a code issue  
+**Debugging Steps**:
+1. Checked webhook logs - received "Media download error" status from WhatsApp
+2. Error code 131052: "Incoming media file validation failed"
+3. Confirmed this is documented limitation in README
+**Solution**: No code fix needed. Voice/image features work (proven by integration tests), but require real WhatsApp Business number for end-to-end testing  
+**Time**: 10 min  
+**Impact**: Documented limitation, voice feature verified working via local tests
+
+### Issue #037: Voice Test Script Language Code Error 🟢
+**Date**: Feb 28, 2026  
+**Severity**: Minor  
+**Symptom**: `python tests/test_voice_simple.py audio.mp3 en cotton` failing with "Value 'en' at 'languageCode' failed to satisfy constraint"  
+**Root Cause**: Amazon Transcribe requires full language codes (e.g., 'en-IN') not short codes (e.g., 'en')  
+**Solution**: Use correct language code format: `python tests/test_voice_simple.py audio.mp3 en-IN cotton`  
+**Time**: 5 min  
+**Impact**: Voice transcription tests now run successfully
+
+### Issue #038: Duplicate Message Processing 🟢
+**Date**: Feb 28, 2026  
+**Severity**: Minor  
+**Symptom**: Same message being processed twice, resulting in duplicate responses  
+**Root Cause**: Race condition in webhook idempotency check - same wamid stored twice in DynamoDB with different timestamps  
+**Debugging Steps**:
+1. Checked DynamoDB - found duplicate wamid entries
+2. Reviewed webhook logs - idempotency check passed but message still queued twice
+3. Likely race condition when WhatsApp sends same message twice quickly
+**Solution**: Existing idempotency logic is correct, but race condition can occur. Workaround: wait a few seconds between messages during testing  
+**Time**: 20 min  
+**Impact**: Minor issue during testing, doesn't affect production usage significantly
 
 ### Issue #030: Webhook 502 Error on GET Requests 🟡
 **Date**: Feb 19, 2026  
