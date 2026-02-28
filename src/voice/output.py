@@ -12,9 +12,9 @@ s3 = boto3.client('s3', region_name='us-east-1')
 TEMP_BUCKET = os.environ.get('TEMP_AUDIO_BUCKET', 'agrinexus-temp-audio-dev-043624892076')
 
 
-def get_polly_voice(dialect: str) -> Tuple[str, str]:
+def get_polly_voice(dialect: str) -> Tuple[str, str, str]:
     """
-    Map user dialect to Polly voice and language code
+    Map user dialect to Polly voice, language code, and engine
     
     Supported:
     - Hindi: Aditi (hi-IN) - Native Hindi support ✅
@@ -22,15 +22,15 @@ def get_polly_voice(dialect: str) -> Tuple[str, str]:
     - Marathi: Aditi (hi-IN) - Fallback (Marathi farmers understand Hindi) ⚠️
     - Telugu: Text-only (no native voice) ⚠️
     
-    Returns: (voice_id, language_code)
+    Returns: (voice_id, language_code, engine)
     """
     voice_map = {
-        'hi': ('Aditi', 'hi-IN'),      # Hindi - Native support
-        'mr': ('Aditi', 'hi-IN'),      # Marathi - Use Hindi voice (understood by Marathi speakers)
-        'te': (None, None),            # Telugu - No voice support, text only
-        'en': ('Kajal', 'en-IN')       # English (Indian) - Bilingual neural voice
+        'hi': ('Aditi', 'hi-IN', 'standard'),      # Hindi - Native support
+        'mr': ('Aditi', 'hi-IN', 'standard'),      # Marathi - Use Hindi voice (understood by Marathi speakers)
+        'te': (None, None, None),                  # Telugu - No voice support, text only
+        'en': ('Kajal', 'en-IN', 'neural')         # English (Indian) - Bilingual neural voice
     }
-    return voice_map.get(dialect, ('Aditi', 'hi-IN'))
+    return voice_map.get(dialect, ('Aditi', 'hi-IN', 'standard'))
 
 
 def text_to_speech(text: str, dialect: str, phone_number: str) -> Optional[str]:
@@ -46,14 +46,14 @@ def text_to_speech(text: str, dialect: str, phone_number: str) -> Optional[str]:
         S3 URL of audio file, or None if failed/not supported
     """
     try:
-        voice_id, language_code = get_polly_voice(dialect)
+        voice_id, language_code, engine = get_polly_voice(dialect)
         
         # Telugu not supported - return None
         if voice_id is None:
             print(f"Voice output not supported for dialect: {dialect}")
             return None
         
-        print(f"Converting text to speech: dialect={dialect}, voice={voice_id}, lang={language_code}")
+        print(f"Converting text to speech: dialect={dialect}, voice={voice_id}, lang={language_code}, engine={engine}")
         print(f"Text preview: {text[:100]}...")
         
         # Synthesize speech
@@ -61,8 +61,8 @@ def text_to_speech(text: str, dialect: str, phone_number: str) -> Optional[str]:
             Text=text,
             OutputFormat='mp3',
             VoiceId=voice_id,
-            LanguageCode=language_code
-            # Note: Using standard engine for Aditi (hi-IN), neural for Kajal (en-IN)
+            LanguageCode=language_code,
+            Engine=engine
         )
         
         # Upload to S3
