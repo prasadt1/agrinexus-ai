@@ -2,15 +2,16 @@
 
 Behavioral intervention engine for smallholder farmers. AWS 10,000 AIdeas Competition submission.
 
-## 🎯 Competition Status: Week 3 Complete ✅
+## 🎯 Competition Status: Production-ready ✅
 
-All core features implemented and tested:
+All core features implemented, tested, and deployed:
 - ✅ RAG-based agricultural Q&A (4 languages)
 - ✅ Voice input (Amazon Transcribe)
-- ✅ Voice output (Amazon Polly)
+- ✅ Voice output (Amazon Polly, neural engine)
 - ✅ Vision analysis (Claude 3 Sonnet - pest/disease identification)
 - ✅ Behavioral nudges with weather triggers
 - ✅ Multi-language support (Hindi, Marathi, Telugu, English)
+- ✅ Language-first onboarding (no duplicate welcome); E2E test guide and scripts
 
 ## Architecture
 
@@ -18,7 +19,9 @@ All core features implemented and tested:
 - **AI**: Amazon Bedrock (Claude 3 Sonnet + RAG), Transcribe, Polly, Claude Vision
 - **Messaging**: WhatsApp Business API
 - **Storage**: DynamoDB single-table design, S3 for knowledge base + temp audio
-- **Cost**: ~$50/month for 1,000 users (includes WhatsApp, Bedrock, OpenSearch Serverless)
+- **Cost**: ~$50/month for 1,000 users (see [Cost breakdown](#cost-breakdown) and [architecture/](architecture/) for details)
+
+**Diagrams:** See [architecture/diagrams.md](architecture/diagrams.md) for Mermaid diagrams (high-level, webhook, text/voice/image flows, nudge flow). Full design: [architecture.md](architecture.md).
 
 ## Features
 
@@ -100,6 +103,14 @@ aws secretsmanager create-secret \
 # Subscribe to 'messages' field
 ```
 
+### WhatsApp integration (webhook, secrets, templates)
+
+- **Webhook URL**: After deploy, use the stack output `WebhookUrl` (e.g. `https://<api-id>.execute-api.us-east-1.amazonaws.com/dev/webhook`). In Meta Developer Portal → WhatsApp → Configuration, set this as **Callback URL** and subscribe to **messages**.
+- **Verification (GET)**: Meta sends `hub.mode=subscribe`, `hub.verify_token`, `hub.challenge`. The webhook Lambda reads `agrinexus/whatsapp/verify-token` from Secrets Manager and returns `hub.challenge` if the token matches.
+- **Signatures (POST)**: Incoming message payloads are verified with `X-Hub-Signature-256` (HMAC-SHA256) using `agrinexus/whatsapp/app-secret`. Reject if invalid.
+- **Sending messages**: The processor and nudge Lambdas use `agrinexus/whatsapp/access-token` and `agrinexus/whatsapp/phone-number-id` to call the WhatsApp Cloud API (text, interactive buttons, or template messages where used).
+- **Message types**: Inbound text, image, and audio are supported. Outbound: text, optional interactive buttons (e.g. language/location during onboarding), and template messages for nudges (see [architecture/diagrams.md](architecture/diagrams.md)).
+
 ## Usage
 
 ### HELP Command
@@ -134,10 +145,20 @@ Bot: बढ़िया! आपने स्प्रे कर दिया। 
 .
 ├── template-week2.yaml              # SAM template (complete system)
 ├── README.md                        # This file
-├── CHANGELOG.md                     # Engineering changelog
-├── ISSUES-LOG.md                    # Debugging log
+├── architecture.md                  # Full architecture document
+├── architecture/                    # Diagrams and quick reference
+│   ├── README.md
+│   └── diagrams.md                 # Mermaid: flows, webhook, nudge
+├── docs/
+│   ├── E2E-TEST-GUIDE.md           # End-to-end test guide
+│   ├── CODE-WALKTHROUGH.md         # Component walkthrough
+│   ├── NUDGE-TEST-CHECKLIST.md
+│   └── NUDGE-DEMO-RUNBOOK.md
 ├── scripts/
-│   ├── deploy-week2.sh             # Deployment script
+│   ├── deploy-week2.sh            # Deployment script
+│   ├── e2e-test.sh                 # E2E automated test
+│   ├── reset-profile.sh            # Reset user for re-onboarding
+│   ├── demo.env.example            # Example env (copy to demo.env)
 │   └── upload-fao-pdfs.sh          # Upload knowledge base docs
 ├── src/
 │   ├── webhook/                    # WhatsApp webhook handler
@@ -241,9 +262,9 @@ Weather Poller → Step Functions → Nudge Sender → WhatsApp
 | SQS | 100K messages | $0 (free tier) |
 | Step Functions | 100 executions | $0 (free tier) |
 | EventBridge Scheduler | 1K schedules | ~$1 |
-| **Total** | | **~$32/month** |
+| **AWS total (above)** | | **~$32/month** |
 
-**Note**: WhatsApp API is free for first 1,000 conversations/month.
+**Overall**: With WhatsApp (free for first 1,000 conversations/month) and a small buffer, expect **~$50/month for 1,000 users**. See [architecture.md](architecture.md) for detailed cost notes.
 
 ## Known Limitations
 
@@ -418,9 +439,12 @@ See `docs/CODE-WALKTHROUGH.md` for a component-by-component architecture and log
 
 ## Documentation
 
+- [architecture/](architecture/) - Diagrams (Mermaid) and quick reference
+- `architecture.md` - Full system architecture design
+- `docs/E2E-TEST-GUIDE.md` - End-to-end testing (onboarding, voice, vision, nudges)
+- `docs/CODE-WALKTHROUGH.md` - Component-by-component walkthrough
 - `CHANGELOG.md` - Engineering changelog with all features and fixes
 - `ISSUES-LOG.md` - Debugging log with 20+ issues resolved
-- `architecture.md` - System architecture design
 - `design.md` - Technical design decisions
 - `requirements.md` - EARS requirements
 
