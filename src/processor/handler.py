@@ -121,14 +121,59 @@ def create_user_profile(phone_number: str, dialect: str, location: str, crop: st
     )
 
 
+def _parse_language_selection(message_text: str) -> Optional[str]:
+    """Return dialect code if message is a language selection, else None."""
+    text_lower = message_text.lower().strip()
+    if 'hindi' in text_lower or 'हिंदी' in message_text:
+        return 'hi'
+    if 'marathi' in text_lower or 'मराठी' in message_text:
+        return 'mr'
+    if 'telugu' in text_lower or 'తెలుగు' in message_text:
+        return 'te'
+    if 'english' in text_lower:
+        return 'en'
+    return None
+
+
 def handle_onboarding(phone_number: str, message_text: str, profile: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Onboarding state machine with interactive buttons
     States: welcome -> language -> location -> crop -> consent -> complete
     Returns: {'type': 'text'|'buttons', 'content': str, 'buttons': list (optional)}
     """
-    # State 1: Welcome (no profile exists)
+    # State 1: No profile exists - treat first message as possible language choice so we don't send welcome 6x
     if not profile:
+        dialect = _parse_language_selection(message_text)
+        if dialect:
+            # First message was a language choice: create profile and go straight to location
+            table.put_item(
+                Item={
+                    'PK': f'USER#{phone_number}',
+                    'SK': 'PROFILE',
+                    'phone_number': phone_number,
+                    'dialect': dialect,
+                    'onboarding_state': 'location',
+                    'onboarding_complete': False
+                }
+            )
+            location_prompt = {
+                'hi': 'बढ़िया! अब मुझे बताएं आप किस जिले में हैं?\n\n(या कोई भी जिला टाइप करें)',
+                'mr': 'छान! आता मला सांगा तुम्ही कोणत्या जिल्ह्यात आहात?\n\n(किंवा कोणताही जिल्हा टाइप करा)',
+                'te': 'బాగుంది! ఇప్పుడు మీరు ఏ జిల్లాలో ఉన్నారో చెప్పండి?\n\n(లేదా ఏదైనా జిల్లా టైప్ చేయండి)',
+                'en': 'Great! Now tell me which district you are in?\n\n(Or type any district name)'
+            }
+            district_buttons = {
+                'hi': ['औरंगाबाद', 'जालना', 'नागपुर'],
+                'mr': ['औरंगाबाद', 'जालना', 'नागपूर'],
+                'te': ['ఔరంగాబాద్', 'జల్నా', 'నాగ్‌పూర్'],
+                'en': ['Aurangabad', 'Jalna', 'Nagpur']
+            }
+            return {
+                'type': 'buttons',
+                'content': location_prompt.get(dialect, location_prompt['en']),
+                'buttons': district_buttons.get(dialect, district_buttons['en'])
+            }
+        # Not a language choice: create profile at language state and send welcome once
         table.put_item(
             Item={
                 'PK': f'USER#{phone_number}',
@@ -138,8 +183,6 @@ def handle_onboarding(phone_number: str, message_text: str, profile: Optional[Di
                 'onboarding_complete': False
             }
         )
-        # Send welcome message with language selection buttons
-        # Show multilingual welcome so all farmers can understand
         multilingual_welcome = """Welcome to AgriNexus AI! 🌾
 
 नमस्ते! AgriNexus AI में आपका स्वागत है।
@@ -147,29 +190,17 @@ def handle_onboarding(phone_number: str, message_text: str, profile: Optional[Di
 నమస్కారం! AgriNexus AI కి స్వాగతం.
 
 Please choose your language / कृपया अपनी भाषा चुनें:"""
-        
         return {
             'type': 'buttons',
             'content': multilingual_welcome,
             'buttons': ['English', 'हिंदी', 'मराठी']
         }
-    
+
     state = profile.get('onboarding_state', 'complete')
     
     # State 2: Language selection
     if state == 'language':
-        # Check if message contains language selection (from button or text)
-        text_lower = message_text.lower()
-        dialect = None
-        if 'hindi' in text_lower or 'हिंदी' in message_text:
-            dialect = 'hi'
-        elif 'marathi' in text_lower or 'मराठी' in message_text:
-            dialect = 'mr'
-        elif 'telugu' in text_lower or 'తెలుగు' in message_text:
-            dialect = 'te'
-        elif 'english' in text_lower:
-            dialect = 'en'
-        
+        dialect = _parse_language_selection(message_text)
         if dialect:
             update_user_profile(phone_number, {
                 'dialect': dialect,

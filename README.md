@@ -334,6 +334,16 @@ APP_SECRET="YOUR_APP_SECRET" \
 
 If you only have one number, set `FROM_NUMBER` and the script will reuse it.
 
+### Reset profile only (single-number testing)
+
+If you test with one WhatsApp number and want to re-run onboarding in another language, clear the stored profile first:
+
+```bash
+./scripts/reset-profile.sh +4917647009148
+```
+
+If `PHONE_NUMBER` is set in `scripts/demo.env`, you can run `./scripts/reset-profile.sh` with no arguments. Then send a new language keyword (हिंदी / मराठी / తెలుగు / English) in WhatsApp to start onboarding again. See `docs/E2E-TEST-GUIDE.md` → "Single-number testing".
+
 ### Single-Number Reset + Nudge Demo
 
 Reset onboarding and run a nudge demo with your personal number:
@@ -372,6 +382,19 @@ See `docs/NUDGE-TEST-CHECKLIST.md` for the MVP test matrix and demo steps.
 ## Nudge Demo Runbook
 
 See `docs/NUDGE-DEMO-RUNBOOK.md` for a judge-friendly 3-minute demo script.
+
+## End-to-End Test (All Features)
+
+See `docs/E2E-TEST-GUIDE.md` for testing onboarding, Q&A, voice, vision, and nudges.
+
+**One-time setup (recommended):** Copy `scripts/demo.env.example` to `scripts/demo.env` and set `WEBHOOK_URL`, `APP_SECRET`, and `PHONE_NUMBER`. All test scripts auto-load `demo.env`, so you don't need to pass the webhook URL every time:
+
+```bash
+cp scripts/demo.env.example scripts/demo.env
+# Edit scripts/demo.env with your values, then:
+./scripts/e2e-test.sh --phone +4917647009148
+# Or if PHONE_NUMBER is in demo.env: ./scripts/e2e-test.sh
+```
 
 ## Code Walkthrough
 
