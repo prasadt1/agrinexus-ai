@@ -4,6 +4,7 @@ version = 0.1
 [default.deploy]
 [default.deploy.parameters]
 stack_name = "agrinexus-week2"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-skxuyk7b5ott"
 s3_prefix = "agrinexus-week2"
 region = "us-east-1"
 confirm_changeset = true

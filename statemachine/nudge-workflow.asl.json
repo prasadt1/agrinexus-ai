@@ -60,7 +60,11 @@
       "Parameters": {
         "TopicArn": "${AlertTopicArn}",
         "Subject": "AgriNexus Nudge Workflow Failed",
-        "Message.$": "States.Format('Nudge workflow failed for location: {}\\n\\nError: {}\\n\\nExecution: {}', $.input.location, $.error.Error, $.executionArn)"
+        "Message": {
+          "error.$": "$.error",
+          "input.$": "$$.Execution.Input",
+          "executionArn.$": "$$.Execution.Id"
+        }
       },
       "End": true
     }
