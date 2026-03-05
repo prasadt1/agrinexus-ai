@@ -17,8 +17,8 @@ transcribe = boto3.client('transcribe', region_name='us-east-1')
 s3 = boto3.client('s3', region_name='us-east-1')
 bedrock_agent = boto3.client('bedrock-agent-runtime', region_name='us-east-1')
 
-TEMP_BUCKET = 'agrinexus-temp-audio-dev-043624892076'
-KB_ID = 'H81XLD3YWY'
+TEMP_BUCKET = os.environ.get('TEMP_AUDIO_BUCKET', '')
+KB_ID = os.environ.get('KNOWLEDGE_BASE_ID', '')
 TEST_PHONE = '+919876543210'
 
 

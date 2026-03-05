@@ -46,7 +46,7 @@ def test_voice_output(text, dialect, description):
             # Get audio file size
             try:
                 response = s3.head_object(
-                    Bucket='agrinexus-temp-audio-dev-043624892076',
+                    Bucket=os.environ.get('TEMP_AUDIO_BUCKET', ''),
                     Key=s3_key
                 )
                 size_kb = response['ContentLength'] / 1024

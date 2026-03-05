@@ -58,6 +58,15 @@ def analyze_crop_image(image_bytes: bytes, dialect: str, crop: str = 'cotton') -
             'confidence': str  # high, medium, low
         }
     """
+    # Detect image format from magic bytes
+    media_type = "image/jpeg"  # default
+    if image_bytes[:2] == b'\xff\xd8':
+        media_type = "image/jpeg"
+    elif image_bytes[:4] == b'\x89PNG':
+        media_type = "image/png"
+    elif image_bytes[:4] == b'RIFF' and image_bytes[8:12] == b'WEBP':
+        media_type = "image/webp"
+    
     # Encode image to base64
     image_base64 = base64.b64encode(image_bytes).decode('utf-8')
     
@@ -107,7 +116,7 @@ Format your response clearly with sections for Diagnosis, Severity, Recommendati
                                 "type": "image",
                                 "source": {
                                     "type": "base64",
-                                    "media_type": "image/jpeg",
+                                    "media_type": media_type,
                                     "data": image_base64
                                 }
                             },

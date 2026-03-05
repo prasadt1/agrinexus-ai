@@ -5,6 +5,63 @@
     "SendNudgeToFarmers": {
       "Type": "Task",
       "Resource": "${NudgeSenderArn}",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "HandleFailure"
+        }
+      ],
+      "Next": "CheckSuccess"
+    },
+    "CheckSuccess": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.nudges_sent",
+          "NumericGreaterThan": 0,
+          "Next": "Success"
+        }
+      ],
+      "Default": "NoNudgesSent"
+    },
+    "Success": {
+      "Type": "Succeed"
+    },
+    "NoNudgesSent": {
+      "Type": "Succeed",
+      "Comment": "No nudges sent (no farmers in location or all had pending nudges)"
+    },
+    "HandleFailure": {
+      "Type": "Pass",
+      "Parameters": {
+        "error.$": "$.error",
+        "input.$": "$$.Execution.Input",
+        "executionArn.$": "$$.Execution.Id"
+      },
+      "Next": "NotifyFailure"
+    },
+    "NotifyFailure": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${AlertTopicArn}",
+        "Subject": "AgriNexus Nudge Workflow Failed",
+        "Message.$": "States.Format('Nudge workflow failed for location: {}\\n\\nError: {}\\n\\nExecution: {}', $.input.location, $.error.Error, $.executionArn)"
+      },
       "End": true
     }
   }

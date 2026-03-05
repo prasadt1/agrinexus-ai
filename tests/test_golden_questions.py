@@ -7,6 +7,7 @@ Philosophy: Validate that responses are grounded in KB sources, not that they ma
 Accept ANY valid method from authoritative sources (ICAR-CICR, PAU, Rajendran, NIPHM).
 """
 
+import os
 import boto3
 import json
 import pytest
@@ -16,8 +17,8 @@ from tests.fixtures.valid_pesticides import ALL_VALID_METHODS, BANNED_PESTICIDES
 # Initialize Bedrock client
 bedrock_agent = boto3.client('bedrock-agent-runtime')
 
-# Get KB ID from environment or CloudFormation
-KNOWLEDGE_BASE_ID = "H81XLD3YWY"
+# Set KNOWLEDGE_BASE_ID for integration tests (e.g. from samconfig or CloudFormation output)
+KNOWLEDGE_BASE_ID = os.environ.get("KNOWLEDGE_BASE_ID", "")
 
 # 20 Golden Questions across 3 dialects
 GOLDEN_QUESTIONS = [

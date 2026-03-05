@@ -8,10 +8,10 @@ import boto3
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, Any
+from common.whatsapp import send_whatsapp_message, send_whatsapp_template
 
 dynamodb = boto3.resource('dynamodb')
 scheduler = boto3.client('scheduler')
-secrets = boto3.client('secretsmanager')
 cloudwatch = boto3.client('cloudwatch')
 
 TABLE_NAME = os.environ['TABLE_NAME']
@@ -70,107 +70,6 @@ def create_reminder_schedule(phone_number: str, nudge_id: str, hours_offset: int
         },
         FlexibleTimeWindow={'Mode': 'OFF'}
     )
-
-
-def send_whatsapp_message(phone_number: str, message: str):
-    """Send message via WhatsApp Business API"""
-    import requests
-    import time
-    
-    # Get WhatsApp credentials
-    access_token_secret = os.environ.get('ACCESS_TOKEN_SECRET', 'agrinexus/whatsapp/access-token')
-    phone_id_secret = os.environ.get('PHONE_NUMBER_ID_SECRET', 'agrinexus/whatsapp/phone-number-id')
-    
-    access_token_response = secrets.get_secret_value(SecretId=access_token_secret)
-    access_token = access_token_response['SecretString']
-    
-    phone_id_response = secrets.get_secret_value(SecretId=phone_id_secret)
-    phone_number_id = phone_id_response['SecretString']
-    
-    # Send via WhatsApp Business API
-    url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": phone_number,
-        "type": "text",
-        "text": {
-            "body": message
-        }
-    }
-    
-    print(f"Sending nudge to {phone_number}: {message[:50]}...")
-    response = None
-    for attempt in range(3):
-        try:
-            response = requests.post(url, headers=headers, json=payload, timeout=5)
-            if response.status_code < 500 and response.status_code != 429:
-                break
-        except requests.RequestException as e:
-            print(f"WhatsApp nudge request error (attempt {attempt + 1}): {e}")
-        time.sleep(0.5 * (2 ** attempt))
-    
-    if response and response.status_code == 200:
-        print(f"Nudge sent successfully: {response.json()}")
-    else:
-        status = response.status_code if response else 'no_response'
-        text = response.text if response else 'no_response_body'
-        print(f"Failed to send nudge: {status} - {text}")
-
-
-def send_whatsapp_template(phone_number: str, template_name: str, language_code: str) -> bool:
-    """Send WhatsApp template message (returns True on success)"""
-    import requests
-    import time
-
-    access_token_secret = os.environ.get('ACCESS_TOKEN_SECRET', 'agrinexus/whatsapp/access-token')
-    phone_id_secret = os.environ.get('PHONE_NUMBER_ID_SECRET', 'agrinexus/whatsapp/phone-number-id')
-
-    access_token_response = secrets.get_secret_value(SecretId=access_token_secret)
-    access_token = access_token_response['SecretString']
-
-    phone_id_response = secrets.get_secret_value(SecretId=phone_id_secret)
-    phone_number_id = phone_id_response['SecretString']
-
-    url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": phone_number,
-        "type": "template",
-        "template": {
-            "name": template_name,
-            "language": {
-                "code": language_code
-            }
-        }
-    }
-
-    print(f"Sending template '{template_name}' ({language_code}) to {phone_number}...")
-    response = None
-    for attempt in range(3):
-        try:
-            response = requests.post(url, headers=headers, json=payload, timeout=5)
-            if response.status_code < 500 and response.status_code != 429:
-                break
-        except requests.RequestException as e:
-            print(f"WhatsApp template request error (attempt {attempt + 1}): {e}")
-        time.sleep(0.5 * (2 ** attempt))
-
-    if response and response.status_code == 200:
-        print(f"Template sent successfully: {response.json()}")
-        return True
-
-    status = response.status_code if response else 'no_response'
-    text = response.text if response else 'no_response_body'
-    print(f"Failed to send template: {status} - {text}")
-    return False
 
 
 def emit_metric(name: str, value: float = 1.0):

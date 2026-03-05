@@ -6,9 +6,9 @@ import json
 import os
 import boto3
 from typing import Dict, Any
+from common.whatsapp import send_whatsapp_message
 
 dynamodb = boto3.resource('dynamodb')
-secrets = boto3.client('secretsmanager')
 
 TABLE_NAME = os.environ['TABLE_NAME']
 table = dynamodb.Table(TABLE_NAME)
@@ -75,53 +75,3 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {'statusCode': 200, 'message': 'Reminder sent'}
     else:
         return {'statusCode': 200, 'message': 'Task already completed'}
-
-
-def send_whatsapp_message(phone_number: str, message: str):
-    """Send message via WhatsApp Business API"""
-    import requests
-    import time
-    
-    # Get WhatsApp credentials
-    access_token_secret = os.environ.get('ACCESS_TOKEN_SECRET', 'agrinexus/whatsapp/access-token')
-    phone_id_secret = os.environ.get('PHONE_NUMBER_ID_SECRET', 'agrinexus/whatsapp/phone-number-id')
-    
-    try:
-        access_token_response = secrets.get_secret_value(SecretId=access_token_secret)
-        access_token = access_token_response['SecretString']
-        
-        phone_id_response = secrets.get_secret_value(SecretId=phone_id_secret)
-        phone_number_id = phone_id_response['SecretString']
-        
-        # Send via WhatsApp Business API
-        url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json"
-        }
-        payload = {
-            "messaging_product": "whatsapp",
-            "to": phone_number,
-            "type": "text",
-            "text": {"body": message}
-        }
-        
-        print(f"Sending reminder to {phone_number}: {message[:50]}...")
-        response = None
-        for attempt in range(3):
-            try:
-                response = requests.post(url, headers=headers, json=payload, timeout=5)
-                if response.status_code < 500 and response.status_code != 429:
-                    break
-            except requests.RequestException as e:
-                print(f"WhatsApp reminder request error (attempt {attempt + 1}): {e}")
-            time.sleep(0.5 * (2 ** attempt))
-        
-        if response and response.status_code == 200:
-            print(f"Reminder sent successfully: {response.json()}")
-        else:
-            status = response.status_code if response else 'no_response'
-            text = response.text if response else 'no_response_body'
-            print(f"Failed to send reminder: {status} - {text}")
-    except Exception as e:
-        print(f"Exception sending reminder to {phone_number}: {str(e)}")

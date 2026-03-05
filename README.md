@@ -1,6 +1,20 @@
-# AgriNexus AI - WhatsApp Agricultural Advisory System
+# AgriNexus AI – WhatsApp Agricultural Advisory
 
-Behavioral intervention engine for smallholder farmers. AWS 10,000 AIdeas Competition submission.
+**Close the last mile:** AI-powered agronomic advice and weather-timed nudges for smallholder farmers—in their language, on WhatsApp. Built for the **AWS Builder 10,000 AIdeas** competition with **Kiro**, **EARS**, and **Amazon Bedrock**.
+
+---
+
+## 🗳️ Why AgriNexus? (Vote for us)
+
+- **Real impact**: Farmers get timely pest/disease advice and spray reminders when weather is right—reducing crop loss and increasing income.
+- **Competition stack, end-to-end**: Developed with **Kiro** (requirements → code → deploy), **EARS** requirements (100+ traceable specs), and **Amazon Bedrock** (RAG, Claude, Transcribe, Polly, Vision) on full AWS serverless.
+- **Production-ready**: Multi-language (Hindi, Marathi, Telugu, English), voice in/out, image-based pest ID, and behavioral nudges with closed-loop tracking—all deployed and testable.
+
+*If you're a fellow builder or judge, we'd love your vote to reach the semi-finals. See [Competition submission](#competition-submission) and [Development workflow (Kiro + EARS)](#development-workflow-with-kiro-ai) below.*
+
+**Demo in 30 seconds:** Send a voice note → get cited agronomic advice in your language. Send a crop photo → get pest/disease ID and recommendations. Get a nudge when weather is right for spraying—reply "हो गया" (done) to close the loop.
+
+---
 
 ## 🎯 Competition Status: Production-ready ✅
 
@@ -440,6 +454,10 @@ See `docs/CODE-WALKTHROUGH.md` for a component-by-component architecture and log
 
 ## Documentation
 
+- [docs/COMPETITION-PITCH-AND-MEDIA.md](docs/COMPETITION-PITCH-AND-MEDIA.md) - **Competition:** Pitch, video script, 1-pager, deck outline, and where to share for votes
+- [docs/CLAUDE-MEDIA-KIT-PROMPT.md](docs/CLAUDE-MEDIA-KIT-PROMPT.md) - **Copy-paste prompt for Claude** to generate a full winning media kit (video script, 1-pager, deck, social posts)
+- [docs/ARCHITECTURE-DIAGRAM-CORRECTIONS.md](docs/ARCHITECTURE-DIAGRAM-CORRECTIONS.md) - **Diagram accuracy:** What to fix in the “system architecture” diagram (Webhook→SQS→Lambdas; Step Functions only for nudges; outbound via WhatsApp API)
+- [docs/PROMPTS-ANIMATED-ARCHITECTURE-GIFS.md](docs/PROMPTS-ANIMATED-ARCHITECTURE-GIFS.md) - **Animated GIFs:** Copy-paste prompts for Gemini/ChatGPT to generate animated flow diagrams (text, voice, image, nudge, webhook)
 - [architecture/](architecture/) - Diagrams (Mermaid) and quick reference
 - `architecture.md` - Full system architecture design
 - `docs/E2E-TEST-GUIDE.md` - End-to-end testing (onboarding, voice, vision, nudges)
@@ -609,7 +627,7 @@ aws cloudformation describe-stacks --stack-name agrinexus-week2
 **Post-Deployment Testing:**
 ```bash
 # Test webhook
-curl "https://nwo9tkvpoi.execute-api.us-east-1.amazonaws.com/dev/webhook"
+curl "https://<your-api-id>.execute-api.us-east-1.amazonaws.com/dev/webhook"
 
 # Test voice processor
 aws lambda invoke --function-name agrinexus-voice-dev --payload '{}' /tmp/response.json
@@ -647,11 +665,17 @@ This workflow demonstrates how Kiro AI enables rapid, high-quality development w
 
 ## Competition Submission
 
-**AWS 10,000 AIdeas Competition**
-- Category: Agriculture & Food Security
-- Region: India (Maharashtra focus)
-- Target Users: Smallholder cotton farmers
-- Impact: Timely pest management → reduced crop loss → increased income
+**AWS Builder 10,000 AIdeas Competition**
+
+| | |
+|---|---|
+| **Category** | Agriculture & Food Security (Social Impact) |
+| **Region** | India (Maharashtra focus) |
+| **Users** | Smallholder cotton farmers |
+| **Impact** | Timely pest management → reduced crop loss → increased income |
+| **Built with** | **Kiro** (spec-to-code), **EARS** requirements, **Bedrock** (RAG, Claude, Transcribe, Polly, Vision), **AWS** serverless (Lambda, DynamoDB, SQS, EventBridge, Step Functions) |
+
+This repo is our competition submission. We used **Kiro** for requirements-driven development, **EARS** for unambiguous specs (see [Requirements (EARS)](#requirements-methodology-ears) and `requirements.md`), and **Amazon Bedrock** for all AI capabilities. If you're voting or evaluating—thank you. Try the [Quick Start](#quick-start) or read the [EARS → Kiro → Bedrock workflow](#development-workflow-with-kiro-ai).
 
 ## License
 

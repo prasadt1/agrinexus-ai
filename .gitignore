@@ -1,2 +1,8 @@
 # Local demo config (contains WEBHOOK_URL, APP_SECRET, PHONE_NUMBER)
 scripts/demo.env
+
+# SAM build artifacts (do not commit)
+.aws-sam/
+
+# Kiro/agent specs (internal planning; keep local for public repo)
+.kiro/

@@ -124,6 +124,12 @@ def create_user_profile(phone_number: str, dialect: str, location: str, crop: st
 def _parse_language_selection(message_text: str) -> Optional[str]:
     """Return dialect code if message is a language selection, else None."""
     text_lower = message_text.lower().strip()
+    
+    # Handle list response IDs directly
+    if text_lower in ['en', 'hi', 'mr', 'te']:
+        return text_lower
+    
+    # Handle language names
     if 'hindi' in text_lower or 'हिंदी' in message_text:
         return 'hi'
     if 'marathi' in text_lower or 'मराठी' in message_text:
@@ -191,9 +197,18 @@ def handle_onboarding(phone_number: str, message_text: str, profile: Optional[Di
 
 Please choose your language / कृपया अपनी भाषा चुनें:"""
         return {
-            'type': 'buttons',
+            'type': 'list',
             'content': multilingual_welcome,
-            'buttons': ['English', 'हिंदी', 'मराठी']
+            'button_text': 'Select Language',
+            'sections': [{
+                'title': 'Available Languages',
+                'rows': [
+                    {'id': 'en', 'title': 'English'},
+                    {'id': 'hi', 'title': 'हिंदी (Hindi)'},
+                    {'id': 'mr', 'title': 'मराठी (Marathi)'},
+                    {'id': 'te', 'title': 'తెలుగు (Telugu)'}
+                ]
+            }]
         }
 
     state = profile.get('onboarding_state', 'complete')
@@ -234,11 +249,19 @@ Please choose your language / कृपया अपनी भाषा चु�
 నమస్కారం! AgriNexus AI కి స్వాగతం.
 
 Please choose your language / कृपया अपनी भाषा चुनें:"""
-            
             return {
-                'type': 'buttons',
+                'type': 'list',
                 'content': multilingual_welcome,
-                'buttons': ['English', 'हिंदी', 'मराठी']
+                'button_text': 'Select Language',
+                'sections': [{
+                    'title': 'Available Languages',
+                    'rows': [
+                        {'id': 'en', 'title': 'English'},
+                        {'id': 'hi', 'title': 'हिंदी (Hindi)'},
+                        {'id': 'mr', 'title': 'मराठी (Marathi)'},
+                        {'id': 'te', 'title': 'తెలుగు (Telugu)'}
+                    ]
+                }]
             }
     
     # State 3: Location validation
@@ -415,8 +438,18 @@ def save_message(phone_number: str, wamid: str, message_data: Dict[str, Any], re
     )
 
 
-def query_bedrock(query: str, dialect: str = 'hi') -> Dict[str, Any]:
-    """Query Bedrock Knowledge Base with RAG"""
+def query_bedrock(query: str, dialect: str = 'hi', session_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Query Bedrock Knowledge Base with RAG
+    
+    Args:
+        query: User's question
+        dialect: User's language dialect
+        session_id: Optional session ID for conversation context (uses phone number)
+    
+    Returns:
+        Dict with 'text' and 'citations'
+    """
     # Map dialect to language instruction
     language_instructions = {
         'hi': 'Respond in Hindi (Devanagari script). Use simple, practical language.',
@@ -455,17 +488,33 @@ Provide actionable farming advice with source references.'''
             'guardrailVersion': GUARDRAIL_VERSION
         }
     
-    response = bedrock_agent.retrieve_and_generate(
-        input={'text': query},
-        retrieveAndGenerateConfiguration={
-            'type': 'KNOWLEDGE_BASE',
-            'knowledgeBaseConfiguration': {
-                'knowledgeBaseId': KB_ID,
-                'modelArn': 'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0',
-                'generationConfiguration': generation_config
-            }
-        }
+    # Get model ARN from environment variable (with fallback to Claude 3 Sonnet)
+    model_arn = os.environ.get(
+        'MODEL_ARN',
+        'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0'
     )
+    
+    # Build retrieve_and_generate configuration
+    rag_config = {
+        'type': 'KNOWLEDGE_BASE',
+        'knowledgeBaseConfiguration': {
+            'knowledgeBaseId': KB_ID,
+            'modelArn': model_arn,
+            'generationConfiguration': generation_config
+        }
+    }
+    
+    # Add sessionId if provided (enables conversation context)
+    request_params = {
+        'input': {'text': query},
+        'retrieveAndGenerateConfiguration': rag_config
+    }
+    
+    if session_id:
+        request_params['sessionId'] = session_id
+        print(f"Using session ID for conversation context: {session_id[:10]}***")
+    
+    response = bedrock_agent.retrieve_and_generate(**request_params)
     
     return {
         'text': response['output']['text'],
@@ -634,17 +683,35 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             if message_type == 'text':
                 text = message.get('text', {}).get('body', '')
             elif message_type == 'interactive':
-                # Extract button reply text
+                # Extract interactive reply (button or list)
                 interactive = message.get('interactive', {})
-                button_reply = interactive.get('button_reply', {})
-                text = button_reply.get('title', '')
+                interactive_type = interactive.get('type', '')
+                
+                if interactive_type == 'button_reply':
+                    # Button reply: use title
+                    button_reply = interactive.get('button_reply', {})
+                    text = button_reply.get('title', '')
+                elif interactive_type == 'list_reply':
+                    # List reply: use id (e.g., 'en', 'hi', 'mr', 'te')
+                    list_reply = interactive.get('list_reply', {})
+                    text = list_reply.get('id', '')
+                else:
+                    text = ''
             
             if text:
                 onboarding_response = handle_onboarding(from_number, text, profile)
                 
-                # Send appropriate message type (text or buttons)
+                # Send appropriate message type (text, buttons, or list)
                 if onboarding_response['type'] == 'buttons':
                     send_whatsapp_buttons(from_number, onboarding_response['content'], onboarding_response['buttons'])
+                elif onboarding_response['type'] == 'list':
+                    from common.whatsapp import send_whatsapp_list
+                    send_whatsapp_list(
+                        from_number,
+                        onboarding_response['content'],
+                        onboarding_response['button_text'],
+                        onboarding_response['sections']
+                    )
                 else:
                     send_whatsapp_message(from_number, onboarding_response['content'])
                 
@@ -766,8 +833,8 @@ Just type your question or send a photo!'''
             }
             send_whatsapp_message(from_number, ack_messages.get(dialect, ack_messages['hi']))
             
-            # Query Bedrock (this takes ~13 seconds)
-            result = query_bedrock(text, dialect)
+            # Query Bedrock with session ID for conversation context (this takes ~13 seconds)
+            result = query_bedrock(text, dialect, session_id=from_number)
             
             # Save to DynamoDB
             save_message(from_number, wamid, message, result['text'], str(result['citations']))

@@ -2,6 +2,65 @@
 
 Mermaid diagrams for AgriNexus AI. Rendered on GitHub.
 
+## System architecture (competition-style, accurate)
+
+Use this for slides or a single “system architecture” image. It matches the actual code: **Webhook Lambda → SQS → Processor Lambdas** for messages; **Step Functions only for nudges**; **Lambdas call WhatsApp API directly** for outbound.
+
+```mermaid
+flowchart TB
+    subgraph User["User interaction"]
+        Farmer[Farmer]
+        WA[WhatsApp]
+    end
+    Farmer -->|1| WA
+
+    subgraph AWS["AWS Cloud"]
+        API[API Gateway\n/webhook]
+        WH[Webhook Lambda]
+        MQ[SQS Message Queue]
+        VQ[SQS Voice Queue]
+        Proc[Message Processor Lambda]
+        VoiceProc[Voice Processor Lambda]
+        DDB[(DynamoDB)]
+        subgraph AI["AI services"]
+            Bedrock[Bedrock\nClaude + RAG]
+            KB[Knowledge Base\nS3/OpenSearch]
+            Transcribe[Transcribe]
+            Polly[Polly]
+            Vision[Claude Vision]
+        end
+        NudgeSend[Nudge Sender Lambda]
+        RemindSend[Reminder Sender Lambda]
+    end
+
+    WA -->|2 POST| API --> WH
+    WH -->|3a text/image| MQ --> Proc
+    WH -->|3b audio| VQ --> VoiceProc
+    VoiceProc -->|transcript| MQ
+    Proc --> DDB
+    Proc --> Bedrock
+    Proc --> KB
+    Proc --> Vision
+    Proc --> Transcribe
+    Proc --> Polly
+    Proc -->|4 reply| WA
+    NudgeSend -->|4 nudge| WA
+    RemindSend -->|4 reminder| WA
+
+    subgraph Event["Event-driven"]
+        EB[EventBridge\nschedule]
+        Poll[Weather Poller Lambda]
+        SF[Step Functions\nnudge workflow]
+        EBS[EventBridge Scheduler\nT+24h, T+48h]
+    end
+    EB --> Poll --> SF --> NudgeSend
+    NudgeSend -.->|create| EBS --> RemindSend
+```
+
+**Flow summary:** (1) Farmer → WhatsApp. (2) WhatsApp → API Gateway → Webhook Lambda. (3) Webhook → SQS (message or voice queue) → Message Processor or Voice Processor. Processors use DynamoDB and AI services (Bedrock RAG, Transcribe, Polly, Vision). (4) Processors and nudge/reminder Lambdas send replies **directly to WhatsApp Cloud API** (HTTP). Nudges: EventBridge → Weather Poller → Step Functions → Nudge Sender → WhatsApp; reminders via EventBridge Scheduler → Reminder Sender → WhatsApp.
+
+---
+
 ## High-level system
 
 ```mermaid

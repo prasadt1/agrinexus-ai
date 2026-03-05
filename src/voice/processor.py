@@ -8,49 +8,18 @@ import boto3
 import time
 import urllib.request
 from typing import Dict, Any, Optional
+from common.whatsapp import get_whatsapp_credentials, send_whatsapp_message
 
 transcribe = boto3.client('transcribe')
 s3 = boto3.client('s3')
-secrets = boto3.client('secretsmanager')
 sqs = boto3.client('sqs')
 
 TEMP_BUCKET = os.environ['TEMP_AUDIO_BUCKET']
 QUEUE_URL = os.environ['QUEUE_URL']
 TABLE_NAME = os.environ['TABLE_NAME']
-ACCESS_TOKEN_SECRET = os.environ.get('ACCESS_TOKEN_SECRET', 'agrinexus/whatsapp/access-token')
-PHONE_NUMBER_ID_SECRET = os.environ.get('PHONE_NUMBER_ID_SECRET', 'agrinexus/whatsapp/phone-number-id')
 
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(TABLE_NAME)
-
-
-def get_whatsapp_credentials():
-    """Get WhatsApp credentials from Secrets Manager"""
-    token_response = secrets.get_secret_value(SecretId=ACCESS_TOKEN_SECRET)
-    phone_response = secrets.get_secret_value(SecretId=PHONE_NUMBER_ID_SECRET)
-    return token_response['SecretString'], phone_response['SecretString']
-
-
-def send_whatsapp_message(to: str, message: str):
-    """Send WhatsApp message"""
-    access_token, phone_number_id = get_whatsapp_credentials()
-    
-    url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json"
-    }
-    
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": to,
-        "type": "text",
-        "text": {"body": message}
-    }
-    
-    req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers=headers, method='POST')
-    with urllib.request.urlopen(req, timeout=5) as response:
-        return json.loads(response.read())
 
 
 def get_whatsapp_media_url(media_id: str) -> str:

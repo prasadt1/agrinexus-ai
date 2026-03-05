@@ -57,7 +57,7 @@ Language: hi-IN
 ------------------------------------------------------------
 
 1. Uploading to S3...
-   ✓ Uploaded: s3://agrinexus-temp-audio-dev-043624892076/test/voice-test-1234567890.mp3
+   ✓ Uploaded: s3://<your-temp-audio-bucket>/test/voice-test-1234567890.mp3
 
 2. Starting transcription job: test-1234567890
    ⏳ Waiting for completion...

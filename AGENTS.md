@@ -19,7 +19,7 @@ Source modules under `src/` read environment variables at import time. For **uni
 ### Running tests
 
 - **Local unit tests (no AWS required):** `TABLE_NAME=agrinexus-data python3 -m pytest tests/test_nudge_flow.py -v` — uses mocks/monkeypatch, runs fully offline with dummy AWS credentials.
-- **Integration tests (require real AWS credentials):** `python3 -m pytest tests/test_golden_questions.py -v` and `tests/test_golden_questions_realistic.py` call live AWS Bedrock Knowledge Base (KB ID `H81XLD3YWY`). `test_voice_*.py` and `test_vision.py` also call live AWS services (Transcribe, Polly, Bedrock Vision).
+- **Integration tests (require real AWS credentials):** `python3 -m pytest tests/test_golden_questions.py -v` and `tests/test_golden_questions_realistic.py` call live AWS Bedrock Knowledge Base (set `KNOWLEDGE_BASE_ID` or use your deployed KB ID). `test_voice_*.py` and `test_vision.py` also call live AWS services (Transcribe, Polly, Bedrock Vision).
 - **Expected integration test failures:** Some golden question tests may fail due to RAG response quality (keyword matching), not environment issues. If a test connects to Bedrock and gets a response, the environment is working correctly.
 
 ### Linting

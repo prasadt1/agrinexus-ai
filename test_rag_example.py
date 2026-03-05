@@ -4,14 +4,15 @@ Example: How Bedrock RAG works
 Run this after deploying Week 1 infrastructure
 """
 
+import os
 import boto3
 import json
 
 # Initialize Bedrock client
 bedrock_agent = boto3.client('bedrock-agent-runtime', region_name='us-east-1')
 
-# Your Knowledge Base ID (get from CloudFormation outputs)
-KB_ID = "H81XLD3YWY"  # Replace after deployment
+# Set KNOWLEDGE_BASE_ID (e.g. from CloudFormation output or samconfig)
+KB_ID = os.environ.get("KNOWLEDGE_BASE_ID", "")
 
 def test_rag_query():
     """

@@ -3,6 +3,7 @@ Realistic Golden Questions Test Suite for RAG Quality Assurance
 Updated based on actual document content (Rajendran 2018, NIPHM, IPM papers)
 """
 
+import os
 import boto3
 import json
 import pytest
@@ -11,8 +12,8 @@ from typing import Dict, List
 # Initialize Bedrock client
 bedrock_agent = boto3.client('bedrock-agent-runtime')
 
-# Get KB ID from environment or CloudFormation
-KNOWLEDGE_BASE_ID = "H81XLD3YWY"
+# Set KNOWLEDGE_BASE_ID for integration tests
+KNOWLEDGE_BASE_ID = os.environ.get("KNOWLEDGE_BASE_ID", "")
 
 # Realistic Golden Questions based on actual document content
 GOLDEN_QUESTIONS = [

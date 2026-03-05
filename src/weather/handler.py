@@ -19,7 +19,8 @@ STATE_MACHINE_ARN = os.environ.get('STATE_MACHINE_ARN')
 table = dynamodb.Table(TABLE_NAME)
 
 # DEMO MODE: Mock perfect weather for all configured locations
-MOCK_WEATHER = os.environ.get('MOCK_WEATHER', 'true').lower() == 'true'  # Default to true for demo
+# WARNING: Set MOCK_WEATHER=true explicitly for testing only
+MOCK_WEATHER = os.environ.get('MOCK_WEATHER', 'false').lower() == 'true'  # Default to false for production
 USE_REAL_WEATHER = os.environ.get('USE_REAL_WEATHER', 'false').lower() == 'true'
 WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY')
 WEATHER_API_BASE = os.environ.get('WEATHER_API_BASE', 'https://api.openweathermap.org/data/2.5/weather')

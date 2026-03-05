@@ -164,25 +164,25 @@ SENT → REMINDED → DONE
 
 ### Reset User Profile
 ```bash
-./scripts/reset-user-profile.sh 4917647009148
+./scripts/reset-user-profile.sh 919876543210
 ```
 Deletes profile, messages, and nudges for fresh onboarding test.
 
 ### Trigger Nudge
 ```bash
-./scripts/trigger-nudge-test.sh 4917647009148
+./scripts/trigger-nudge-test.sh 919876543210
 ```
 Manually triggers weather poller and checks if nudge was created.
 
 ### Test T+24h Reminder
 ```bash
-./scripts/test-reminder.sh 4917647009148 T+24h
+./scripts/test-reminder.sh 919876543210 T+24h
 ```
 Immediately sends T+24h reminder (bypasses 24h wait).
 
 ### Test T+48h Reminder
 ```bash
-./scripts/test-reminder.sh 4917647009148 T+48h
+./scripts/test-reminder.sh 919876543210 T+48h
 ```
 Immediately sends T+48h reminder (bypasses 48h wait).
 
@@ -215,7 +215,7 @@ aws logs tail /aws/lambda/agrinexus-response-detector-dev --follow
 aws dynamodb query \
   --table-name agrinexus-data \
   --key-condition-expression "PK = :pk AND begins_with(SK, :sk)" \
-  --expression-attribute-values '{":pk":{"S":"USER#4917647009148"},":sk":{"S":"NUDGE#"}}'
+  --expression-attribute-values '{":pk":{"S":"USER#919876543210"},":sk":{"S":"NUDGE#"}}'
 
 # Check scheduled reminders
 aws scheduler list-schedules --query 'Schedules[?contains(Name, `reminder`)]'

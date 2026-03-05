@@ -17,7 +17,7 @@ This will:
 
 After running the test, you'll see URLs like:
 ```
-https://agrinexus-temp-audio-dev-043624892076.s3.amazonaws.com/voice-output/...
+https://<your-temp-audio-bucket>.s3.amazonaws.com/voice-output/...
 ```
 
 **Option 1: Browser**

@@ -88,6 +88,13 @@ def verify_signature(payload: str, signature: str) -> bool:
         return False
 
 
+def redact_phone(phone: str) -> str:
+    """Redact phone number for logging (show only first 3 digits)"""
+    if not phone or len(phone) < 3:
+        return "***"
+    return f"{phone[:3]}***"
+
+
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Handle WhatsApp webhook events
@@ -165,7 +172,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             from_number = message.get('from')
             message_type = message.get('type')
             
-            logger.info(f"Message - wamid: {wamid}, from: {from_number}, type: {message_type}")
+            logger.info(f"Message - wamid: {wamid}, from: {redact_phone(from_number)}, type: {message_type}")
             
             # Idempotency check: Conditional write to avoid race
             try:
@@ -240,7 +247,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 message_text = message.get('text', {}).get('body', '')
             
             if should_skip_rag(message_text):
-                logger.info(f"Message contains DONE/NOT YET keyword - skipping RAG, will be handled by response detector: {message_text}")
+                logger.info(f"Message contains DONE/NOT YET keyword - skipping RAG, will be handled by response detector")
                 # Don't send to SQS - response detector will handle it via DynamoDB Streams
                 continue
             

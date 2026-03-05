@@ -7,14 +7,15 @@ what keywords are actually present in the responses, so you can update
 your test expectations to be realistic.
 """
 
+import os
 import boto3
 import json
 
 # Initialize Bedrock client
 bedrock_agent = boto3.client('bedrock-agent-runtime', region_name='us-east-1')
 
-# Your Knowledge Base ID
-KB_ID = "H81XLD3YWY"
+# Set KNOWLEDGE_BASE_ID for your deployed KB
+KB_ID = os.environ.get("KNOWLEDGE_BASE_ID", "")
 
 # Sample questions to test
 SAMPLE_QUESTIONS = [

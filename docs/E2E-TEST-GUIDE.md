@@ -25,7 +25,7 @@ All compute is serverless (Lambda, DynamoDB, SQS, Step Functions, EventBridge). 
    - `WEBHOOK_URL` – Your webhook URL, e.g.  
      `https://xxxxxxxx.execute-api.us-east-1.amazonaws.com/dev/webhook`
    - `APP_SECRET` – WhatsApp app secret (for `X-Hub-Signature-256`). If verification is disabled in dev, you can omit it.
-   - A **test phone number** in E.164 (e.g. `919876543210` or `4917647009148`). For voice and image tests, use a number that can send media (real WhatsApp Business numbers; test numbers often don’t support media).
+   - A **test phone number** in E.164 (e.g. `919876543210`). For voice and image tests, use a number that can send media (real WhatsApp Business numbers; test numbers often don’t support media).
 
 3. **Recommended (no typing URL each time):** Copy the example env file and edit with your values:
    ```bash
@@ -34,7 +34,7 @@ All compute is serverless (Lambda, DynamoDB, SQS, Step Functions, EventBridge). 
    ```
    All automated test scripts (`e2e-test.sh`, `reset-onboard-and-demo.sh`, `reset-profile.sh`, `demo-nudge-flow.sh`, etc.) **auto-load** `scripts/demo.env` when present. You can then run tests without passing env vars every time, e.g.:
    ```bash
-   ./scripts/e2e-test.sh --phone +4917647009148
+   ./scripts/e2e-test.sh --phone +919876543210
    # or, if PHONE_NUMBER is set in demo.env:
    ./scripts/e2e-test.sh
    ```
@@ -44,12 +44,12 @@ All compute is serverless (Lambda, DynamoDB, SQS, Step Functions, EventBridge). 
 
 ### Single-number testing (one WhatsApp number)
 
-If you only have **one** test number (e.g. your own: `+4917647009148`), each onboarding creates a **user profile** in DynamoDB. To test onboarding in a **different language**, you must delete that profile first; otherwise the bot may treat you as already onboarded.
+If you only have **one** test number (e.g. your own: `+919876543210`), each onboarding creates a **user profile** in DynamoDB. To test onboarding in a **different language**, you must delete that profile first; otherwise the bot may treat you as already onboarded.
 
 **Before each new language onboarding:**
 
 ```bash
-./scripts/reset-profile.sh +4917647009148
+./scripts/reset-profile.sh +919876543210
 ```
 
 If you have `PHONE_NUMBER` in `scripts/demo.env`, you can run: `./scripts/reset-profile.sh` (script uses `PHONE_NUMBER` when no argument is given—see below). For `reset-profile.sh`, the phone can also be passed as the first argument.

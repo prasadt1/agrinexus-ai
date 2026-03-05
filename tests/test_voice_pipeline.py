@@ -14,10 +14,10 @@ s3 = boto3.client('s3', region_name='us-east-1')
 dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
 sqs = boto3.client('sqs', region_name='us-east-1')
 
-# Configuration
-TEMP_BUCKET = 'agrinexus-temp-audio-dev-043624892076'
-TABLE_NAME = 'agrinexus-data'
-QUEUE_URL = 'https://sqs.us-east-1.amazonaws.com/043624892076/agrinexus-messages-dev.fifo'
+# Configuration (set TEMP_AUDIO_BUCKET, VOICE_QUEUE_URL for integration tests)
+TEMP_BUCKET = os.environ.get('TEMP_AUDIO_BUCKET', '')
+TABLE_NAME = os.environ.get('TABLE_NAME', 'agrinexus-data')
+QUEUE_URL = os.environ.get('VOICE_QUEUE_URL', '')
 TEST_PHONE = '+919876543210'  # Fake test number
 
 table = dynamodb.Table(TABLE_NAME)

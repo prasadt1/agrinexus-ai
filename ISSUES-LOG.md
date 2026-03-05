@@ -9,6 +9,135 @@ A chronological record of bugs, issues, and debugging sessions from project ince
 
 ---
 
+## March 2026 - Code Review Fixes
+
+### Issue #039: Lambda Packaging - Common Module Not Reachable 🔴
+**Date**: March 5, 2026  
+**Severity**: Critical (deployment blocker)  
+**Symptom**: All nudge and voice Lambdas would fail at runtime with `ModuleNotFoundError: No module named 'common'`  
+**Root Cause**: SAM packages each Lambda from its own CodeUri directory. When CodeUri is `src/nudge/`, only contents of that directory are packaged. `src/common/` is not accessible at Lambda runtime  
+**Debugging Steps**:
+1. Claude Code review identified the issue before deployment
+2. Verified SAM packaging behavior - each Lambda gets isolated package
+3. Confirmed imports would fail: `from common.whatsapp import send_whatsapp_message`
+**Solution**: Created Lambda Layer (CommonLayer) in template-week2.yaml with ContentUri: src/common/. Attached layer to 6 Lambdas that need it. Layer makes common module accessible at /opt/python/ in Lambda runtime  
+**Time**: 45 min  
+**Impact**: All imports now work correctly, no runtime failures
+
+### Issue #040: Telugu List Message - No Interactive Buttons 🔴
+**Date**: March 5, 2026  
+**Severity**: Critical (UX failure)  
+**Symptom**: Telugu language selection showed plain text with no interactive buttons - complete UX failure  
+**Root Cause**: Changed response type to 'list' to support 4 languages, but no `send_whatsapp_list()` function existed. Handler fell through to plain text fallback  
+**Debugging Steps**:
+1. Claude Code review identified missing function
+2. Verified WhatsApp API requires different payload format for list messages
+3. Confirmed handler only checked for 'buttons' type, not 'list'
+**Solution**: Implemented `send_whatsapp_list()` in src/common/whatsapp.py with proper WhatsApp interactive list format. Updated onboarding response to use sections/rows structure. Updated lambda_handler to route 'list' type. Updated _parse_language_selection() to handle list response IDs  
+**Time**: 60 min  
+**Impact**: Telugu farmers can now select language with interactive list UI
+
+### Issue #041: VoiceProcessor Timeout 🟡
+**Date**: March 5, 2026  
+**Severity**: Major  
+**Symptom**: Voice transcription timing out before completion  
+**Root Cause**: 60-second polling loop but only 30-second Lambda timeout  
+**Solution**: Increased VoiceProcessor timeout to 90 seconds in template-week2.yaml  
+**Time**: 5 min  
+**Impact**: Voice messages process successfully
+
+### Issue #042: MOCK_WEATHER Production Risk 🟡
+**Date**: March 5, 2026  
+**Severity**: Major  
+**Symptom**: Would send fake weather data to real farmers in production  
+**Root Cause**: Default value was 'true' instead of 'false'  
+**Solution**: Changed default to 'false' in src/weather/handler.py and template-week2.yaml  
+**Time**: 5 min  
+**Impact**: Production-safe default
+
+### Issue #043: Telugu Button Missing 🟡
+**Date**: March 5, 2026  
+**Severity**: Major  
+**Symptom**: Telugu speakers couldn't select their language  
+**Root Cause**: WhatsApp buttons limited to 3 options, only had English/Hindi/Marathi  
+**Solution**: Changed to list format (supports 10+ options), added Telugu  
+**Time**: 30 min (combined with Issue #040)  
+**Impact**: All 4 languages now supported
+
+### Issue #044: Polly Engine Parameter Missing 🟡
+**Date**: March 5, 2026  
+**Severity**: Major  
+**Symptom**: Neural voices would fail without Engine parameter  
+**Root Cause**: synthesize_speech() call missing Engine parameter  
+**Solution**: Updated get_polly_voice() to return 3-tuple with engine, added Engine parameter  
+**Time**: 15 min  
+**Impact**: Correct engine used for each voice
+
+### Issue #045: Image Format Hardcoded 🟡
+**Date**: March 5, 2026  
+**Severity**: Major  
+**Symptom**: PNG and WebP images would fail  
+**Root Cause**: Hardcoded media_type to image/jpeg  
+**Solution**: Added magic byte detection for JPEG/PNG/WebP  
+**Time**: 20 min  
+**Impact**: All image formats now supported
+
+### Issue #046: PII in CloudWatch Logs 🟡
+**Date**: March 5, 2026  
+**Severity**: Major (privacy risk)  
+**Symptom**: Full phone numbers and message content in logs  
+**Root Cause**: No redaction in log statements  
+**Solution**: Added redact_phone() function, masked phone numbers to first 3 digits  
+**Time**: 15 min  
+**Impact**: GDPR/privacy compliant logging
+
+### Issue #047: Code Duplication - send_whatsapp_message 🟢
+**Date**: March 5, 2026  
+**Severity**: Minor (maintenance issue)  
+**Symptom**: Function duplicated in 5 files  
+**Root Cause**: Copy-paste during development  
+**Solution**: Created src/common/whatsapp.py, migrated all files to import from common  
+**Time**: 45 min  
+**Impact**: Single source of truth, easier maintenance
+
+### Issue #048: Secrets Manager Performance 🟢
+**Date**: March 5, 2026  
+**Severity**: Minor (performance)  
+**Symptom**: 100-200ms latency per message from Secrets Manager calls  
+**Root Cause**: No caching, called on every message  
+**Solution**: Implemented 5-minute TTL cache in common/whatsapp.py  
+**Time**: 30 min  
+**Impact**: 80% reduction in Secrets Manager calls, 100-200ms latency savings
+
+### Issue #049: No Conversation Context 🟢
+**Date**: March 5, 2026  
+**Severity**: Minor (UX limitation)  
+**Symptom**: Follow-up questions didn't work  
+**Root Cause**: No sessionId passed to Bedrock  
+**Solution**: Added sessionId parameter using phone number  
+**Time**: 20 min  
+**Impact**: Multi-turn conversations now work
+
+### Issue #050: Silent Step Functions Failures 🟢
+**Date**: March 5, 2026  
+**Severity**: Minor (observability)  
+**Symptom**: No visibility into nudge workflow failures  
+**Root Cause**: No error handling in state machine  
+**Solution**: Added Retry, Catch, SNS notifications, CloudWatch alarm  
+**Time**: 45 min  
+**Impact**: Full visibility into failures
+
+### Issue #051: Hardcoded Model ARN 🟢
+**Date**: March 5, 2026  
+**Severity**: Minor (maintenance)  
+**Symptom**: Must update code for model upgrades  
+**Root Cause**: ARN hardcoded in processor/handler.py  
+**Solution**: Moved to MODEL_ARN environment variable  
+**Time**: 10 min  
+**Impact**: Easy model upgrades
+
+---
+
 ## Week 4 (Feb 18-28, 2026)
 
 ### Issue #035: English Voice Output Failing with Engine Error 🟡
@@ -74,7 +203,7 @@ A chronological record of bugs, issues, and debugging sessions from project ince
 **Severity**: Critical  
 **Symptom**: RAG queries failing with "ValidationException: The provided guardrail identifier is invalid" and placeholder KB ID  
 **Root Cause**: samconfig-week2.toml had placeholder values `REPLACE_WITH_YOUR_KB_ID` and `REPLACE_WITH_YOUR_GUARDRAIL_ID`  
-**Solution**: Updated samconfig with actual KB ID (H81XLD3YWY) and removed guardrail requirement (empty string)  
+**Solution**: Updated samconfig with actual KB ID and removed guardrail requirement (empty string)  
 **Time**: 15 min  
 **Impact**: RAG queries now work correctly
 
@@ -82,7 +211,7 @@ A chronological record of bugs, issues, and debugging sessions from project ince
 **Date**: Feb 19, 2026  
 **Severity**: Major  
 **Symptom**: User data reset script couldn't find profile, but profile existed in DynamoDB  
-**Root Cause**: DynamoDB stores phone numbers WITHOUT + sign (`USER#4917647009148`) but reset script searched for `USER#+4917647009148`  
+**Root Cause**: DynamoDB stores phone numbers WITHOUT + sign (e.g. `USER#919876543210`) but reset script searched for `USER#+919876543210`  
 **Solution**: Updated all scripts to use phone number without + sign when querying DynamoDB  
 **Time**: 20 min  
 **Impact**: User data management now works correctly

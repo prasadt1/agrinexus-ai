@@ -7,10 +7,10 @@ import os
 import boto3
 from typing import Dict, Any, List
 import re
+from common.whatsapp import send_whatsapp_message
 
 dynamodb = boto3.resource('dynamodb')
 scheduler = boto3.client('scheduler')
-secrets = boto3.client('secretsmanager')
 cloudwatch = boto3.client('cloudwatch')
 
 TABLE_NAME = os.environ['TABLE_NAME']
@@ -49,51 +49,6 @@ NOT_YET_FINAL_MESSAGES = {
     'mr': 'काही हरकत नाही. तुम्ही तयार असाल तेव्हा करा. पुढच्या वेळी हवामान चांगले असेल तर मी पुन्हा आठवण करून देईन. 👍',
     'te': 'పర్వాలేదు. మీరు సిద్ధంగా ఉన్నప్పుడు చేయండి. తదుపరిసారి వాతావరణం మంచిగా ఉంటే నేను మళ్లీ గుర్తు చేస్తాను. 👍'
 }
-
-
-def send_whatsapp_message(phone_number: str, message: str):
-    """Send message via WhatsApp Business API"""
-    import requests
-    import time
-    
-    access_token_secret = os.environ.get('ACCESS_TOKEN_SECRET', 'agrinexus/whatsapp/access-token')
-    phone_id_secret = os.environ.get('PHONE_NUMBER_ID_SECRET', 'agrinexus/whatsapp/phone-number-id')
-    
-    access_token_response = secrets.get_secret_value(SecretId=access_token_secret)
-    access_token = access_token_response['SecretString']
-    
-    phone_id_response = secrets.get_secret_value(SecretId=phone_id_secret)
-    phone_number_id = phone_id_response['SecretString']
-    
-    url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": phone_number,
-        "type": "text",
-        "text": {
-            "body": message
-        }
-    }
-    
-    response = None
-    for attempt in range(3):
-        try:
-            response = requests.post(url, headers=headers, json=payload, timeout=5)
-            if response.status_code < 500 and response.status_code != 429:
-                break
-        except requests.RequestException as e:
-            print(f"WhatsApp detector request error (attempt {attempt + 1}): {e}")
-        time.sleep(0.5 * (2 ** attempt))
-    if response and response.status_code == 200:
-        print(f"Confirmation sent to {phone_number}")
-    else:
-        status = response.status_code if response else 'no_response'
-        text = response.text if response else 'no_response_body'
-        print(f"Failed to send confirmation: {status} - {text}")
 
 
 def emit_metric(name: str, value: float = 1.0):

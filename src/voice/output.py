@@ -9,7 +9,8 @@ from typing import Optional, Tuple
 polly = boto3.client('polly', region_name='us-east-1')
 s3 = boto3.client('s3', region_name='us-east-1')
 
-TEMP_BUCKET = os.environ.get('TEMP_AUDIO_BUCKET', 'agrinexus-temp-audio-dev-043624892076')
+# Set by SAM at deploy; for local runs set TEMP_AUDIO_BUCKET (no default to avoid leaking account IDs)
+TEMP_BUCKET = os.environ.get('TEMP_AUDIO_BUCKET', '')
 
 
 def get_polly_voice(dialect: str) -> Tuple[str, str, str]:

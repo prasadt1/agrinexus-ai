@@ -47,6 +47,17 @@ Globals:
         GUARDRAIL_VERSION: !Ref GuardrailVersion
 
 Resources:
+  # ============================================================================
+  # Lambda Layer: Common Utilities
+  # ============================================================================
+  CommonLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub agrinexus-common-${Environment}
+      Description: Common utilities for WhatsApp integration (caching, PII redaction)
+      ContentUri: src/common-layer/
+      CompatibleRuntimes:
+        - python3.11
 
   # ============================================================================
   # Note: WhatsApp secrets are already created in Secrets Manager:
@@ -177,12 +188,15 @@ Resources:
       Handler: handler.lambda_handler
       Description: Process messages from SQS and interact with Bedrock
       Timeout: 60
+      Layers:
+        - !Ref CommonLayer
       Environment:
         Variables:
           QUEUE_URL: !Ref MessageQueue
           ACCESS_TOKEN_SECRET: agrinexus/whatsapp/access-token
           PHONE_NUMBER_ID_SECRET: agrinexus/whatsapp/phone-number-id
           TEMP_AUDIO_BUCKET: !Ref TempAudioBucket
+          MODEL_ARN: arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TableName
@@ -226,6 +240,8 @@ Resources:
       Handler: processor.lambda_handler
       Description: Process WhatsApp voice notes using Amazon Transcribe
       Timeout: 90
+      Layers:
+        - !Ref CommonLayer
       Environment:
         Variables:
           TEMP_AUDIO_BUCKET: !Ref TempAudioBucket
@@ -269,6 +285,8 @@ Resources:
       CodeUri: src/dlq/
       Handler: handler.lambda_handler
       Description: Handle failed messages with dialect-aware error responses
+      Layers:
+        - !Ref CommonLayer
       Environment:
         Variables:
           ACCESS_TOKEN_SECRET: agrinexus/whatsapp/access-token
@@ -331,6 +349,8 @@ Resources:
       CodeUri: src/nudge/
       Handler: sender.lambda_handler
       Description: Send behavioral nudges via WhatsApp
+      Layers:
+        - !Ref CommonLayer
       Environment:
         Variables:
           REMINDER_LAMBDA_ARN: !GetAtt ReminderSender.Arn
@@ -368,6 +388,8 @@ Resources:
       CodeUri: src/nudge/
       Handler: reminder.lambda_handler
       Description: Send T+24h and T+48h reminders
+      Layers:
+        - !Ref CommonLayer
       Environment:
         Variables:
           ACCESS_TOKEN_SECRET: agrinexus/whatsapp/access-token
@@ -393,6 +415,8 @@ Resources:
       CodeUri: src/nudge/
       Handler: detector.lambda_handler
       Description: Detect DONE/NOT YET responses and update nudge status
+      Layers:
+        - !Ref CommonLayer
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TableName
@@ -416,6 +440,37 @@ Resources:
                 - !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus/whatsapp/*'
 
   # ============================================================================
+  # SNS Topic for Alerts
+  # ============================================================================
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub agrinexus-alerts-${Environment}
+      DisplayName: AgriNexus System Alerts
+
+  # ============================================================================
+  # CloudWatch Alarm for Failed State Machine Executions
+  # ============================================================================
+  NudgeWorkflowFailureAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub agrinexus-nudge-workflow-failures-${Environment}
+      AlarmDescription: Alert when nudge workflow executions fail
+      MetricName: ExecutionsFailed
+      Namespace: AWS/States
+      Statistic: Sum
+      Period: 300  # 5 minutes
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: StateMachineArn
+          Value: !Ref NudgeStateMachine
+      AlarmActions:
+        - !Ref AlertTopic
+      TreatMissingData: notBreaching
+
+  # ============================================================================
   # Step Functions: Nudge Workflow
   # ============================================================================
   NudgeStateMachine:
@@ -426,11 +481,14 @@ Resources:
       DefinitionSubstitutions:
         NudgeSenderArn: !GetAtt NudgeSender.Arn
         TableName: !Ref TableName
+        AlertTopicArn: !Ref AlertTopic
       Policies:
         - LambdaInvokePolicy:
             FunctionName: !Ref NudgeSender
         - DynamoDBReadPolicy:
             TableName: !Ref TableName
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt AlertTopic.TopicName
 
   # ============================================================================
   # IAM Role for EventBridge Scheduler
@@ -489,3 +547,7 @@ Outputs:
   NudgeStateMachineArn:
     Description: Step Functions state machine ARN
     Value: !Ref NudgeStateMachine
+
+  AlertTopicArn:
+    Description: SNS topic ARN for system alerts
+    Value: !Ref AlertTopic

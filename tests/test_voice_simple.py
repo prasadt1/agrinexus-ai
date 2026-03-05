@@ -10,7 +10,7 @@ import sys
 transcribe = boto3.client('transcribe', region_name='us-east-1')
 s3 = boto3.client('s3', region_name='us-east-1')
 
-TEMP_BUCKET = 'agrinexus-temp-audio-dev-043624892076'
+TEMP_BUCKET = os.environ.get('TEMP_AUDIO_BUCKET', '')
 
 
 def test_transcribe(audio_file_path, language='hi-IN'):
