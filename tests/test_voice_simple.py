@@ -4,6 +4,7 @@ Tests Transcribe with a sample audio file you provide
 """
 import boto3
 import json
+import os
 import time
 import sys
 
@@ -13,7 +14,7 @@ s3 = boto3.client('s3', region_name='us-east-1')
 TEMP_BUCKET = os.environ.get('TEMP_AUDIO_BUCKET', '')
 
 
-def test_transcribe(audio_file_path, language='hi-IN'):
+def run_transcribe(audio_file_path, language='hi-IN'):
     """
     Test transcription with a local audio file
     
@@ -128,4 +129,4 @@ if __name__ == '__main__':
     audio_file = sys.argv[1]
     language = sys.argv[2] if len(sys.argv) > 2 else 'hi-IN'
     
-    test_transcribe(audio_file, language)
+    run_transcribe(audio_file, language)

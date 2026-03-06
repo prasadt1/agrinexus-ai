@@ -1,10 +1,14 @@
 import json
 import os
+import sys
 from datetime import datetime
 
 import types
 
 import importlib
+
+# Add common layer to path so `from common.whatsapp import ...` resolves locally
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src', 'common-layer', 'python'))
 
 os.environ.setdefault("TABLE_NAME", "agrinexus-data")
 
@@ -104,17 +108,8 @@ def test_reminder_sender_updates_status(monkeypatch):
         "Item": {"status": "SENT"}
     }
     monkeypatch.setattr(reminder, "table", fake_table)
-
-    def fake_get_secret_value(SecretId):
-        return {"SecretString": "dummy"}
-
-    monkeypatch.setattr(reminder.secrets, "get_secret_value", fake_get_secret_value)
-
-    def fake_post(*args, **kwargs):
-        return FakeResponse(200)
-
-    import requests
-    monkeypatch.setattr(requests, "post", fake_post)
+    monkeypatch.setattr(reminder, "send_whatsapp_message", lambda *args, **kwargs: None)
+    monkeypatch.setattr(reminder, "send_whatsapp_buttons", lambda *args, **kwargs: True)
 
     event = {
         "phone_number": "+911",
@@ -143,17 +138,7 @@ def test_detector_marks_done_and_deletes_schedule(monkeypatch):
             delete_calls.append(Name)
 
     monkeypatch.setattr(detector, "scheduler", FakeScheduler())
-
-    def fake_get_secret_value(SecretId):
-        return {"SecretString": "dummy"}
-
-    monkeypatch.setattr(detector.secrets, "get_secret_value", fake_get_secret_value)
-
-    def fake_post(*args, **kwargs):
-        return FakeResponse(200)
-
-    import requests
-    monkeypatch.setattr(requests, "post", fake_post)
+    monkeypatch.setattr(detector, "send_whatsapp_message", lambda *args, **kwargs: None)
 
     event = {
         "Records": [

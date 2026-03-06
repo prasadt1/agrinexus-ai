@@ -186,6 +186,68 @@ def send_whatsapp_template(phone_number: str, template_name: str, language_code:
         return False
 
 
+def send_whatsapp_buttons(phone_number: str, body_text: str, buttons: list) -> bool:
+    """
+    Send WhatsApp interactive button message (max 3 buttons)
+
+    Args:
+        phone_number: Recipient phone number
+        body_text: Main message body
+        buttons: List of dicts with 'id' and 'title' keys
+                 Example: [{"id": "done", "title": "हो गया"}, {"id": "not_yet", "title": "अभी नहीं"}]
+
+    Returns:
+        True if message sent successfully, False otherwise
+    """
+    try:
+        access_token, phone_number_id = get_whatsapp_credentials()
+
+        url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": phone_number,
+            "type": "interactive",
+            "interactive": {
+                "type": "button",
+                "body": {"text": body_text},
+                "action": {
+                    "buttons": [
+                        {"type": "reply", "reply": {"id": b["id"], "title": b["title"]}}
+                        for b in buttons
+                    ]
+                }
+            }
+        }
+
+        print(f"Sending button message to {phone_number[:6]}***: {body_text[:50]}...")
+        response = None
+        for attempt in range(3):
+            try:
+                response = requests.post(url, headers=headers, json=payload, timeout=5)
+                if response.status_code < 500 and response.status_code != 429:
+                    break
+            except requests.RequestException as e:
+                print(f"WhatsApp button request error (attempt {attempt + 1}): {e}")
+            time.sleep(0.5 * (2 ** attempt))
+
+        if response and response.status_code == 200:
+            print(f"Button message sent successfully: {response.json()}")
+            return True
+
+        status = response.status_code if response else 'no_response'
+        text = response.text if response else 'no_response_body'
+        print(f"Failed to send button message: {status} - {text}")
+        return False
+
+    except Exception as e:
+        print(f"Exception sending WhatsApp button message: {e}")
+        return False
+
+
 def send_whatsapp_list(phone_number: str, body_text: str, button_text: str, sections: list) -> bool:
     """
     Send WhatsApp list message (supports up to 10 options per section)

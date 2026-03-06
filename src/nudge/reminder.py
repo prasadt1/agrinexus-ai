@@ -6,25 +6,43 @@ import json
 import os
 import boto3
 from typing import Dict, Any
-from common.whatsapp import send_whatsapp_message
+from common.whatsapp import send_whatsapp_message, send_whatsapp_buttons
 
 dynamodb = boto3.resource('dynamodb')
 
 TABLE_NAME = os.environ['TABLE_NAME']
 table = dynamodb.Table(TABLE_NAME)
 
+CROP_INFO = {
+    'Cotton':  {'hi': ('कपास', 'कीटनाशक'),    'mr': ('कापूस', 'कीटकनाशक'),    'te': ('పత్తి', 'పురుగుమందు'),       'en': ('cotton', 'pesticide')},
+    'Wheat':   {'hi': ('गेहूं', 'फफूंदनाशक'),  'mr': ('गहू', 'बुरशीनाशक'),      'te': ('గోధుమ', 'శిలీంధ్రనాశని'),    'en': ('wheat', 'fungicide')},
+    'Soybean': {'hi': ('सोयाबीन', 'कीटनाशक'), 'mr': ('सोयाबीन', 'कीटकनाशक'),  'te': ('సోయాబీన్', 'పురుగుమందు'),   'en': ('soybean', 'pesticide')},
+    'Maize':   {'hi': ('मक्का', 'कीटनाशक'),   'mr': ('मका', 'कीटकनाशक'),       'te': ('మొక్కజొన్న', 'పురుగుమందు'), 'en': ('maize', 'pesticide')},
+}
+
+REMINDER_BUTTONS = {
+    'hi': [{"id": "done", "title": "हो गया"}, {"id": "not_yet", "title": "अभी नहीं"}],
+    'mr': [{"id": "done", "title": "झाला"}, {"id": "not_yet", "title": "नाही झाला"}],
+    'te': [{"id": "done", "title": "అయ్యింది"}, {"id": "not_yet", "title": "ఇంకా లేదు"}],
+    'en': [{"id": "done", "title": "Done"}, {"id": "not_yet", "title": "Not Yet"}],
+}
+
 REMINDER_TEMPLATES = {
     'hi': {
-        'T+24h': 'याद दिलाना: कल हमने स्प्रे करने के लिए कहा था। क्या आपने कर लिया? "हो गया" या "अभी नहीं" भेजें।',
-        'T+48h': 'अंतिम याद दिलाना: स्प्रे करना बाकी है। कृपया जल्द करें और "हो गया" भेजें।'
+        'T+24h': 'याद दिलाना: कल हमने {crop} में {spray_type} स्प्रे के लिए कहा था। क्या आपने कर लिया?',
+        'T+48h': 'अंतिम याद दिलाना: {crop} में {spray_type} स्प्रे अभी बाकी है। कृपया जल्द करें।'
     },
     'mr': {
-        'T+24h': 'आठवण: काल आम्ही फवारणी करण्यास सांगितले होते। तुम्ही केले का? "झाला" किंवा "नाही झाला" पाठवा.',
-        'T+48h': 'शेवटची आठवण: फवारणी बाकी आहे. कृपया लवकर करा आणि "झाला" पाठवा.'
+        'T+24h': 'आठवण: काल आम्ही {crop} साठी {spray_type} फवारणी करण्यास सांगितले होते। तुम्ही केले का?',
+        'T+48h': 'शेवटची आठवण: {crop} साठी {spray_type} फवारणी अजून बाकी आहे. कृपया लवकर करा.'
     },
     'te': {
-        'T+24h': 'గుర్తు: నిన్న మేము స్ప్రే చేయమని చెప్పాము. మీరు చేశారా? "అయ్యింది" లేదా "ఇంకా లేదు" పంపండి.',
-        'T+48h': 'చివరి గుర్తు: స్ప్రే చేయడం మిగిలి ఉంది. దయచేసి త్వరగా చేయండి మరియు "అయ్యింది" పంపండి.'
+        'T+24h': 'గుర్తు: నిన్న {crop}లో {spray_type} స్ప్రే చేయమని చెప్పాము. మీరు చేశారా?',
+        'T+48h': 'చివరి గుర్తు: {crop}లో {spray_type} స్ప్రే ఇంకా మిగిలి ఉంది. దయచేసి త్వరగా చేయండి.'
+    },
+    'en': {
+        'T+24h': 'Reminder: Yesterday we suggested {spray_type} spray for your {crop}. Have you done it?',
+        'T+48h': 'Final reminder: {spray_type} spray for your {crop} is still pending. Please do it soon.'
     }
 }
 
@@ -49,14 +67,20 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {'statusCode': 404, 'message': 'Nudge not found'}
     
     status = nudge.get('status')
-    
+    crop = nudge.get('crop', 'Cotton')
+    crop_data = CROP_INFO.get(crop, CROP_INFO['Cotton'])
+    crop_name, spray_type = crop_data.get(dialect, crop_data['hi'])
+
     # Only send reminder if not completed
     if status != 'DONE':
         template = REMINDER_TEMPLATES.get(dialect, REMINDER_TEMPLATES['hi'])
-        message = template.get(reminder_type, template['T+24h'])
+        message = template.get(reminder_type, template['T+24h']).format(crop=crop_name, spray_type=spray_type)
         
-        # Send WhatsApp message
-        send_whatsapp_message(phone_number, message)
+        # Send WhatsApp message with DONE/NOT YET buttons
+        buttons = REMINDER_BUTTONS.get(dialect, REMINDER_BUTTONS['hi'])
+        sent = send_whatsapp_buttons(phone_number, message, buttons)
+        if not sent:
+            send_whatsapp_message(phone_number, message)
         
         # Update nudge record
         table.update_item(
