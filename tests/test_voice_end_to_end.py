@@ -42,24 +42,28 @@ def step2_transcribe(audio_file_path, dialect):
     lang_map = {'hi': 'hi-IN', 'mr': 'mr-IN', 'te': 'te-IN', 'en': 'en-IN'}
     language_code = lang_map.get(dialect, 'hi-IN')
     
+    # Detect media format from file extension
+    ext = os.path.splitext(audio_file_path)[1].lower().lstrip('.')
+    media_format = ext if ext in ('mp3', 'mp4', 'wav', 'flac', 'ogg', 'amr', 'webm', 'm4a') else 'wav'
+
     # Upload to S3
     timestamp = int(time.time())
-    s3_key = f"test/voice-e2e-{timestamp}.mp3"
-    
+    s3_key = f"test/voice-e2e-{timestamp}.{media_format}"
+
     print(f"Uploading to S3...")
     s3.upload_file(audio_file_path, TEMP_BUCKET, s3_key)
     s3_uri = f"s3://{TEMP_BUCKET}/{s3_key}"
     print(f"✓ Uploaded: {s3_uri}")
-    
+
     # Start transcription
     job_name = f"e2e-test-{timestamp}"
     print(f"\nStarting transcription job: {job_name}")
-    print(f"Language: {language_code}")
-    
+    print(f"Language: {language_code}, Format: {media_format}")
+
     transcribe.start_transcription_job(
         TranscriptionJobName=job_name,
         Media={'MediaFileUri': s3_uri},
-        MediaFormat='mp3',
+        MediaFormat=media_format,
         LanguageCode=language_code
     )
     

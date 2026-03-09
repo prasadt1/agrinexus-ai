@@ -16,6 +16,7 @@ NUDGE=$(aws dynamodb query \
   --table-name agrinexus-data \
   --key-condition-expression "PK = :pk AND begins_with(SK, :sk)" \
   --expression-attribute-values '{":pk":{"S":"USER#'${PHONE_NUMBER}'"},":sk":{"S":"NUDGE#"}}' \
+  --no-scan-index-forward \
   --limit 1 \
   --output json)
 

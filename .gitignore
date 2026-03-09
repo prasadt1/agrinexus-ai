@@ -6,3 +6,63 @@ scripts/demo.env
 
 # Kiro/agent specs (internal planning; keep local for public repo)
 .kiro/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# macOS
+.DS_Store
+
+# Test audio/binary output
+*-response.mp3
+*-output.mp3
+*-test.mp3
+
+# Internal docs (never commit these)
+docs/ARCHITECTURE-DIAGRAM-PROMPT.md
+docs/FLOW-DIAGRAM-PROMPTS.md
+docs/PROMPTS-*.md
+docs/CLAUDE-*.md
+docs/COMPETITION-PITCH-AND-MEDIA.md
+docs/Competitor-*.md
+docs/B2B2C-*.md
+docs/B2G-*.md
+docs/Direct-*.md
+docs/Traditional-*.md
+docs/DEMO-RECORDING-SCRIPT.md
+docs/GITHUB-CLEANUP-PLAN.md
+docs/COMPETITION-ARTICLE-paste.md
+
+# Internal status/journal files
+WEEK*.md
+PHASE-*.md
+TODAY-*.md
+NEXT-ACTIONS.md
+REDEEM-CREDITS.md
+CRITICAL-*.md
+HIGH-PRIORITY-*.md
+CODE-REVIEW-*.md
+CLAUDE-CODE-*.md
+COST-*.md
+THRESHOLD-*.md
+DEPLOYMENT-READY.md
+PRE-COMMIT-*.md
+ROUND-3-*.md
+AGENTS.md
+design.md.bak
+
+# Old/unused templates and configs
+template-simple.yaml
+template.yaml
+samconfig.toml
+
+# Deploy info (reveals infra details)
+deploy-info.txt
+
+# Claude Code worktrees
+.claude/worktrees/
+
+# Root-level test scripts (belong in tests/)
+test_rag_example.py

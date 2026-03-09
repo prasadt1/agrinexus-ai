@@ -125,7 +125,7 @@ def _parse_language_selection(message_text: str) -> Optional[str]:
     """Return dialect code if message is a language selection, else None."""
     text_lower = message_text.lower().strip()
     
-    # Handle list response IDs directly
+    # Handle list response IDs directly (only when from interactive reply, not free text)
     if text_lower in ['en', 'hi', 'mr', 'te']:
         return text_lower
     
@@ -141,7 +141,7 @@ def _parse_language_selection(message_text: str) -> Optional[str]:
     return None
 
 
-def handle_onboarding(phone_number: str, message_text: str, profile: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+def handle_onboarding(phone_number: str, message_text: str, profile: Optional[Dict[str, Any]], is_interactive: bool = False) -> Dict[str, Any]:
     """
     Onboarding state machine with interactive buttons
     States: welcome -> language -> location -> crop -> consent -> complete
@@ -149,7 +149,8 @@ def handle_onboarding(phone_number: str, message_text: str, profile: Optional[Di
     """
     # State 1: No profile exists - treat first message as possible language choice so we don't send welcome 6x
     if not profile:
-        dialect = _parse_language_selection(message_text)
+        # Only parse language from interactive replies — free text "Hi" must not match language code "hi"
+        dialect = _parse_language_selection(message_text) if is_interactive else None
         if dialect:
             # First message was a language choice: create profile and go straight to location
             table.put_item(
@@ -504,21 +505,42 @@ Provide actionable farming advice with source references.'''
         }
     }
     
-    # Add sessionId if provided (enables conversation context)
+    # Build request parameters
     request_params = {
         'input': {'text': query},
         'retrieveAndGenerateConfiguration': rag_config
     }
     
+    # Try with sessionId first (for conversation context)
     if session_id:
         request_params['sessionId'] = session_id
-        print(f"Using session ID for conversation context: {session_id[:10]}***")
+        print(f"Attempting to use session ID for conversation context: {session_id[:10]}***")
+        try:
+            response = bedrock_agent.retrieve_and_generate(**request_params)
+            print(f"Successfully used existing session: {session_id[:10]}***")
+            return {
+                'text': response['output']['text'],
+                'citations': response.get('citations', []),
+                'sessionId': response.get('sessionId')
+            }
+        except bedrock_agent.exceptions.ValidationException as e:
+            # Session doesn't exist yet, create new one by calling without sessionId
+            if 'Session with Id' in str(e) and 'is not valid' in str(e):
+                print(f"Session {session_id[:10]}*** not found, creating new session")
+                del request_params['sessionId']
+            else:
+                raise
     
+    # Call without sessionId (creates new session)
     response = bedrock_agent.retrieve_and_generate(**request_params)
+    
+    if session_id:
+        print(f"Created new session: {response.get('sessionId', 'unknown')}")
     
     return {
         'text': response['output']['text'],
-        'citations': response.get('citations', [])
+        'citations': response.get('citations', []),
+        'sessionId': response.get('sessionId')
     }
 
 
@@ -699,7 +721,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     text = ''
             
             if text:
-                onboarding_response = handle_onboarding(from_number, text, profile)
+                onboarding_response = handle_onboarding(from_number, text, profile, is_interactive=(message_type == 'interactive'))
                 
                 # Send appropriate message type (text, buttons, or list)
                 if onboarding_response['type'] == 'buttons':

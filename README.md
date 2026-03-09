@@ -1,31 +1,10 @@
 # AgriNexus AI – WhatsApp Agricultural Advisory
 
-**Close the last mile:** AI-powered agronomic advice and weather-timed nudges for smallholder farmers—in their language, on WhatsApp. Built for the **AWS Builder 10,000 AIdeas** competition with **Kiro**, **EARS**, and **Amazon Bedrock**.
+**Close the last mile:** AI-powered agronomic advice and weather-timed nudges for smallholder farmers—in their language, on WhatsApp. Built with **Kiro**, **EARS**, and **Amazon Bedrock**.
+
+**In 30 seconds:** Send a voice note → get cited agronomic advice in your language. Send a crop photo → get pest/disease ID and recommendations. Get a nudge when weather is right for spraying—reply "हो गया" (done) to close the loop.
 
 ---
-
-## 🗳️ Why AgriNexus? (Vote for us)
-
-- **Real impact**: Farmers get timely pest/disease advice and spray reminders when weather is right—reducing crop loss and increasing income.
-- **Competition stack, end-to-end**: Developed with **Kiro** (requirements → code → deploy), **EARS** requirements (100+ traceable specs), and **Amazon Bedrock** (RAG, Claude, Transcribe, Polly, Vision) on full AWS serverless.
-- **Production-ready**: Multi-language (Hindi, Marathi, Telugu, English), voice in/out, image-based pest ID, and behavioral nudges with closed-loop tracking—all deployed and testable.
-
-*If you're a fellow builder or judge, we'd love your vote to reach the semi-finals. See [Competition submission](#competition-submission) and [Development workflow (Kiro + EARS)](#development-workflow-with-kiro-ai) below.*
-
-**Demo in 30 seconds:** Send a voice note → get cited agronomic advice in your language. Send a crop photo → get pest/disease ID and recommendations. Get a nudge when weather is right for spraying—reply "हो गया" (done) to close the loop.
-
----
-
-## 🎯 Competition Status: Production-ready ✅
-
-All core features implemented, tested, and deployed:
-- ✅ RAG-based agricultural Q&A (4 languages)
-- ✅ Voice input (Amazon Transcribe)
-- ✅ Voice output (Amazon Polly, neural engine)
-- ✅ Vision analysis (Claude 3 Sonnet - pest/disease identification)
-- ✅ Behavioral nudges with weather triggers
-- ✅ Multi-language support (Hindi, Marathi, Telugu, English)
-- ✅ Language-first onboarding (no duplicate welcome); E2E test guide and scripts
 
 ## Architecture
 
@@ -173,6 +152,7 @@ Bot: बढ़िया! आपने स्प्रे कर दिया। 
 │   ├── deploy-week2.sh            # Deployment script
 │   ├── e2e-test.sh                 # E2E automated test
 │   ├── reset-profile.sh            # Reset user for re-onboarding
+│   ├── demo-reset.sh               # Pre-demo cleanup (DynamoDB + SQS)
 │   ├── demo.env.example            # Example env (copy to demo.env)
 │   └── upload-fao-pdfs.sh          # Upload knowledge base docs
 ├── src/
@@ -223,6 +203,26 @@ python tests/test_vision.py path/to/image.jpg en cotton
 # Voice in → Transcribe → RAG → Voice out
 python tests/test_voice_end_to_end.py
 ```
+
+### End-to-End (All Features)
+
+See `docs/E2E-TEST-GUIDE.md` for testing onboarding, Q&A, voice, vision, and nudges.
+
+**One-time setup:** Copy `scripts/demo.env.example` to `scripts/demo.env` and set `WEBHOOK_URL`, `APP_SECRET`, and `PHONE_NUMBER`. All test scripts auto-load it:
+
+```bash
+cp scripts/demo.env.example scripts/demo.env
+# Edit scripts/demo.env, then:
+./scripts/e2e-test.sh --phone +919876543210
+```
+
+### Reset Profile (Re-Onboarding)
+
+```bash
+./scripts/reset-profile.sh +919876543210
+```
+
+Then send a new language keyword (`हिंदी` / `मराठी` / `తెలుగు` / `English`) in WhatsApp to restart onboarding.
 
 ## Architecture Details
 
@@ -304,15 +304,28 @@ aws logs tail /aws/lambda/agrinexus-voice-dev --follow
 
 ### Test Components
 ```bash
-# Test webhook
-curl "https://YOUR_API.execute-api.us-east-1.amazonaws.com/dev/webhook?hub.mode=subscribe&hub.verify_token=YOUR_TOKEN&hub.challenge=test"
-
 # Test voice processor
 aws lambda invoke --function-name agrinexus-voice-dev --payload '{}' /tmp/response.json
 
 # Test weather poller
 aws lambda invoke --function-name agrinexus-weather-dev --payload '{}' /tmp/response.json
 ```
+
+### Common Issues
+
+**"No module named 'output'" error:**
+- Ensure `src/processor/output.py` and `src/processor/analyzer.py` exist
+- Rebuild: `sam build --template template-week2.yaml`
+
+**"Invalid guardrail identifier" error:**
+- Set GuardrailId to empty string in deployment
+- Or update Lambda env var: `aws lambda update-function-configuration --function-name agrinexus-processor-dev --environment "Variables={...,GUARDRAIL_ID=''}"`
+
+**Duplicate nudges:**
+- Fixed in latest version - system checks for existing pending nudges
+
+**Medical advice responses:**
+- Fixed in latest version - system now refuses non-farming questions
 
 ## Monitoring
 
@@ -339,164 +352,22 @@ WEATHER_API_KEY="YOUR_OPENWEATHER_API_KEY"
 
 These are configured via Lambda environment variables (see `template-week2.yaml`).
 
-## Real-Time Multi-Language Nudge Testing
-
-1. Complete onboarding in each language:
-   - Hindi: send `हिंदी`
-   - Marathi: send `मराठी`
-   - Telugu: send `తెలుగు`
-   - English: send `English`
-2. Use the same district (e.g., Aurangabad) to keep demo deterministic.
-3. Trigger the weather poller:
-   ```bash
-   aws lambda invoke --function-name agrinexus-weather-dev --payload '{}' /tmp/response.json
-   ```
-4. Reply with:
-   - DONE: `हो गया`, `झाला`, `అయ్యింది`, or `DONE`
-   - NOT YET: `अभी नहीं`, `नाही झाला`, `ఇంకా లేదు`, or `NOT YET`
-
-You can automate this with `scripts/demo-nudge-flow.sh`.
-
-### Multi-Language Nudge Demo (Optional)
-
-Use one number per language (recommended):
-
-```bash
-WEBHOOK_URL="https://YOUR_API.execute-api.us-east-1.amazonaws.com/dev/webhook" \
-FROM_NUMBERS="+91_hi,+91_mr,+91_te,+91_en" \
-APP_SECRET="YOUR_APP_SECRET" \
-./scripts/demo-nudge-multilang.sh
-```
-
-If you only have one number, set `FROM_NUMBER` and the script will reuse it.
-
-### Reset profile only (single-number testing)
-
-If you test with one WhatsApp number and want to re-run onboarding in another language, clear the stored profile first:
-
-```bash
-./scripts/reset-profile.sh +919876543210
-```
-
-If `PHONE_NUMBER` is set in `scripts/demo.env`, you can run `./scripts/reset-profile.sh` with no arguments. Then send a new language keyword (हिंदी / मराठी / తెలుగు / English) in WhatsApp to start onboarding again. See `docs/E2E-TEST-GUIDE.md` → "Single-number testing".
-
-### Single-Number Reset + Nudge Demo
-
-Reset onboarding and run a nudge demo with your personal number:
-
-```bash
-WEBHOOK_URL="https://YOUR_API.execute-api.us-east-1.amazonaws.com/dev/webhook" \
-APP_SECRET="YOUR_APP_SECRET" \
-./scripts/reset-onboard-and-demo.sh --phone +919876543210 --lang hi
-```
-
-**Tip**: Create `scripts/demo.env` once and the scripts will auto-load it:
-
-```bash
-WEBHOOK_URL="https://YOUR_API.execute-api.us-east-1.amazonaws.com/dev/webhook"
-APP_SECRET="YOUR_APP_SECRET"
-PHONE_NUMBER="+919876543210"
-```
-
-## Demo Scenario Script
-
-Run an end-to-end demo flow (onboarding + HELP + sample question + DONE):
-
-```bash
-WEBHOOK_URL="https://YOUR_API.execute-api.us-east-1.amazonaws.com/dev/webhook" \\
-FROM_NUMBER="919876543210" \\
-APP_SECRET="YOUR_APP_SECRET" \\
-./scripts/demo-scenario.sh
-```
-
-**Note**: If `APP_SECRET` is omitted, the script will skip signature headers. In dev, you can set `VERIFY_SIGNATURE=false` on the webhook Lambda.
-
-## Nudge Test Checklist
-
-See `docs/NUDGE-TEST-CHECKLIST.md` for the MVP test matrix and demo steps.
-
-## Nudge Demo Runbook
-
-See `docs/NUDGE-DEMO-RUNBOOK.md` for a judge-friendly 3-minute demo script.
-
-## End-to-End Test (All Features)
-
-See `docs/E2E-TEST-GUIDE.md` for testing onboarding, Q&A, voice, vision, and nudges.
-
-**One-time setup (recommended):** Copy `scripts/demo.env.example` to `scripts/demo.env` and set `WEBHOOK_URL`, `APP_SECRET`, and `PHONE_NUMBER`. All test scripts auto-load `demo.env`, so you don't need to pass the webhook URL every time:
-
-```bash
-cp scripts/demo.env.example scripts/demo.env
-# Edit scripts/demo.env with your values, then:
-./scripts/e2e-test.sh --phone +919876543210
-# Or if PHONE_NUMBER is in demo.env: ./scripts/e2e-test.sh
-```
-
-## Code Walkthrough
-
-See `docs/CODE-WALKTHROUGH.md` for a component-by-component architecture and logic guide.
-
-### Common Issues
-
-**"No module named 'output'" error:**
-- Ensure `src/processor/output.py` and `src/processor/analyzer.py` exist
-- Rebuild: `sam build --template template-week2.yaml`
-
-**"Invalid guardrail identifier" error:**
-- Set GuardrailId to empty string in deployment
-- Or update Lambda env var: `aws lambda update-function-configuration --function-name agrinexus-processor-dev --environment "Variables={...,GUARDRAIL_ID=''}"`
-
-**Duplicate nudges:**
-- Fixed in latest version - system checks for existing pending nudges
-
-**Medical advice responses:**
-- Fixed in latest version - system now refuses non-farming questions
-
-## Documentation
-
-- [docs/COMPETITION-PITCH-AND-MEDIA.md](docs/COMPETITION-PITCH-AND-MEDIA.md) - **Competition:** Pitch, video script, 1-pager, deck outline, and where to share for votes
-- [docs/CLAUDE-MEDIA-KIT-PROMPT.md](docs/CLAUDE-MEDIA-KIT-PROMPT.md) - **Copy-paste prompt for Claude** to generate a full winning media kit (video script, 1-pager, deck, social posts)
-- [docs/ARCHITECTURE-DIAGRAM-CORRECTIONS.md](docs/ARCHITECTURE-DIAGRAM-CORRECTIONS.md) - **Diagram accuracy:** What to fix in the “system architecture” diagram (Webhook→SQS→Lambdas; Step Functions only for nudges; outbound via WhatsApp API)
-- [docs/PROMPTS-ANIMATED-ARCHITECTURE-GIFS.md](docs/PROMPTS-ANIMATED-ARCHITECTURE-GIFS.md) - **Animated GIFs:** Copy-paste prompts for Gemini/ChatGPT to generate animated flow diagrams (text, voice, image, nudge, webhook)
-- [architecture/](architecture/) - Diagrams (Mermaid) and quick reference
-- `architecture.md` - Full system architecture design
-- `docs/E2E-TEST-GUIDE.md` - End-to-end testing (onboarding, voice, vision, nudges)
-- `docs/CODE-WALKTHROUGH.md` - Component-by-component walkthrough
-- `CHANGELOG.md` - Engineering changelog with all features and fixes
-- `ISSUES-LOG.md` - Debugging log with 38+ issues resolved
-- `design.md` - Technical design decisions
-- `requirements.md` - EARS requirements specification
-
-### Requirements Methodology: EARS
+## Requirements Methodology: EARS
 
 This project uses **EARS (Easy Approach to Requirements Syntax)** for all functional requirements. EARS provides a structured, unambiguous way to write requirements using five patterns:
 
 1. **Ubiquitous**: The [System] shall [Response]
-   - Example: "The system shall include source citations in every response"
-
 2. **Event-driven**: When [Event], the [System] shall [Response]
-   - Example: "When a farmer sends a voice note, the system shall transcribe it using Amazon Transcribe"
-
 3. **State-driven**: While [State], the [System] shall [Response]
-   - Example: "While onboarding is incomplete, the system shall resume onboarding before processing queries"
-
 4. **Optional**: Where [Feature], the [System] shall [Response]
-   - Example: "Where voice preference is enabled, the system shall respond with audio"
-
 5. **Unwanted**: If [Condition], then the [System] shall [Response]
-   - Example: "If transcription confidence is below 0.5, then the system shall fall back to text response"
 
-**Benefits:**
-- Clear, testable requirements (100+ requirements in requirements.md)
-- Easy traceability from requirements → design → code → tests
-- Unambiguous behavior specification for all scenarios (normal, error, edge cases)
-
-**Example Mapping:**
+**Example mapping:**
 
 ```
 Requirement (EARS):
-REQ-NUDGE-008: When a farmer responds with DONE keywords 
-(Hindi: "ho gaya"), the system shall mark the task as 
+REQ-NUDGE-008: When a farmer responds with DONE keywords
+(Hindi: "ho gaya"), the system shall mark the task as
 completed in DynamoDB and delete pending reminders.
 
 Implementation (src/nudge/detector.py):
@@ -511,149 +382,29 @@ def test_done_response_marks_complete():
     assert get_scheduled_reminders() == []
 ```
 
-See `requirements.md` for the complete EARS specification with 100+ requirements covering all features.
+See `requirements.md` for the complete EARS specification (100+ requirements covering all features).
 
-### Development Workflow with Kiro AI
+## Development Workflow: Kiro AI
 
-This project was developed using **Kiro AI**, an AI-powered IDE that enables collaborative development from requirements through deployment. Here's how we used Kiro's workflow:
+This project was developed using **Kiro AI**, which enabled requirements-driven development from EARS specs through to deployed Lambda functions. Kiro's steering documents (`.kiro/specs/`) defined feature specs, implementation plans, and acceptance criteria—keeping requirements, code, and tests traceable throughout the 4-week build.
 
-#### 1. Requirements → Design → Implementation Cycle
+**Key metrics:**
+- 100+ EARS requirements in `requirements.md`
+- 38+ issues debugged and documented in `ISSUES-LOG.md`
+- ~3,000 lines of Python across 8 Lambda functions
+- Full test coverage: voice, vision, RAG, nudges
 
-**Example: Voice Output Feature**
+## Documentation
 
-**Step 1: Requirements (EARS)**
-```
-REQ-VOICE-003: When a user has sent a voice note, 
-the system shall respond with audio via Amazon Polly 
-using Hindi Aditi/Neural voice.
-```
-
-**Step 2: Design Discussion**
-- Kiro helped identify that English voice (Kajal) requires 'neural' engine
-- Hindi/Marathi (Aditi) uses 'standard' engine
-- Telugu has no native voice support (text-only fallback)
-
-**Step 3: Implementation**
-```python
-# src/voice/output.py
-def get_polly_voice(dialect: str) -> Tuple[str, str, str]:
-    voice_map = {
-        'hi': ('Aditi', 'hi-IN', 'standard'),
-        'en': ('Kajal', 'en-IN', 'neural'),
-        'te': (None, None, None)  # Text-only
-    }
-    return voice_map.get(dialect, ('Aditi', 'hi-IN', 'standard'))
-```
-
-**Step 4: Testing**
-```bash
-# Integration test with real audio file
-python tests/test_voice_end_to_end.py tests/test-audio/en-cotton-crop-pest.mp3 en
-
-# Results:
-# ✓ Transcription: "How to control pests in cotton crop" (87% confidence)
-# ✓ RAG Query: Retrieved IPM guidance from knowledge base
-# ✓ Voice Output: Generated audio response with Polly neural engine
-```
-
-**Step 5: Debugging & Iteration**
-- **Issue Found**: English voice failing with "engine not supported" error
-- **Root Cause**: Code defaulting to 'standard' engine for all voices
-- **Fix**: Updated `get_polly_voice()` to return engine type per voice
-- **Verification**: Re-ran test, voice output successful
-
-**Step 6: Documentation**
-- Updated CHANGELOG.md with fix details
-- Added Issue #035 to ISSUES-LOG.md
-- Committed and pushed to GitHub
-
-#### 2. Kiro-Assisted Development Features Used
-
-**Autonomous Code Generation:**
-- Generated Lambda handler boilerplate
-- Created DynamoDB query patterns
-- Implemented EARS requirements as testable code
-
-**Intelligent Debugging:**
-- Analyzed CloudWatch logs to identify duplicate message processing
-- Traced webhook signature validation issues
-- Diagnosed Polly engine compatibility problems
-
-**Testing Automation:**
-- Created integration tests for voice, vision, and RAG
-- Generated test audio files for voice testing
-- Validated EARS requirements with automated tests
-
-**Documentation Generation:**
-- Auto-generated CHANGELOG entries from git commits
-- Created ISSUES-LOG with debugging details
-- Maintained requirements traceability
-
-#### 3. Real Example: Fixing Duplicate Messages (Issue #038)
-
-**Problem Identified:**
-```
-User sends "Namaste" → Receives 2 identical responses
-```
-
-**Kiro-Assisted Investigation:**
-1. **Check Logs**: `aws logs tail /aws/lambda/agrinexus-webhook-dev --since 5m`
-2. **Query DynamoDB**: Found duplicate wamid entries with different timestamps
-3. **Analyze Code**: Idempotency check passed but message queued twice
-4. **Root Cause**: Race condition when WhatsApp sends same message twice quickly
-
-**Solution:**
-- Existing idempotency logic is correct
-- Documented as known limitation (minor issue)
-- Workaround: Wait a few seconds between test messages
-
-**Documentation:**
-- Added to ISSUES-LOG.md as Issue #038
-- Explained race condition and workaround
-- Marked as minor severity (doesn't affect production)
-
-#### 4. Deployment with Kiro
-
-**SAM Build & Deploy:**
-```bash
-# Kiro helped generate deployment commands
-sam build --template template-week2.yaml
-sam deploy --config-file samconfig-week2.toml
-
-# Verified deployment
-aws cloudformation describe-stacks --stack-name agrinexus-week2
-```
-
-**Post-Deployment Testing:**
-```bash
-# Test webhook
-curl "https://<your-api-id>.execute-api.us-east-1.amazonaws.com/dev/webhook"
-
-# Test voice processor
-aws lambda invoke --function-name agrinexus-voice-dev --payload '{}' /tmp/response.json
-
-# Trigger nudge workflow
-aws lambda invoke --function-name agrinexus-weather-dev --payload '{}' /tmp/response.json
-```
-
-#### 5. Benefits of Kiro-Assisted Development
-
-- **Speed**: Reduced development time by 40% with AI-generated boilerplate
-- **Quality**: Caught 38+ issues early with intelligent debugging
-- **Traceability**: Maintained clear requirements → code → test mapping
-- **Documentation**: Auto-generated changelogs and issue logs
-- **Collaboration**: Natural language discussions about architecture decisions
-
-#### 6. Development Metrics
-
-- **Total Requirements**: 100+ EARS requirements
-- **Issues Resolved**: 38+ documented in ISSUES-LOG.md
-- **Test Coverage**: Voice, vision, RAG, nudges all tested
-- **Deployment Time**: ~15 minutes with SAM
-- **Lines of Code**: ~3,000 (Python Lambda functions)
-- **Development Duration**: 4 weeks (Feb 1-28, 2026)
-
-This workflow demonstrates how Kiro AI enables rapid, high-quality development while maintaining rigorous requirements traceability and comprehensive documentation.
+- `architecture.md` — full system design
+- `architecture/diagrams.md` — Mermaid flow diagrams
+- `docs/E2E-TEST-GUIDE.md` — end-to-end test walkthrough
+- `docs/CODE-WALKTHROUGH.md` — component-by-component guide
+- `docs/NUDGE-TEST-CHECKLIST.md` — nudge MVP test matrix
+- `docs/NUDGE-DEMO-RUNBOOK.md` — 3-minute demo script
+- `CHANGELOG.md` — engineering changelog
+- `ISSUES-LOG.md` — 38+ resolved debugging issues
+- `requirements.md` — EARS requirements specification
 
 ## Resources
 
@@ -663,35 +414,21 @@ This workflow demonstrates how Kiro AI enables rapid, high-quality development w
 - [Amazon Polly](https://docs.aws.amazon.com/polly/)
 - [WhatsApp Business API](https://developers.facebook.com/docs/whatsapp)
 
-## Competition Submission
-
-**AWS Builder 10,000 AIdeas Competition**
-
-| | |
-|---|---|
-| **Category** | Agriculture & Food Security (Social Impact) |
-| **Region** | India (Maharashtra focus) |
-| **Users** | Smallholder cotton farmers |
-| **Impact** | Timely pest management → reduced crop loss → increased income |
-| **Built with** | **Kiro** (spec-to-code), **EARS** requirements, **Bedrock** (RAG, Claude, Transcribe, Polly, Vision), **AWS** serverless (Lambda, DynamoDB, SQS, EventBridge, Step Functions) |
-
-This repo is our competition submission. We used **Kiro** for requirements-driven development, **EARS** for unambiguous specs (see [Requirements (EARS)](#requirements-methodology-ears) and `requirements.md`), and **Amazon Bedrock** for all AI capabilities. If you're voting or evaluating—thank you. Try the [Quick Start](#quick-start) or read the [EARS → Kiro → Bedrock workflow](#development-workflow-with-kiro-ai).
-
 ## License
 
 MIT License - See LICENSE file for details
 
-## Public repo / Keeping it safe
+## Security
 
 - **Do not commit** API keys, tokens, app secrets, or real phone numbers. `scripts/demo.env` and `.aws-sam/` are gitignored.
-- Set **KnowledgeBaseId** in `samconfig-week2.toml` or via `--parameter-overrides` when deploying; set **TEMP_AUDIO_BUCKET** and **KNOWLEDGE_BASE_ID** (and optionally **VOICE_QUEUE_URL**) for integration tests.
-- **`.kiro/`** is gitignored (internal agent specs). To remove it from the repo if already tracked: `git rm -r --cached .kiro`
+- Set **KnowledgeBaseId** in `samconfig-week2.toml` or via `--parameter-overrides` when deploying.
+- Set **TEMP_AUDIO_BUCKET** and **KNOWLEDGE_BASE_ID** (and optionally **VOICE_QUEUE_URL**) for integration tests.
 
 ## Support
 
 For technical issues:
 1. Check CloudWatch Logs
-2. Review ISSUES-LOG.md for similar problems
+2. Review `ISSUES-LOG.md` for similar problems
 3. Verify IAM permissions and secrets configuration
 
 For agricultural advice:
