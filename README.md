@@ -1,3 +1,5 @@
+<img width="2816" height="1536" alt="Gemini_Generated_Image_lodjzglodjzglodj" src="https://github.com/user-attachments/assets/6987a1de-2f7c-4d1e-8d96-d6c9c7619f94" />
+
 # AgriNexus AI – WhatsApp Agricultural Advisory
 
 **Close the last mile:** AI-powered agronomic advice and weather-timed nudges for smallholder farmers—in their language, on WhatsApp. Built with **Kiro**, **EARS**, and **Amazon Bedrock**.
