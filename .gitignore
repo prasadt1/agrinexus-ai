@@ -66,3 +66,15 @@ deploy-info.txt
 
 # Root-level test scripts (belong in tests/)
 test_rag_example.py
+
+# Additional personal/internal docs
+docs/VOICEOVER-SCRIPTS.md
+docs/CAPCUT-EDITING-GUIDE.md
+docs/POST-DRAFT.md
+docs/eraser-diagram.md
+docs/ARCHITECTURE-DIAGRAM-CORRECTIONS.md
+docs/AGRINEXUS-COMPETITION-ARTICLE*.md
+docs/COMPETITION-ARTICLE-github.md
+architecture/ANIMATION-PROMPTS.md
+.kiro/
+.claude/
