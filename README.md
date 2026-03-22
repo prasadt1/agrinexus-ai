@@ -284,7 +284,22 @@ Weather Poller → Step Functions → Nudge Sender → WhatsApp
 
 OpenSearch Serverless is the dominant cost—it's always-on infrastructure, not pay-per-query. This fixed cost amortizes sharply with scale: at 10,000 farmers, total is ~$574/month (~$0.70/farmer/year).
 
-> **Cost optimization**: Replace OpenSearch Serverless with Aurora PostgreSQL + pgvector or Pinecone free tier to reduce fixed costs to near-zero (~$40/month for 1K farmers).
+### Cost Optimization: Cheaper Vector Store Alternatives
+
+OpenSearch Serverless has a ~$174/month minimum. Here are AWS-native alternatives that work with Bedrock Knowledge Bases:
+
+| Alternative | Monthly Cost | Latency | Best For |
+|-------------|--------------|---------|----------|
+| **Amazon S3 Vectors** (new, Dec 2025) | Pay-per-query (~$5-10) | 100-800ms | Cost-sensitive, low-medium QPS |
+| **Aurora PostgreSQL + pgvector** | ~$30-50 (smallest instance) | <100ms | Need SQL + vectors |
+| **OpenSearch Managed Cluster** | ~$50-100 | <50ms | High throughput, need full-text search |
+| **Pinecone Free Tier** | $0 (up to 100K vectors) | <100ms | Small datasets, external service OK |
+
+**Recommended for AgriNexus**: Switch to **Amazon S3 Vectors** for up to 90% savings. S3 Vectors is fully AWS-native, requires no infrastructure management, and works directly with Bedrock Knowledge Bases. Slightly higher latency (100-800ms vs <50ms) is acceptable for a chatbot use case.
+
+**With S3 Vectors**: Total cost drops to **~$45-50/month** for 1,000 farmers.
+
+See: [AWS S3 Vectors announcement](https://aws.amazon.com/about-aws/whats-new/2024/12/amazon-s3-vectors-preview/) | [Bedrock KB vector store options](https://docs.aws.amazon.com/bedrock/latest/userguide/knowledge-base-setup.html)
 
 ## Known Limitations
 

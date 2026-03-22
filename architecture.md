@@ -741,15 +741,25 @@ jobs:
 
 **Note**: OpenSearch Serverless is the dominant cost (~81% of total). It's always-on infrastructure, not pay-per-query. At 10,000 farmers, total is ~$574/month (~$0.70/farmer/year) as fixed costs amortize.
 
-**Cost Optimization Strategies**:
-- Replace OpenSearch Serverless with Pinecone free tier or Aurora PostgreSQL + pgvector (reduces fixed cost to near-zero, ~$40/month total)
+**Vector Store Alternatives** (to eliminate $174/month OpenSearch cost):
+
+| Alternative | Monthly Cost | Latency | Notes |
+|-------------|--------------|---------|-------|
+| **Amazon S3 Vectors** | ~$5-10 (pay-per-query) | 100-800ms | AWS-native, 90% cheaper, new Dec 2025 |
+| **Aurora PostgreSQL + pgvector** | ~$30-50 | <100ms | Managed RDS, SQL + vectors |
+| **Pinecone Free Tier** | $0 | <100ms | 100K vectors free, external service |
+| **OpenSearch Managed Cluster** | ~$50-100 | <50ms | Cheaper than Serverless |
+
+**Recommended**: Switch to **Amazon S3 Vectors** for Bedrock Knowledge Base. Reduces total cost to ~$45-50/month for 1K farmers. Higher latency (100-800ms) is acceptable for chatbot use cases.
+
+**Other Cost Optimization Strategies**:
 - Implement response caching for common queries (reduce Bedrock calls)
 - Use S3 lifecycle policies (images auto-delete after 7 days)
 - Monitor and alert on cost thresholds ($200, $300, $400)
 
 ### 8.2 Scaling Projections (10,000 farmers - Post-MVP)
 
-**Estimated Monthly Cost**: ~$250
+**Estimated Monthly Cost**: ~$574 with OpenSearch Serverless (~$174 fixed + ~$400 variable), or ~$450 with S3 Vectors
 
 **Bottlenecks**:
 - DynamoDB read/write capacity
