@@ -392,7 +392,6 @@ This project was developed using **Kiro AI**, which enabled requirements-driven 
 
 **Key metrics:**
 - 100+ EARS requirements in `requirements.md`
-- 38+ issues debugged and documented in `ISSUES-LOG.md`
 - ~3,000 lines of Python across 8 Lambda functions
 - Full test coverage: voice, vision, RAG, nudges
 
@@ -402,10 +401,6 @@ This project was developed using **Kiro AI**, which enabled requirements-driven 
 - `architecture/diagrams.md` — Mermaid flow diagrams
 - `docs/E2E-TEST-GUIDE.md` — end-to-end test walkthrough
 - `docs/CODE-WALKTHROUGH.md` — component-by-component guide
-- `docs/NUDGE-TEST-CHECKLIST.md` — nudge MVP test matrix
-- `docs/NUDGE-DEMO-RUNBOOK.md` — 3-minute demo script
-- `CHANGELOG.md` — engineering changelog
-- `ISSUES-LOG.md` — 38+ resolved debugging issues
 - `requirements.md` — EARS requirements specification
 
 ## Resources

@@ -88,3 +88,16 @@ CHANGELOG.md
 design.md
 SETUP-CHECKLIST.md
 DEPLOYMENT-SUCCESS.md
+
+# Docs images (competition/blog assets - keep local)
+docs/*.png
+docs/*.jpg
+docs/*.jpeg
+docs/*.gif
+docs/compressed/
+docs/*.html
+
+# Root test images
+*.jpg
+*.jpeg
+!README.md
