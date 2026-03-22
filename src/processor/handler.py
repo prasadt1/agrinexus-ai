@@ -14,9 +14,24 @@ from output import text_to_speech, should_send_voice_response
 # Import vision module
 from analyzer import process_image_message
 
+# Import WhatsApp utilities from common layer (with Secrets Manager caching)
+from common.whatsapp import send_whatsapp_message, send_whatsapp_list
+from common.whatsapp import send_whatsapp_buttons as _send_whatsapp_buttons
+
+
+def send_whatsapp_buttons(phone_number: str, body_text: str, buttons: list):
+    """
+    Wrapper for common layer's send_whatsapp_buttons that accepts simple string list.
+    Converts ['Option 1', 'Option 2'] to [{'id': 'btn_0', 'title': 'Option 1'}, ...]
+    """
+    formatted_buttons = [
+        {"id": f"btn_{i}", "title": btn}
+        for i, btn in enumerate(buttons[:3])
+    ]
+    return _send_whatsapp_buttons(phone_number, body_text, formatted_buttons)
+
 dynamodb = boto3.resource('dynamodb')
 bedrock_agent = boto3.client('bedrock-agent-runtime')
-secrets = boto3.client('secretsmanager')
 
 TABLE_NAME = os.environ['TABLE_NAME']
 KB_ID = os.environ['KNOWLEDGE_BASE_ID']
@@ -542,146 +557,6 @@ Provide actionable farming advice with source references.'''
         'citations': response.get('citations', []),
         'sessionId': response.get('sessionId')
     }
-
-
-def send_whatsapp_message(phone_number: str, message: str, audio_url: Optional[str] = None):
-    """
-    Send message via WhatsApp Business API
-    Supports both text and audio messages
-    
-    Args:
-        phone_number: Recipient phone number
-        message: Text message to send
-        audio_url: Optional audio URL for voice message
-    """
-    import requests
-    import time
-    
-    # Get WhatsApp credentials from environment variables (secret names)
-    access_token_secret = os.environ.get('ACCESS_TOKEN_SECRET', 'agrinexus/whatsapp/access-token')
-    phone_id_secret = os.environ.get('PHONE_NUMBER_ID_SECRET', 'agrinexus/whatsapp/phone-number-id')
-    
-    # Get secret values
-    access_token_response = secrets.get_secret_value(SecretId=access_token_secret)
-    access_token = access_token_response['SecretString']
-    
-    phone_id_response = secrets.get_secret_value(SecretId=phone_id_secret)
-    phone_number_id = phone_id_response['SecretString']
-    
-    # Send via WhatsApp Business API
-    url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json"
-    }
-    
-    # If audio URL provided, send audio message
-    if audio_url:
-        payload = {
-            "messaging_product": "whatsapp",
-            "to": phone_number,
-            "type": "audio",
-            "audio": {
-                "link": audio_url
-            }
-        }
-        print(f"Sending voice message to {phone_number}: {audio_url}")
-    else:
-        # Send text message
-        payload = {
-            "messaging_product": "whatsapp",
-            "to": phone_number,
-            "type": "text",
-            "text": {
-                "body": message
-            }
-        }
-        print(f"Sending text to {phone_number}: {message[:50]}...")
-    
-    response = None
-    for attempt in range(3):
-        try:
-            response = requests.post(url, headers=headers, json=payload, timeout=5)
-            if response.status_code < 500 and response.status_code != 429:
-                break
-        except requests.RequestException as e:
-            print(f"WhatsApp request error (attempt {attempt + 1}): {e}")
-        time.sleep(0.5 * (2 ** attempt))
-    
-    if response and response.status_code == 200:
-        print(f"Message sent successfully: {response.json()}")
-    else:
-        status = response.status_code if response else 'no_response'
-        text = response.text if response else 'no_response_body'
-        print(f"Failed to send message: {status} - {text}")
-
-
-def send_whatsapp_buttons(phone_number: str, body_text: str, buttons: list):
-    """Send interactive reply buttons via WhatsApp Business API"""
-    import requests
-    import time
-    
-    # Get WhatsApp credentials
-    access_token_secret = os.environ.get('ACCESS_TOKEN_SECRET', 'agrinexus/whatsapp/access-token')
-    phone_id_secret = os.environ.get('PHONE_NUMBER_ID_SECRET', 'agrinexus/whatsapp/phone-number-id')
-    
-    access_token_response = secrets.get_secret_value(SecretId=access_token_secret)
-    access_token = access_token_response['SecretString']
-    
-    phone_id_response = secrets.get_secret_value(SecretId=phone_id_secret)
-    phone_number_id = phone_id_response['SecretString']
-    
-    # Build interactive message with reply buttons
-    url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json"
-    }
-    
-    # Format buttons for WhatsApp API (max 3 buttons)
-    formatted_buttons = []
-    for i, button in enumerate(buttons[:3]):  # WhatsApp allows max 3 reply buttons
-        formatted_buttons.append({
-            "type": "reply",
-            "reply": {
-                "id": f"btn_{i}",
-                "title": button
-            }
-        })
-    
-    payload = {
-        "messaging_product": "whatsapp",
-        "recipient_type": "individual",
-        "to": phone_number,
-        "type": "interactive",
-        "interactive": {
-            "type": "button",
-            "body": {
-                "text": body_text
-            },
-            "action": {
-                "buttons": formatted_buttons
-            }
-        }
-    }
-    
-    print(f"Sending buttons to {phone_number}: {body_text[:50]}...")
-    response = None
-    for attempt in range(3):
-        try:
-            response = requests.post(url, headers=headers, json=payload, timeout=5)
-            if response.status_code < 500 and response.status_code != 429:
-                break
-        except requests.RequestException as e:
-            print(f"WhatsApp buttons request error (attempt {attempt + 1}): {e}")
-        time.sleep(0.5 * (2 ** attempt))
-    
-    if response and response.status_code == 200:
-        print(f"Buttons sent successfully: {response.json()}")
-    else:
-        status = response.status_code if response else 'no_response'
-        text = response.text if response else 'no_response_body'
-        print(f"Failed to send buttons: {status} - {text}")
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:

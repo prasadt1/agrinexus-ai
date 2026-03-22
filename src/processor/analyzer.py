@@ -8,9 +8,11 @@ import base64
 import os
 from typing import Dict, Any, Optional
 
+# Import WhatsApp credentials with caching from common layer
+from common.whatsapp import get_whatsapp_credentials
+
 bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
 s3 = boto3.client('s3', region_name='us-east-1')
-secrets = boto3.client('secretsmanager', region_name='us-east-1')
 
 TEMP_BUCKET = os.environ.get('TEMP_AUDIO_BUCKET')
 if not TEMP_BUCKET:
@@ -20,11 +22,9 @@ if not TEMP_BUCKET:
 def download_whatsapp_image(media_id: str) -> bytes:
     """Download image from WhatsApp"""
     import urllib.request
-    
-    # Get WhatsApp credentials
-    access_token_secret = os.environ.get('ACCESS_TOKEN_SECRET', 'agrinexus/whatsapp/access-token')
-    response = secrets.get_secret_value(SecretId=access_token_secret)
-    access_token = response['SecretString']
+
+    # Get WhatsApp credentials (cached - saves Secrets Manager calls)
+    access_token, _ = get_whatsapp_credentials()
     
     # Get media URL
     url = f"https://graph.facebook.com/v22.0/{media_id}"

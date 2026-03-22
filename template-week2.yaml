@@ -78,6 +78,7 @@ Resources:
       ContentBasedDeduplication: true
       VisibilityTimeout: 180
       MessageRetentionPeriod: 345600  # 4 days
+      ReceiveMessageWaitTimeSeconds: 20  # Long polling - reduces SQS API calls
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt MessageDLQ.Arn
         maxReceiveCount: 3
@@ -88,6 +89,7 @@ Resources:
       QueueName: !Sub agrinexus-messages-dlq-${Environment}.fifo
       FifoQueue: true
       MessageRetentionPeriod: 1209600  # 14 days
+      ReceiveMessageWaitTimeSeconds: 20  # Long polling - reduces SQS API calls
 
   # ============================================================================
   # SQS Queue for Voice Processing
@@ -100,6 +102,7 @@ Resources:
       ContentBasedDeduplication: true
       VisibilityTimeout: 180
       MessageRetentionPeriod: 345600  # 4 days
+      ReceiveMessageWaitTimeSeconds: 20  # Long polling - reduces SQS API calls
 
   # ============================================================================
   # S3 Bucket for Temporary Audio Storage
@@ -112,7 +115,12 @@ Resources:
         Rules:
           - Id: DeleteOldAudio
             Status: Enabled
-            ExpirationInDays: 1  # Delete after 1 day
+            Prefix: voice/
+            ExpirationInDays: 1  # Delete voice files after 1 day
+          - Id: DeleteOldImages
+            Status: Enabled
+            Prefix: images/
+            ExpirationInDays: 7  # Delete analyzed images after 7 days
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -142,6 +150,7 @@ Resources:
       CodeUri: src/webhook/
       Handler: handler.lambda_handler
       Description: WhatsApp webhook handler with signature validation
+      MemorySize: 256  # Reduced from 512MB - only does validation + SQS enqueue
       Environment:
         Variables:
           QUEUE_URL: !Ref MessageQueue
@@ -318,6 +327,7 @@ Resources:
       CodeUri: src/weather/
       Handler: handler.lambda_handler
       Description: Poll weather API and trigger nudge workflow
+      MemorySize: 256  # Reduced from 512MB - minimal processing, just DynamoDB scan + Step Functions trigger
       Timeout: 60
       Environment:
         Variables:

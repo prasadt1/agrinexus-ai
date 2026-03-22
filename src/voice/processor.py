@@ -108,8 +108,9 @@ def process_voice_note(message: Dict[str, Any], user_profile: Dict[str, Any]) ->
         )
         
         # 4. Poll for result (max 60 seconds for voice notes)
-        for attempt in range(60):
-            time.sleep(1)
+        # Poll every 3 seconds instead of 1 second to reduce Lambda duration/cost
+        for attempt in range(20):
+            time.sleep(3)
             result = transcribe.get_transcription_job(TranscriptionJobName=job_name)
             status = result['TranscriptionJob']['TranscriptionJobStatus']
             

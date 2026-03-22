@@ -8,8 +8,8 @@ import hmac
 import hashlib
 import boto3
 import logging
-from typing import Dict, Any
-from datetime import datetime
+from typing import Dict, Any, Optional
+from datetime import datetime, timedelta
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -25,6 +25,14 @@ APP_SECRET_NAME = os.environ.get('APP_SECRET_NAME', 'agrinexus/whatsapp/app-secr
 VERIFY_SIGNATURE = os.environ.get('VERIFY_SIGNATURE', 'true').lower() == 'true'
 
 table = dynamodb.Table(TABLE_NAME)
+
+# Cache for Secrets Manager (5-minute TTL) - reduces API calls significantly
+_secrets_cache: Dict[str, Any] = {
+    'verify_token': None,
+    'app_secret': None,
+    'expires_at': None
+}
+CACHE_TTL_SECONDS = 300
 
 # DONE/NOT YET keywords - skip RAG processing for these
 SKIP_RAG_KEYWORDS = [
@@ -48,16 +56,32 @@ def should_skip_rag(text: str) -> bool:
     return any(keyword.lower() in text_lower for keyword in SKIP_RAG_KEYWORDS)
 
 
+def _refresh_secrets_cache() -> None:
+    """Refresh secrets cache if expired"""
+    now = datetime.utcnow()
+    if _secrets_cache['expires_at'] and now < _secrets_cache['expires_at']:
+        return  # Cache still valid
+
+    # Fetch both secrets
+    verify_response = secrets.get_secret_value(SecretId=VERIFY_TOKEN_SECRET)
+    app_response = secrets.get_secret_value(SecretId=APP_SECRET_NAME)
+
+    _secrets_cache['verify_token'] = verify_response['SecretString']
+    _secrets_cache['app_secret'] = app_response['SecretString']
+    _secrets_cache['expires_at'] = now + timedelta(seconds=CACHE_TTL_SECONDS)
+    logger.info(f"Refreshed secrets cache (TTL: {CACHE_TTL_SECONDS}s)")
+
+
 def get_verify_token() -> str:
-    """Retrieve WhatsApp verify token from Secrets Manager"""
-    response = secrets.get_secret_value(SecretId=VERIFY_TOKEN_SECRET)
-    return response['SecretString']
+    """Retrieve WhatsApp verify token from Secrets Manager (cached)"""
+    _refresh_secrets_cache()
+    return _secrets_cache['verify_token']
 
 
 def get_app_secret() -> str:
-    """Retrieve WhatsApp app secret from Secrets Manager"""
-    response = secrets.get_secret_value(SecretId=APP_SECRET_NAME)
-    return response['SecretString']
+    """Retrieve WhatsApp app secret from Secrets Manager (cached)"""
+    _refresh_secrets_cache()
+    return _secrets_cache['app_secret']
 
 
 def verify_signature(payload: str, signature: str) -> bool:
@@ -101,7 +125,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     - GET: Webhook verification
     - POST: Message processing
     """
-    logger.info(f"Event received: {json.dumps(event)}")
+    # Reduced logging - only log event structure, not full payload (saves CloudWatch costs)
+    logger.info(f"Event received: method={event.get('httpMethod')}, path={event.get('path')}")
     
     # Log the HTTP method (support both API Gateway v1 and v2 formats)
     http_method = event.get('httpMethod') or event.get('requestContext', {}).get('http', {}).get('method')
@@ -150,7 +175,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Parse webhook payload
         try:
             payload = json.loads(body)
-            logger.info(f"Parsed payload: {json.dumps(payload)}")
+            # Only log message count, not full payload (saves CloudWatch costs)
+            msg_count = len(payload.get('entry', [{}])[0].get('changes', [{}])[0].get('value', {}).get('messages', []))
+            logger.info(f"Parsed payload: {msg_count} message(s)")
         except json.JSONDecodeError as e:
             logger.error(f"JSON decode error: {e}")
             return {

@@ -34,27 +34,29 @@ DISTRICT_COORDS = {
 
 
 def get_unique_locations() -> List[str]:
-    """Get unique locations from user profiles"""
+    """
+    Get unique locations from user profiles.
+    Uses GSI1 query instead of full table scan to reduce DynamoDB costs.
+    GSI1PK is set to LOCATION#{location} for all user profiles.
+    """
     locations = set()
-    last_evaluated_key = None
-    while True:
-        scan_kwargs = {
-            'FilterExpression': 'begins_with(SK, :sk)',
-            'ExpressionAttributeValues': {':sk': 'PROFILE'}
-        }
-        if last_evaluated_key:
-            scan_kwargs['ExclusiveStartKey'] = last_evaluated_key
 
-        response = table.scan(**scan_kwargs)
-
-        for item in response.get('Items', []):
-            location = item.get('location')
-            if location:
-                locations.add(location)
-
-        last_evaluated_key = response.get('LastEvaluatedKey')
-        if not last_evaluated_key:
-            break
+    # Query each known district using GSI1 instead of scanning entire table
+    # This is much more efficient than a full table scan
+    for district in DISTRICT_COORDS.keys():
+        try:
+            response = table.query(
+                IndexName='GSI1',
+                KeyConditionExpression='GSI1PK = :pk',
+                ExpressionAttributeValues={':pk': f'LOCATION#{district}'},
+                Limit=1  # We only need to know if at least one user exists
+            )
+            if response.get('Items'):
+                locations.add(district)
+        except Exception as e:
+            print(f"Error querying GSI1 for {district}: {e}")
+            # Fallback: assume location has users if query fails
+            locations.add(district)
 
     return list(locations)
 

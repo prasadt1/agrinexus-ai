@@ -75,6 +75,16 @@ docs/eraser-diagram.md
 docs/ARCHITECTURE-DIAGRAM-CORRECTIONS.md
 docs/AGRINEXUS-COMPETITION-ARTICLE*.md
 docs/COMPETITION-ARTICLE-github.md
+docs/COMPETITION-ARTICLE.md
+docs/nudge-cycle.md
+docs/NUDGE-TEST-CHECKLIST.md
 architecture/ANIMATION-PROMPTS.md
 .kiro/
 .claude/
+
+# Internal development logs (keep local)
+ISSUES-LOG.md
+CHANGELOG.md
+design.md
+SETUP-CHECKLIST.md
+DEPLOYMENT-SUCCESS.md
