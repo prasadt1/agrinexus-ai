@@ -288,20 +288,21 @@ aws ce get-cost-and-usage \
   --metrics BlendedCost \
   --filter file://cost-filter.json
 
-# IMPORTANT: OpenSearch Serverless costs ~$20/month minimum
-# This is a fixed cost: 1 OCU indexing + 1 OCU search = ~$0.24/hour each
-# Total system cost: ~$50/month (not $30 as initially estimated)
+# IMPORTANT: OpenSearch Serverless costs ~$174/month minimum
+# This is a fixed cost: 0.5 OCU indexing + 0.5 OCU search = $0.24/OCU-hour
+# Minimum = 2 × 0.5 OCU × 24 hours × 30 days × $0.24 = ~$174/month
+# Total system cost: ~$214/month for 1,000 farmers ($174 fixed + ~$40 variable)
 
-# Cost breakdown:
-# - OpenSearch Serverless: ~$20/month (40%)
-# - Bedrock inference: ~$15/month (30%)
-# - DynamoDB overage: ~$12.50/month (25%)
-# - Other services: ~$2.50/month (5%)
+# Cost breakdown (1K farmers):
+# - OpenSearch Serverless: ~$174/month (81%) - FIXED, always-on
+# - Bedrock (RAG + Vision): ~$25/month (12%) - variable
+# - Transcribe: ~$12/month (5%) - variable
+# - Other services: ~$3/month (2%) - variable
 
 # To reduce costs:
-# Option 1: Accept $50/month (reasonable for production-grade vector search)
-# Option 2: Use Aurora Serverless v2 as vector store (requires custom implementation)
-# Option 3: Delete stack when not actively developing
+# Option 1: Replace OpenSearch Serverless with Pinecone free tier (~$40/month total)
+# Option 2: Use Aurora PostgreSQL + pgvector (near-zero fixed cost)
+# Option 3: Delete stack when not actively developing (stops OpenSearch charges)
 
 # Delete stack to stop charges
 aws cloudformation delete-stack --stack-name agrinexus-dev

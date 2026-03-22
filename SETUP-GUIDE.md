@@ -319,18 +319,19 @@ aws configure set region us-east-1
 
 Before deploying, understand the costs:
 
-| Service | Cost |
-|---------|------|
-| OpenSearch Serverless | ~$20/month (minimum) |
-| Bedrock queries | ~$5/month (pay-per-use) |
-| DynamoDB | $0 (free tier) |
-| S3 | $0 (free tier) |
-| Lambda | $0 (free tier) |
-| **Total** | **~$25/month** |
+| Service | Monthly Cost | Notes |
+|---------|--------------|-------|
+| OpenSearch Serverless | ~$174 | Fixed cost, always-on (0.5 OCU × 2) |
+| Bedrock (RAG + Vision) | ~$25 | Variable, pay-per-use |
+| Transcribe | ~$12 | 500 voice minutes |
+| Polly, DynamoDB, EventBridge | ~$3 | Variable |
+| Lambda, S3, SQS, API Gateway | $0 | Free tier |
+| **Total (1K farmers)** | **~$214/month** | |
 
 **To minimize costs:**
-- Deploy only when testing
-- Delete stack when done: `aws cloudformation delete-stack --stack-name agrinexus-dev`
+- Delete stack when not testing: `aws cloudformation delete-stack --stack-name agrinexus-dev`
+- OpenSearch Serverless charges even when idle—tear down between test sessions
+- Consider Pinecone free tier or Aurora PostgreSQL + pgvector to eliminate $174 fixed cost
 - Monitor costs: https://console.aws.amazon.com/billing/
 
 ## Next Steps

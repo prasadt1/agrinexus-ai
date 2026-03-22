@@ -162,13 +162,19 @@ Your AWS user needs these permissions:
 ## Cost Estimate
 
 Before deploying, understand the costs:
-- OpenSearch Serverless: ~$20/month (minimum)
-- Bedrock queries: ~$5/month (pay-per-use)
-- DynamoDB: $0 (free tier)
-- S3: $0 (free tier)
-- Lambda: $0 (free tier)
 
-**Total: ~$25/month**
+**Fixed (always-on):**
+- OpenSearch Serverless: ~$174/month (minimum 0.5 OCU × 2 at $0.24/OCU-hr)
+
+**Variable (pay-per-use for 1K farmers):**
+- Bedrock (RAG + Vision): ~$25/month
+- Transcribe: ~$12/month (500 voice minutes)
+- Polly, DynamoDB, EventBridge: ~$3/month
+- Lambda, S3, SQS, API Gateway: $0 (free tier)
+
+**Total: ~$214/month for 1,000 farmers**
+
+> **Cost optimization**: Replace OpenSearch Serverless with Pinecone free tier or Aurora PostgreSQL + pgvector to reduce fixed costs to near-zero (~$40/month).
 
 ## Ready to Deploy?
 

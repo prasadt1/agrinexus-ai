@@ -15,7 +15,7 @@ This document specifies the functional and non-functional requirements for AgriN
 AgriNexus AI delivers agronomic advice through WhatsApp, using Amazon Bedrock for dialect-aware conversations (Hindi, Marathi, Telugu), EventBridge Scheduler for behavioral nudges, Claude 3 Vision for pest diagnosis, and Amazon Transcribe + Polly for voice accessibility. The system prioritizes trust through dialect-native voice interactions and evidence-backed citations from validated FAO sources.
 
 ### 1.3 Architecture
-Free-tier-leaning serverless architecture with pay-as-you-go Bedrock. Estimated cost: ~$50/month for 1,000 users, with OpenSearch Serverless (~$20) and Bedrock (~$15) as the primary cost drivers.
+Serverless architecture with pay-as-you-go Bedrock. Estimated cost: ~$214/month for 1,000 farmers, with OpenSearch Serverless (~$174 fixed) and Bedrock (~$25 variable) as the primary cost drivers. At 10,000 farmers, cost drops to ~$0.70/farmer/year.
 
 ### 1.4 EARS Syntax Convention
 All functional requirements follow EARS (Easy Approach to Requirements Syntax):
@@ -285,7 +285,7 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **REQ-COST-004**: The system shall use CloudWatch Logs with retention policies to limit log storage costs.
 
-**REQ-COST-005**: The system shall target ~$50/month operational cost for 1,000 users, with OpenSearch Serverless and Bedrock as the primary cost drivers.
+**REQ-COST-005**: The system shall target ~$214/month operational cost for 1,000 farmers (~$174 fixed OpenSearch + ~$40 variable), scaling to ~$0.70/farmer/year at 10,000 farmers.
 
 ### 3.4 Security
 
@@ -403,7 +403,7 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **AC-009**: When errors occur, the system provides clear, actionable guidance in the farmer's dialect via DLQ handler.
 
-**AC-010**: The system operates within free-tier-leaning architecture with estimated cost ~$50/month for 1,000 users.
+**AC-010**: The system operates within serverless architecture with estimated cost ~$214/month for 1,000 farmers (~$0.70/farmer/year at 10K scale).
 
 **AC-011**: Pre-commit and pre-push hooks successfully block commits with linting errors or security vulnerabilities.
 

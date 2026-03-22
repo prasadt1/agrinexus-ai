@@ -9,13 +9,13 @@
 
 AgriNexus AI is a behavioral intervention engine and behavioral AI extension agent designed to close the "last mile" gap in agricultural extension for smallholder farmers. Unlike reactive information systems, AgriNexus utilizes a proactive, weather-timed behavioral nudge engine with closed-loop accountability to ensure agronomic advice translates into field action. The system prioritizes trust through dialect-native voice interactions (Hindi, Marathi, Telugu) and evidence-backed citations from validated FAO sources.
 
-The architecture is a free-tier-leaning serverless system with pay-as-you-go Bedrock. Estimated cost: ~$50/month for 1,000 users, with OpenSearch Serverless (~$20) and Bedrock (~$15) as the primary cost drivers. The system leverages Amazon Bedrock (Claude 3 Sonnet) for dialect-aware conversations, EventBridge Scheduler for behavioral nudges, Claude 3 Vision for pest diagnosis, and Amazon Transcribe + Polly for voice accessibility.
+The architecture is a serverless system with pay-as-you-go Bedrock. Estimated cost: ~$214/month for 1,000 farmers, with OpenSearch Serverless (~$174 fixed) and Bedrock (~$25 variable) as the primary cost drivers. At 10,000 farmers, cost drops to ~$0.70/farmer/year as fixed costs amortize. The system leverages Amazon Bedrock (Claude 3 Sonnet) for dialect-aware conversations, EventBridge Scheduler for behavioral nudges, Claude 3 Vision for pest diagnosis, and Amazon Transcribe + Polly for voice accessibility.
 
 ## 2. Architecture Principles
 
 - **Serverless First**: Use Lambda, DynamoDB, and managed services to minimize operational overhead and costs
 - **Event-Driven**: Leverage EventBridge Scheduler and Step Functions for asynchronous workflows
-- **Cost-Conscious**: Free-tier-leaning architecture with pay-as-you-go Bedrock (~$50/month for 1,000 users)
+- **Cost-Conscious**: Serverless architecture with pay-as-you-go Bedrock (~$214/month for 1,000 farmers; ~$0.70/farmer/year at 10K scale)
 - **Scalable**: Design for 1,000 farmers in MVP with ability to scale to 10,000 post-MVP
 - **Secure by Default**: Implement encryption, least-privilege IAM, and input validation throughout
 - **Behavioral Closed Loop**: Track nudge → action → confirmation cycle with Nudge Completion Rate as primary metric
@@ -136,7 +136,7 @@ s3://agrinexus-knowledge-base/
 
 **Bedrock Configuration**:
 - Model: Claude 3 Sonnet (cost-effective, multilingual)
-- Knowledge Base: S3 + OpenSearch Serverless vector store (~$20/month for 1 OCU)
+- Knowledge Base: S3 + OpenSearch Serverless vector store (~$174/month for 0.5 OCU × 2, always-on)
 - Guardrails: Block banned pesticides (Paraquat, Endosulfan), escalate medical/veterinary queries to KVK, include label disclaimers
 - Agent Instructions: "You are an agricultural extension agent. Provide practical, actionable advice grounded in FAO data. Handle code-switching (e.g., Hinglish - mixed Hindi/English) naturally. Respond in the farmer's preferred language (Hindi, Marathi, or Telugu). Include simplified source citations."
 - Language Support: Hindi (primary), Marathi, Telugu, and code-switched variants (Hinglish)
@@ -729,24 +729,23 @@ jobs:
 | DynamoDB | 10M write units | 25M free | $0 |
 | S3 Storage | 5 GB | 5 GB free | $0 |
 | S3 Requests | 50,000 PUT | 2,000 free | ~$0.24 |
-| OpenSearch Serverless | 1 OCU (indexing + search) | Pay-as-you-go | ~$20 |
-| Bedrock (Claude 3 Sonnet) | 5M tokens | Pay-as-you-go | ~$15 |
-| Transcribe | 30,000 minutes | 60 min free | ~$2.40 |
-| Polly | 30,000 characters | 5M free | $0 |
+| OpenSearch Serverless | 0.5 OCU × 2 (indexing + search) | Always-on | ~$174 |
+| Bedrock (Claude 3 Sonnet RAG + Vision) | 3K queries, 100 images | Pay-as-you-go | ~$25 |
+| Transcribe | 500 voice minutes | $0.024/min | ~$12 |
+| Polly | 30,000 characters | 5M free | ~$1 |
+| DynamoDB | On-demand | | ~$1 |
 | Step Functions | 10,000 transitions | 4,000 free | ~$0.15 |
-| EventBridge Scheduler | 8,000 schedules | Free | $0 |
-| CloudWatch Logs | 3 GB | 5 GB free | $0 |
-| **Total** | | | **~$50/month** |
+| EventBridge Scheduler | 8,000 schedules | Free | ~$1 |
+| Lambda, API Gateway, SQS, S3 | | Free tier | $0 |
+| **Total (1K farmers)** | | | **~$214/month** |
 
-**Note**: OpenSearch Serverless is the primary cost driver (~40% of total cost). Bedrock is second (~30%). DynamoDB overage is third (~25%).
+**Note**: OpenSearch Serverless is the dominant cost (~81% of total). It's always-on infrastructure, not pay-per-query. At 10,000 farmers, total is ~$574/month (~$0.70/farmer/year) as fixed costs amortize.
 
 **Cost Optimization Strategies**:
-- Consider Aurora Serverless v2 as vector store alternative (lower minimum cost)
+- Replace OpenSearch Serverless with Pinecone free tier or Aurora PostgreSQL + pgvector (reduces fixed cost to near-zero, ~$40/month total)
 - Implement response caching for common queries (reduce Bedrock calls)
-- Batch DynamoDB writes where possible
-- Use S3 lifecycle policies aggressively
-- Optimize Bedrock prompts to reduce tokens
-- Monitor and alert on cost thresholds ($50, $75, $100)
+- Use S3 lifecycle policies (images auto-delete after 7 days)
+- Monitor and alert on cost thresholds ($200, $300, $400)
 
 ### 8.2 Scaling Projections (10,000 farmers - Post-MVP)
 
@@ -825,7 +824,7 @@ jobs:
 - [ ] Performance testing (p95 latency with 10 concurrent users)
 - [ ] End-to-End Demo Video (Aurangabad Farmer scenario)
 - [ ] Article publication on AWS Builder Center (#aideas-2025, #EMEA tags)
-- [ ] Cost audit: verify actual spend vs. $50/month estimate
+- [ ] Cost audit: verify actual spend vs. $214/month estimate (OpenSearch ~$174 + variable ~$40)
 
 **Acceptance**:
 - Dashboard shows Completion Rate metric, DLQ depth, latency

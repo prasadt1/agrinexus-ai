@@ -14,7 +14,7 @@
 - **AI**: Amazon Bedrock (Claude 3 Sonnet + RAG), Transcribe, Polly, Claude Vision
 - **Messaging**: WhatsApp Business API
 - **Storage**: DynamoDB single-table design, S3 for knowledge base + temp audio
-- **Cost**: ~$50/month for 1,000 users (see [Cost breakdown](#cost-breakdown) and [architecture/](architecture/) for details)
+- **Cost**: ~$214/month for 1,000 farmers (~$174 fixed OpenSearch + ~$40 variable). See [Cost breakdown](#cost-breakdown)
 
 **Diagrams:** See [architecture/diagrams.md](architecture/diagrams.md) for Mermaid diagrams (high-level, webhook, text/voice/image flows, nudge flow). Full design: [architecture.md](architecture.md).
 
@@ -264,24 +264,27 @@ Weather Poller → Step Functions → Nudge Sender → WhatsApp
 
 ## Cost Breakdown
 
+### Fixed Infrastructure (always-on)
+| Service | Monthly Cost | Notes |
+|---------|--------------|-------|
+| OpenSearch Serverless | ~$174 | Minimum 0.5 OCU × 2 at $0.24/OCU-hr; always-on |
+
+### Variable Costs (~3K queries + 500 voice min/month for 1K farmers)
 | Service | Usage (1K users) | Monthly Cost |
 |---------|------------------|--------------|
-| DynamoDB | 1M reads, 500K writes | $0 (free tier) |
-| DynamoDB Streams | 1M stream reads | ~$0.50 |
-| S3 | 100 MB docs + temp audio | $0 (free tier) |
-| Bedrock KB | 1K queries | ~$5 |
-| Bedrock Vision | 100 images | ~$3 |
-| OpenSearch Serverless | 1 OCU | ~$20 |
-| Transcribe | 100 voice notes | ~$2 |
-| Polly | 100 responses | ~$0.50 |
-| Lambda | 50K invocations | $0 (free tier) |
-| API Gateway | 10K requests | $0 (free tier) |
-| SQS | 100K messages | $0 (free tier) |
-| Step Functions | 100 executions | $0 (free tier) |
+| Bedrock (Claude 3 Sonnet RAG + Vision) | 3K queries, 100 images | ~$25 |
+| Transcribe | 500 voice minutes | ~$12 |
+| Polly (neural TTS) | Voice responses | ~$1 |
+| DynamoDB (on-demand) | 1M reads, 500K writes | ~$1 |
 | EventBridge Scheduler | 1K schedules | ~$1 |
-| **AWS total (above)** | | **~$32/month** |
+| Lambda, API Gateway, SQS, S3, Step Functions | | $0 (free tier) |
+| **Variable total** | | **~$40/month** |
 
-**Overall**: With WhatsApp (free for first 1,000 conversations/month) and a small buffer, expect **~$50/month for 1,000 users**. See [architecture.md](architecture.md) for detailed cost notes.
+### Total: ~$214/month for 1,000 farmers
+
+OpenSearch Serverless is the dominant cost—it's always-on infrastructure, not pay-per-query. This fixed cost amortizes sharply with scale: at 10,000 farmers, total is ~$574/month (~$0.70/farmer/year).
+
+> **Cost optimization**: Replace OpenSearch Serverless with Aurora PostgreSQL + pgvector or Pinecone free tier to reduce fixed costs to near-zero (~$40/month for 1K farmers).
 
 ## Known Limitations
 
