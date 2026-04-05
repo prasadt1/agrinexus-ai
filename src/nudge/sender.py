@@ -16,6 +16,7 @@ _nudge_dir = os.path.dirname(os.path.abspath(__file__))
 if _nudge_dir not in sys.path:
     sys.path.insert(0, _nudge_dir)
 from nudge_copy import build_nudge_message
+from bedrock_liner import invoke_nudge_focus_line
 
 dynamodb = boto3.resource('dynamodb')
 scheduler = boto3.client('scheduler')
@@ -180,7 +181,17 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         district_key = profile.get('location') or location
 
         # Context-aware message (district, crop, spray type, wind, extension-style hint)
-        message = build_nudge_message(dialect, district_key, crop, wind_speed)
+        hint_override = None
+        if os.environ.get("NUDGE_BEDROCK_LINER", "").lower() in ("1", "true", "yes"):
+            try:
+                hint_override = invoke_nudge_focus_line(
+                    dialect, crop, str(district_key), wind_speed
+                )
+            except Exception as e:
+                print(f"Nudge Bedrock liner skipped: {e}")
+        message = build_nudge_message(
+            dialect, district_key, crop, wind_speed, context_hint_override=hint_override
+        )
 
         # Create nudge record in DynamoDB
         timestamp = datetime.utcnow().isoformat()

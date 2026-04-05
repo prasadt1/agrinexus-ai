@@ -9,6 +9,21 @@ A living record of significant fixes, architectural decisions, and system evolut
 ### Summary
 After AWS GenAI Competition finalist announcement, implemented critical fixes for production readiness: migrated to S3 vector store (cost savings), nudge expiry logic, English language support across all flows, voice ACK latency optimization, and DynamoDB float type handling.
 
+### Nudge messaging enhancements (April 2026)
+
+#### Localized, context-aware copy (`nudge_copy.py`)
+- **What**: Centralized Hindi / Marathi / Telugu / English strings for weather nudges and reminders: district display names (Latur, Jalna, Nagpur), crop labels plus spray category (pesticide vs fungicide), short crop-scouting hints in an extension style (no product names, no doses), and templates parameterized by district, crop, wind speed, and `context_hint`.
+- **API**: `district_display()`, `crop_terms()`, `context_hint()`, `reminder_hint_short()`, `build_nudge_message()`, `build_reminder_message()` — nudge body includes location, crop, relevance line, and spray-weather line.
+- **Delivery** (`sender.py`): Builds the body with `build_nudge_message`, sends WhatsApp reply buttons first (Done / Not yet), falls back to approved template `weather_nudge_spray` when `USE_NUDGE_TEMPLATE` is enabled, then plain text.
+- **Lambda packaging**: `sys.path` bootstrap in `sender.py` and `reminder.py` so `nudge_copy` resolves when the nudge Lambdas are packaged as flat zips.
+- **Tests**: `tests/test_nudge_flow.py` — pending-nudge dedup, context-aware body, template fallback, reminder updates, detector/schedules.
+
+#### Optional Bedrock scout line for nudge hints
+- **What**: When `NUDGE_BEDROCK_LINER` is `true`, `invoke_nudge_focus_line()` calls Amazon Bedrock Runtime (Claude 3 Haiku by default) to produce a single seasonal scouting sentence; system prompt disallows product/chemical names and doses and allows KVK/dealer-style wording. If the call fails or the flag is off or unset, the static `context_hint` from `nudge_copy` is used unchanged.
+- **Files**: `src/nudge/bedrock_liner.py`; `src/nudge/nudge_copy.py` — `build_nudge_message(..., context_hint_override=None)`; `src/nudge/sender.py` — attempts Bedrock override only when the flag is enabled, then passes `context_hint_override` into `build_nudge_message`.
+- **Infrastructure** (`template-week2.yaml`): `NUDGE_BEDROCK_LINER` (default `false`), `NUDGE_LINER_MODEL_ID` (default Haiku inference profile ID); IAM `bedrock:InvokeModel` on `arn:aws:bedrock:${Region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`; `NudgeSender` **Timeout** set to **60s** to accommodate Bedrock latency.
+- **Operations**: Deploy as usual; leave `NUDGE_BEDROCK_LINER=false` for static hints only. Set to `true` to enable generated one-liners after verifying Haiku access in the account/region.
+
 ### S3 Vector Store Migration (April 4, 2026)
 - **Issue**: OpenSearch Serverless cost $174/month fixed (0.5 OCU × 2 × $0.24/hr × 730hr), burning through AWS credits rapidly. Deleted collection on March 22 to stop burn, but RAG was broken.
 - **Solution**: Migrated from OpenSearch Serverless to Amazon Bedrock Knowledge Base with S3 vector store. Created new S3 bucket `agrinexus-kb-vectors`, uploaded all 8 FAO/ICAR/NIPHM/PAU PDFs, created new Knowledge Base with S3 data source. Ingestion completed successfully (COMPLETE status).

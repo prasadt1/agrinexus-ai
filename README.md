@@ -1,4 +1,4 @@
-<img width="2816" height="1536" alt="Gemini_Generated_Image_lodjzglodjzglodj" src="https://github.com/user-attachments/assets/6987a1de-2f7c-4d1e-8d96-d6c9c7619f94" />
+![AgriNexus AI - Bridging the Last Mile: From trapped research to accessible WhatsApp-based agricultural advice for smallholder farmers](https://github.com/user-attachments/assets/6987a1de-2f7c-4d1e-8d96-d6c9c7619f94)
 
 # AgriNexus AI – WhatsApp Agricultural Advisory
 

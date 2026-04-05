@@ -3,7 +3,7 @@ Shared localized copy for weather nudges and reminders (crop, district, context 
 Hints are non-prescriptive (no product names) — accuracy for demos without regulated advice.
 """
 
-from typing import Tuple
+from typing import Optional, Tuple
 
 # Canonical district keys from onboarding (location field)
 DISTRICT_LABELS = {
@@ -169,10 +169,11 @@ def build_nudge_message(
     district_key: str,
     crop: str,
     wind_speed: float,
+    context_hint_override: Optional[str] = None,
 ) -> str:
     crop_name, spray_type = crop_terms(crop, dialect)
     district = district_display(district_key, dialect) or district_key or "—"
-    hint = context_hint(crop, dialect)
+    hint = context_hint_override if context_hint_override else context_hint(crop, dialect)
     tmpl = NUDGE_TEMPLATES.get(dialect, NUDGE_TEMPLATES["hi"])
     return tmpl.format(
         district=district,

@@ -210,6 +210,7 @@ Resources:
           PHONE_NUMBER_ID_SECRET: agrinexus/whatsapp/phone-number-id
           TEMP_AUDIO_BUCKET: !Ref TempAudioBucket
           MODEL_ARN: arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0
+          APPEND_DISTRICT_HELPLINE: "true"
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TableName
@@ -367,6 +368,7 @@ Resources:
       CodeUri: src/nudge/
       Handler: sender.lambda_handler
       Description: Send behavioral nudges via WhatsApp
+      Timeout: 60
       Layers:
         - !Ref CommonLayer
       Environment:
@@ -377,9 +379,17 @@ Resources:
           PHONE_NUMBER_ID_SECRET: agrinexus/whatsapp/phone-number-id
           NUDGE_TEMPLATE_NAME: weather_nudge_spray
           USE_NUDGE_TEMPLATE: "true"
+          NUDGE_BEDROCK_LINER: "false"
+          NUDGE_LINER_MODEL_ID: anthropic.claude-3-haiku-20240307-v1:0
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TableName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource:
+                - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0'
         - Statement:
             - Effect: Allow
               Action:

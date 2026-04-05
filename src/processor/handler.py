@@ -18,6 +18,7 @@ from analyzer import process_image_message
 # Import WhatsApp utilities from common layer (with Secrets Manager caching)
 from common.whatsapp import send_whatsapp_message, send_whatsapp_list
 from common.whatsapp import send_whatsapp_buttons as _send_whatsapp_buttons
+from common.district_helplines import maybe_append_helpline_footer
 
 
 def send_whatsapp_buttons(phone_number: str, body_text: str, buttons: list):
@@ -754,9 +755,15 @@ Just type your question or send a photo!'''
             
             # Query Bedrock with session ID for conversation context (this takes ~13 seconds)
             result = query_bedrock(text, dialect, session_id=from_number)
+            reply_text = maybe_append_helpline_footer(
+                result["text"],
+                text,
+                dialect,
+                profile.get("location") if profile else None,
+            )
             
             # Save to DynamoDB
-            save_message(from_number, wamid, message, result['text'], str(result['citations']))
+            save_message(from_number, wamid, message, reply_text, str(result['citations']))
             
             # Check if user wants voice response (Hindi, Marathi, English supported)
             send_voice = (dialect in ['hi', 'mr', 'en'] and 
@@ -764,16 +771,16 @@ Just type your question or send a photo!'''
             
             if send_voice:
                 # Generate voice output
-                audio_url = text_to_speech(result['text'], dialect, from_number)
+                audio_url = text_to_speech(reply_text, dialect, from_number)
                 if audio_url:
                     # Send voice message
-                    send_whatsapp_message(from_number, result['text'], audio_url=audio_url)
+                    send_whatsapp_message(from_number, reply_text, audio_url=audio_url)
                 else:
                     # Fallback to text if voice generation fails
-                    send_whatsapp_message(from_number, result['text'])
+                    send_whatsapp_message(from_number, reply_text)
             else:
                 # Send text response
-                send_whatsapp_message(from_number, result['text'])
+                send_whatsapp_message(from_number, reply_text)
         
         elif message_type == 'image':
             # Process image with Claude Vision
