@@ -67,8 +67,31 @@ def get_average_confidence(transcript_data: Dict) -> float:
             if 'confidence' in item.get('alternatives', [{}])[0]
         ]
         return sum(confidences) / len(confidences) if confidences else 0.0
-    except:
+    except (KeyError, IndexError, TypeError, ValueError):
         return 0.0
+
+
+def _finalize_transcription(
+    result: Dict[str, Any], job_name: str, s3_key: str
+) -> Dict[str, Any]:
+    """Download transcript JSON, score confidence, cleanup S3 + Transcribe job."""
+    transcript_uri = result['TranscriptionJob']['Transcript']['TranscriptFileUri']
+    req = urllib.request.Request(transcript_uri)
+    with urllib.request.urlopen(req) as response:
+        transcript_data = json.loads(response.read())
+    transcript_text = transcript_data['results']['transcripts'][0]['transcript']
+    confidence = get_average_confidence(transcript_data)
+    print(f"Transcription complete: '{transcript_text}' (confidence: {confidence:.2f})")
+    s3.delete_object(Bucket=TEMP_BUCKET, Key=s3_key)
+    transcribe.delete_transcription_job(TranscriptionJobName=job_name)
+    if confidence >= 0.5:
+        return {'success': True, 'text': transcript_text, 'confidence': confidence, 'source': 'voice'}
+    return {
+        'success': False,
+        'error': 'low_confidence',
+        'confidence': confidence,
+        'text': transcript_text
+    }
 
 
 def process_voice_note(message: Dict[str, Any], user_profile: Dict[str, Any]) -> Dict[str, Any]:
@@ -81,6 +104,8 @@ def process_voice_note(message: Dict[str, Any], user_profile: Dict[str, Any]) ->
     print(f"Processing voice note from {phone}, audio_id: {audio_id}")
     
     try:
+        # Voice "received" ACK is sent in webhook handler (before SQS) for minimal delay.
+
         # 1. Download audio from WhatsApp
         print("Downloading audio from WhatsApp...")
         audio_url = get_whatsapp_media_url(audio_id)
@@ -106,51 +131,35 @@ def process_voice_note(message: Dict[str, Any], user_profile: Dict[str, Any]) ->
                 'ShowSpeakerLabels': False
             }
         )
-        
-        # 4. Poll for result (max 60 seconds for voice notes)
-        # Poll every 3 seconds instead of 1 second to reduce Lambda duration/cost
-        for attempt in range(20):
-            time.sleep(3)
+
+        # 4. Poll for result: immediate first check, then adaptive intervals (1s then 2s)
+        max_polls = 30
+        result = transcribe.get_transcription_job(TranscriptionJobName=job_name)
+        status = result['TranscriptionJob']['TranscriptionJobStatus']
+        print(f"Transcription status: {status} (elapsed: 0s, first poll)")
+
+        if status == 'COMPLETED':
+            return _finalize_transcription(result, job_name, s3_key)
+        if status == 'FAILED':
+            print(f"Transcription failed: {result}")
+            s3.delete_object(Bucket=TEMP_BUCKET, Key=s3_key)
+            return {'success': False, 'error': 'transcription_failed'}
+
+        for attempt in range(1, max_polls):
+            wait_time = 1 if attempt < 10 else 2
+            time.sleep(wait_time)
             result = transcribe.get_transcription_job(TranscriptionJobName=job_name)
             status = result['TranscriptionJob']['TranscriptionJobStatus']
-            
+            elapsed = attempt if attempt <= 10 else 10 + (attempt - 10) * 2
+            print(f"Transcription status: {status} (elapsed: {elapsed}s)")
+
             if status == 'COMPLETED':
-                # Get transcript
-                transcript_uri = result['TranscriptionJob']['Transcript']['TranscriptFileUri']
-                req = urllib.request.Request(transcript_uri)
-                with urllib.request.urlopen(req) as response:
-                    transcript_data = json.loads(response.read())
-                
-                transcript_text = transcript_data['results']['transcripts'][0]['transcript']
-                confidence = get_average_confidence(transcript_data)
-                
-                print(f"Transcription complete: '{transcript_text}' (confidence: {confidence:.2f})")
-                
-                # 5. Cleanup
-                s3.delete_object(Bucket=TEMP_BUCKET, Key=s3_key)
-                transcribe.delete_transcription_job(TranscriptionJobName=job_name)
-                
-                if confidence >= 0.5:
-                    return {
-                        'success': True,
-                        'text': transcript_text,
-                        'confidence': confidence,
-                        'source': 'voice'
-                    }
-                else:
-                    return {
-                        'success': False,
-                        'error': 'low_confidence',
-                        'confidence': confidence,
-                        'text': transcript_text
-                    }
-            
-            elif status == 'FAILED':
+                return _finalize_transcription(result, job_name, s3_key)
+            if status == 'FAILED':
                 print(f"Transcription failed: {result}")
-                # Cleanup
                 s3.delete_object(Bucket=TEMP_BUCKET, Key=s3_key)
                 return {'success': False, 'error': 'transcription_failed'}
-        
+
         # Timeout
         print("Transcription timeout")
         s3.delete_object(Bucket=TEMP_BUCKET, Key=s3_key)

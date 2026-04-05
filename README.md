@@ -105,6 +105,8 @@ aws secretsmanager create-secret \
 - **Verification (GET)**: Meta sends `hub.mode=subscribe`, `hub.verify_token`, `hub.challenge`. The webhook Lambda reads `agrinexus/whatsapp/verify-token` from Secrets Manager and returns `hub.challenge` if the token matches.
 - **Signatures (POST)**: Incoming message payloads are verified with `X-Hub-Signature-256` (HMAC-SHA256) using `agrinexus/whatsapp/app-secret`. Reject if invalid.
 - **Sending messages**: The processor and nudge Lambdas use `agrinexus/whatsapp/access-token` and `agrinexus/whatsapp/phone-number-id` to call the WhatsApp Cloud API (text, interactive buttons, or template messages where used).
+- **Production number cutover** (new eSIM / WABA / templates): see [docs/WHATSAPP-PRODUCTION-NUMBER-CUTOVER.md](docs/WHATSAPP-PRODUCTION-NUMBER-CUTOVER.md).
+- **Deploy / test handoff** (e.g. for Kiro): [docs/KIRO-DEPLOY-AND-TEST.md](docs/KIRO-DEPLOY-AND-TEST.md).
 - **Message types**: Inbound text, image, and audio are supported. Outbound: text, optional interactive buttons (e.g. language/location during onboarding), and template messages for nudges (see [architecture/diagrams.md](architecture/diagrams.md)).
 
 ## Usage
@@ -363,14 +365,7 @@ The dashboard includes a completion rate widget based on these metrics.
 
 ## Real Weather API (Optional)
 
-By default, the system uses mocked weather for demo reliability. To use real weather:
-
-```bash
-USE_REAL_WEATHER=true
-WEATHER_API_KEY="YOUR_OPENWEATHER_API_KEY"
-```
-
-These are configured via Lambda environment variables (see `template-week2.yaml`).
+Production uses **OpenWeatherMap** when `MOCK_WEATHER` is false and `WEATHER_API_KEY` is set (see `template-week2.yaml` and `sam deploy ... WeatherApiKey=`). Set `MOCK_WEATHER=true` on the Weather poller only for deterministic demo weather.
 
 ## Requirements Methodology: EARS
 

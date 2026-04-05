@@ -101,7 +101,7 @@ Signature verification can be disabled in dev via `VERIFY_SIGNATURE=false` on th
 
 ### Onboarding State Machine
 
-Implemented in `src/processor/handler.py`. States: language selection -> district -> crop -> nudge consent -> `COMPLETE`. Supported languages/dialects: `hi` (Hindi), `mr` (Marathi), `te` (Telugu), `en` (English). Valid districts: Aurangabad, Jalna, Nagpur. Valid crops: Cotton, Wheat, Soybean, Maize.
+Implemented in `src/processor/handler.py`. States: language selection -> district -> crop -> nudge consent -> `COMPLETE`. Supported languages/dialects: `hi` (Hindi), `mr` (Marathi), `te` (Telugu), `en` (English). Valid districts: Latur, Jalna, Nagpur (replaces legacy Aurangabad label; district renamed in Maharashtra). Valid crops: Cotton, Wheat, Soybean, Maize.
 
 ### Voice Language Support
 
@@ -138,5 +138,7 @@ Create `scripts/demo.env` (gitignored) with `WEBHOOK_URL`, `APP_SECRET`, `PHONE_
 - `architecture/diagrams.md` — Mermaid flow diagrams
 - `docs/E2E-TEST-GUIDE.md` — end-to-end test walkthrough
 - `docs/CODE-WALKTHROUGH.md` — component-by-component guide
+- `docs/WHATSAPP-PRODUCTION-NUMBER-CUTOVER.md` — new WhatsApp Business number, secrets, webhook, templates
+- `docs/KIRO-DEPLOY-AND-TEST.md` — build/deploy/test checklist for AWS (SAM, secrets, smoke tests)
 - `ISSUES-LOG.md` — 38+ resolved debugging issues
 - `requirements.md` — EARS requirements specification (100+ requirements)

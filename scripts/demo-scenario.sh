@@ -78,7 +78,7 @@ JSON
 # Onboarding flow (English path)
 send_text "English"
 sleep 2
-send_text "Aurangabad"
+send_text "Latur"
 sleep 2
 send_text "Cotton"
 sleep 2

@@ -23,7 +23,7 @@ We've upgraded the onboarding flow from plain text responses to WhatsApp Reply B
 
 **Input Type:** Free text (no buttons)
 
-**Valid Districts:** Aurangabad, Jalna, Nagpur
+**Valid Districts:** Latur, Jalna, Nagpur
 
 **User Action:** Type district name
 
@@ -122,7 +122,7 @@ The processor handles both button clicks and typed text, so users can:
    - You should see text prompt: "बढ़िया! अब मुझे बताएं आप किस जिले में हैं?"
 
 3. **Enter Location:**
-   - Type "Aurangabad"
+   - Type "Latur"
    - You should see 3 buttons: [Cotton] [Wheat] [Soybean]
 
 4. **Select Crop:**

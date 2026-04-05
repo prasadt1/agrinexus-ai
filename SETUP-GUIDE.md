@@ -353,17 +353,12 @@ Create the prebuilt dashboard for ops visibility:
 
 ## Real Weather API (Optional)
 
-To enable real weather ingestion (post-MVP):
+To enable real weather:
 
 1. Create an OpenWeatherMap API key.
-2. Update Lambda environment variables:
+2. Deploy or update the Weather poller with `WEATHER_API_KEY` and `MOCK_WEATHER=false` (see `template-week2.yaml`).
 
-```bash
-USE_REAL_WEATHER=true
-WEATHER_API_KEY="YOUR_OPENWEATHER_API_KEY"
-```
-
-**Note**: Keep `MOCK_WEATHER=true` for deterministic demos.
+**Note:** Use `MOCK_WEATHER=true` only for deterministic spray nudge demos.
 
 ## Week 2 WhatsApp Prerequisite (Webhook Signature)
 

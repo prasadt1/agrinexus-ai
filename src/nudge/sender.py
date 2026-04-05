@@ -79,6 +79,32 @@ def create_reminder_schedule(phone_number: str, nudge_id: str, hours_offset: int
     )
 
 
+def create_expiry_schedule(phone_number: str, nudge_id: str, hours_offset: int):
+    """Create EventBridge Scheduler to auto-expire nudge if no response"""
+    schedule_time = datetime.utcnow() + timedelta(hours=hours_offset)
+    
+    # Create valid schedule name
+    safe_nudge_id = nudge_id.replace(':', '-').replace('#', '-')
+    schedule_name = f'expiry-{safe_nudge_id}'
+    
+    # Use the same reminder Lambda but with a special 'EXPIRY' type
+    scheduler.create_schedule(
+        Name=schedule_name,
+        ScheduleExpression=f'at({schedule_time.strftime("%Y-%m-%dT%H:%M:%S")})',
+        Target={
+            'Arn': os.environ['REMINDER_LAMBDA_ARN'],
+            'RoleArn': os.environ['SCHEDULER_ROLE_ARN'],
+            'Input': json.dumps({
+                'phone_number': phone_number,
+                'nudge_id': nudge_id,
+                'reminder_type': 'EXPIRY',
+                'activity': 'auto-expire'
+            })
+        },
+        FlexibleTimeWindow={'Mode': 'OFF'}
+    )
+
+
 def emit_metric(name: str, value: float = 1.0):
     """Emit custom CloudWatch metric for nudges"""
     try:
@@ -209,6 +235,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Schedule reminders at T+24h and T+48h
         create_reminder_schedule(phone_number, nudge_id, 24, dialect)
         create_reminder_schedule(phone_number, nudge_id, 48, dialect)
+        
+        # Schedule auto-expiry at T+72h (24h after final reminder)
+        # This closes the nudge if farmer never responds
+        create_expiry_schedule(phone_number, nudge_id, 72)
         
         nudges_sent += 1
     

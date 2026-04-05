@@ -52,7 +52,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     phone_number = event['phone_number']
     nudge_id = event['nudge_id']
     reminder_type = event['reminder_type']
-    dialect = event.get('dialect', 'hi')
     
     # Check nudge status
     response = table.get_item(
@@ -67,6 +66,37 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return {'statusCode': 404, 'message': 'Nudge not found'}
     
     status = nudge.get('status')
+    
+    # Handle auto-expiry (T+72h - no response from farmer)
+    if reminder_type == 'EXPIRY':
+        if status not in ['DONE', 'EXPIRED']:
+            # Mark as EXPIRED (farmer never responded)
+            table.update_item(
+                Key={
+                    'PK': f'USER#{phone_number}',
+                    'SK': f'NUDGE#{nudge_id}'
+                },
+                UpdateExpression='SET #status = :status',
+                ExpressionAttributeNames={'#status': 'status'},
+                ExpressionAttributeValues={
+                    ':status': 'EXPIRED'
+                }
+            )
+            print(f"Auto-expired nudge {nudge_id} (no response after T+48h)")
+        return {'statusCode': 200, 'message': 'Nudge expired'}
+    
+    # Get user profile to determine dialect
+    try:
+        profile_response = table.get_item(
+            Key={
+                'PK': f'USER#{phone_number}',
+                'SK': 'PROFILE'
+            }
+        )
+        dialect = profile_response.get('Item', {}).get('dialect', 'hi')
+    except:
+        dialect = 'hi'  # Default to Hindi if profile not found
+    
     crop = nudge.get('crop', 'Cotton')
     crop_data = CROP_INFO.get(crop, CROP_INFO['Cotton'])
     crop_name, spray_type = crop_data.get(dialect, crop_data['hi'])

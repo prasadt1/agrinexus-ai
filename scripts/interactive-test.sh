@@ -131,7 +131,7 @@ function prompt_onboarding() {
   echo "  1️⃣  Send: Hello or Namaste"
   echo "      (Bot will show welcome with language buttons)"
   echo ""
-  echo "  2️⃣  Send: Your district name (e.g., Aurangabad)"
+  echo "  2️⃣  Send: Your district name (e.g., Latur)"
   echo "      (Bot will ask for district)"
   echo ""
   echo "  3️⃣  Send: Cotton"

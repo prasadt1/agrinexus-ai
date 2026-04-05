@@ -7,6 +7,7 @@ import os
 import boto3
 from typing import Dict, Any, Optional
 from datetime import datetime
+from decimal import Decimal
 
 # Import voice output module
 from output import text_to_speech, should_send_voice_response
@@ -41,15 +42,16 @@ GUARDRAIL_VERSION = os.environ['GUARDRAIL_VERSION']
 table = dynamodb.Table(TABLE_NAME)
 
 # Onboarding configuration
-VALID_DISTRICTS = ['Aurangabad', 'Jalna', 'Nagpur']
+VALID_DISTRICTS = ['Latur', 'Jalna', 'Nagpur']
 VALID_CROPS = ['Cotton', 'Wheat', 'Soybean', 'Maize']
 VALID_LANGUAGES = ['Hindi', 'Marathi', 'Telugu', 'English']
 
-# District -> coordinates (approximate; for geo-based nudges)
+# District -> coordinates (approximate; for geo-based nudges + weather)
+# Note: Former "Aurangabad" district area is now Chhatrapati Sambhajinagar; Latur used as primary Marathwada demo.
 DISTRICT_COORDS = {
-    'Aurangabad': {'lat': 19.8762, 'lon': 75.3433},
+    'Latur': {'lat': 18.4088, 'lon': 76.5604},
     'Jalna': {'lat': 19.8347, 'lon': 75.8816},
-    'Nagpur': {'lat': 21.1458, 'lon': 79.0882}
+    'Nagpur': {'lat': 21.1458, 'lon': 79.0882},
 }
 
 # Onboarding messages by dialect
@@ -185,10 +187,10 @@ def handle_onboarding(phone_number: str, message_text: str, profile: Optional[Di
                 'en': 'Great! Now tell me which district you are in?\n\n(Or type any district name)'
             }
             district_buttons = {
-                'hi': ['औरंगाबाद', 'जालना', 'नागपुर'],
-                'mr': ['औरंगाबाद', 'जालना', 'नागपूर'],
-                'te': ['ఔరంగాబాద్', 'జల్నా', 'నాగ్‌పూర్'],
-                'en': ['Aurangabad', 'Jalna', 'Nagpur']
+                'hi': ['लातूर', 'जालना', 'नागपुर'],
+                'mr': ['लातूर', 'जालना', 'नागपूर'],
+                'te': ['లాతూర్', 'జల్నా', 'నాగ్‌పూర్'],
+                'en': ['Latur', 'Jalna', 'Nagpur']
             }
             return {
                 'type': 'buttons',
@@ -246,10 +248,10 @@ Please choose your language / कृपया अपनी भाषा चु�
             }
             # District names in local script
             district_buttons = {
-                'hi': ['औरंगाबाद', 'जालना', 'नागपुर'],
-                'mr': ['औरंगाबाद', 'जालना', 'नागपूर'],
-                'te': ['ఔరంగాబాద్', 'జల్నా', 'నాగ్‌పూర్'],
-                'en': ['Aurangabad', 'Jalna', 'Nagpur']
+                'hi': ['लातूर', 'जालना', 'नागपुर'],
+                'mr': ['लातूर', 'जालना', 'नागपूर'],
+                'te': ['లాతూర్', 'జల్నా', 'నాగ్‌పూర్'],
+                'en': ['Latur', 'Jalna', 'Nagpur']
             }
             return {
                 'type': 'buttons',
@@ -288,10 +290,10 @@ Please choose your language / कृपया अपनी भाषा चु�
         
         # District name mappings (local script -> English)
         district_mappings = {
-            # Aurangabad
-            'aurangabad': 'Aurangabad',
-            'औरंगाबाद': 'Aurangabad',
-            'ఔరంగాబాద్': 'Aurangabad',
+            # Latur
+            'latur': 'Latur',
+            'लातूर': 'Latur',
+            'లాతూర్': 'Latur',
             # Jalna
             'jalna': 'Jalna',
             'जालना': 'Jalna',
@@ -300,7 +302,7 @@ Please choose your language / कृपया अपनी भाषा चु�
             'nagpur': 'Nagpur',
             'नागपुर': 'Nagpur',
             'नागपूर': 'Nagpur',
-            'నాగ్‌పూర్': 'Nagpur'
+            'నాగ్‌పూర్': 'Nagpur',
         }
         
         # Check for district in any language
@@ -351,10 +353,10 @@ Please choose your language / कृपया अपनी भाषा चु�
             }
             # District names in local script
             district_buttons = {
-                'hi': ['औरंगाबाद', 'जालना', 'नागपुर'],
-                'mr': ['औरंगाबाद', 'जालना', 'नागपूर'],
-                'te': ['ఔరంగాబాద్', 'జల్నా', 'నాగ్‌పూర్'],
-                'en': ['Aurangabad', 'Jalna', 'Nagpur']
+                'hi': ['लातूर', 'जालना', 'नागपुर'],
+                'mr': ['लातूर', 'जालना', 'नागपूर'],
+                'te': ['లాతూర్', 'జల్నా', 'నాగ్‌పూర్'],
+                'en': ['Latur', 'Jalna', 'Nagpur']
             }
             return {
                 'type': 'buttons',
@@ -436,17 +438,35 @@ Please choose your language / कृपया अपनी भाषा चु�
     }
 
 
+def convert_floats_to_decimal(obj):
+    """
+    Recursively convert float values to Decimal for DynamoDB compatibility.
+    DynamoDB doesn't support float types - must use Decimal instead.
+    """
+    if isinstance(obj, list):
+        return [convert_floats_to_decimal(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {key: convert_floats_to_decimal(value) for key, value in obj.items()}
+    elif isinstance(obj, float):
+        return Decimal(str(obj))
+    else:
+        return obj
+
+
 def save_message(phone_number: str, wamid: str, message_data: Dict[str, Any], response_text: str, source_citation: str):
     """Save message to DynamoDB with TTL"""
     timestamp = datetime.utcnow().isoformat()
     ttl = int(datetime.utcnow().timestamp()) + (90 * 24 * 60 * 60)  # 90 days
+    
+    # Convert any float values to Decimal for DynamoDB
+    message_data_clean = convert_floats_to_decimal(message_data)
     
     table.put_item(
         Item={
             'PK': f'USER#{phone_number}',
             'SK': f'MSG#{timestamp}',
             'wamid': wamid,
-            'message': message_data,
+            'message': message_data_clean,
             'response': response_text,
             'source_citation': source_citation,
             'ttl': ttl
@@ -721,14 +741,16 @@ Just type your question or send a photo!'''
             # Check for DONE/NOT YET keywords (handled by response detector)
             # Just process as normal query
             
-            # Send immediate acknowledgment (improves perceived response time)
-            ack_messages = {
-                'hi': '✓ आपका सवाल मिल गया। जवाब तैयार कर रहे हैं...',
-                'mr': '✓ तुमचा प्रश्न मिळाला. उत्तर तयार करत आहे...',
-                'te': '✓ మీ ప్రశ్న అందింది. సమాధానం తయారు చేస్తున్నాము...',
-                'en': '✓ Question received. Preparing answer...'
-            }
-            send_whatsapp_message(from_number, ack_messages.get(dialect, ack_messages['hi']))
+            # Immediate text-query ack only (voice already got VOICE_RECEIVED_ACK in VoiceProcessor)
+            voice_source = message.get('_source')
+            if voice_source not in ('voice', 'voice_test'):
+                ack_messages = {
+                    'hi': '✓ आपका सवाल मिल गया। जवाब तैयार कर रहे हैं...',
+                    'mr': '✓ तुमचा प्रश्न मिळाला. उत्तर तयार करत आहे...',
+                    'te': '✓ మీ ప్రశ్న అందింది. సమాధానం తయారు చేస్తున్నాము...',
+                    'en': '✓ Question received. Preparing answer...'
+                }
+                send_whatsapp_message(from_number, ack_messages.get(dialect, ack_messages['hi']))
             
             # Query Bedrock with session ID for conversation context (this takes ~13 seconds)
             result = query_bedrock(text, dialect, session_id=from_number)

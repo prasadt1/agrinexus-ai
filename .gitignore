@@ -83,8 +83,6 @@ architecture/ANIMATION-PROMPTS.md
 .claude/
 
 # Internal development logs (keep local)
-ISSUES-LOG.md
-CHANGELOG.md
 design.md
 SETUP-CHECKLIST.md
 DEPLOYMENT-SUCCESS.md

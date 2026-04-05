@@ -21,6 +21,14 @@ _credentials_cache = {
 
 CACHE_TTL_SECONDS = 300  # 5 minutes
 
+# Shown right after inbound voice is accepted (webhook path, before SQS → Voice Lambda)
+VOICE_RECEIVED_ACK = {
+    'hi': 'आपका संदेश मिल गया। जवाब तैयार कर रहे हैं…',
+    'mr': 'तुमचा संदेश मिळाला. उत्तर तयार करत आहोत…',
+    'te': 'మీ సందేశం అందింది. సమాధానం సిద్ధం చేస్తున్నాము…',
+    'en': 'We received your message and are preparing a reply…',
+}
+
 
 def get_whatsapp_credentials() -> Tuple[str, str]:
     """

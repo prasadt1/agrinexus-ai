@@ -57,7 +57,7 @@ Expected response: `test123`
 1. Send "Namaste" from your WhatsApp to the business number
 2. You should receive a welcome message with language selection buttons
 3. Select "हिंदी" (Hindi)
-4. Select your district (e.g., "Aurangabad")
+4. Select your district (e.g., "Latur")
 5. Select your crop (e.g., "कपास" - Cotton)
 6. Reply "हाँ" (Yes) to consent for weather tips
 7. You should receive: "बधाई हो! आपका प्रोफाइल तैयार है..."

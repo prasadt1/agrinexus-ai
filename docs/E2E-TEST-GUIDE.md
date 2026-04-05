@@ -67,7 +67,7 @@ User must complete onboarding before Q&A/nudges work correctly (language and pro
 | Step   | Hindi    | Marathi  | Telugu   | English  |
 |--------|----------|----------|----------|----------|
 | Language | `हिंदी`  | `मराठी`  | `తెలుగు` | `English` |
-| District | e.g. `Aurangabad` | same | same | same |
+| District | e.g. `Latur` | same | same | same |
 | Crop   | e.g. `Cotton` | same | same | same |
 | Nudge consent | `Yes` / `No` | same | same | same |
 

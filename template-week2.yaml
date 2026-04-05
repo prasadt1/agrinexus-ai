@@ -33,6 +33,12 @@ Parameters:
     Type: String
     Default: "1"
     Description: Bedrock Guardrail Version from Week 1 (optional)
+  
+  WeatherApiKey:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: OpenWeatherMap API Key (get free key at https://openweathermap.org/api)
 
 Globals:
   Function:
@@ -151,6 +157,8 @@ Resources:
       Handler: handler.lambda_handler
       Description: WhatsApp webhook handler with signature validation
       MemorySize: 256  # Reduced from 512MB - only does validation + SQS enqueue
+      Layers:
+        - !Ref CommonLayer
       Environment:
         Variables:
           QUEUE_URL: !Ref MessageQueue
@@ -158,6 +166,8 @@ Resources:
           VERIFY_TOKEN_SECRET: agrinexus/whatsapp/verify-token
           APP_SECRET_NAME: agrinexus/whatsapp/app-secret
           VERIFY_SIGNATURE: "true"
+          ACCESS_TOKEN_SECRET: agrinexus/whatsapp/access-token
+          PHONE_NUMBER_ID_SECRET: agrinexus/whatsapp/phone-number-id
       Policies:
         - SQSSendMessagePolicy:
             QueueName: !GetAtt MessageQueue.QueueName
@@ -333,8 +343,7 @@ Resources:
         Variables:
           STATE_MACHINE_ARN: !Ref NudgeStateMachine
           MOCK_WEATHER: "false"
-          USE_REAL_WEATHER: "false"
-          WEATHER_API_KEY: ""
+          WEATHER_API_KEY: !Ref WeatherApiKey
           WEATHER_API_BASE: "https://api.openweathermap.org/data/2.5/weather"
       Policies:
         - DynamoDBReadPolicy:

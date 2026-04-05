@@ -8,7 +8,7 @@ fi
 
 PHONE="${PHONE_NUMBER:-}"
 LANG="hi"
-DISTRICT="${DISTRICT:-Aurangabad}"
+DISTRICT="${DISTRICT:-Latur}"
 CROP="${CROP:-Cotton}"
 CONSENT="${CONSENT:-Yes}"
 WEBHOOK_URL="${WEBHOOK_URL:-}"

@@ -127,7 +127,7 @@ SENT → REMINDED → DONE
 ### Weather Polling
 - **Frequency**: Every 6 hours (configurable via EventBridge)
 - **Mode**: Mock mode (default) or Real weather API
-- **Mock Mode**: Always returns favorable conditions for Aurangabad, Jalna, Nagpur
+- **Mock Mode**: Always returns favorable conditions for Latur, Jalna, Nagpur
 - **Real Mode**: Calls OpenWeather API with actual conditions
 
 ---

@@ -11,6 +11,8 @@ import logging
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 
+from common.whatsapp import send_whatsapp_message, VOICE_RECEIVED_ACK
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
@@ -119,6 +121,26 @@ def redact_phone(phone: str) -> str:
     return f"{phone[:3]}***"
 
 
+def get_user_dialect(phone: str) -> str:
+    """Fast PROFILE lookup for localized voice ACK (defaults to hi)."""
+    try:
+        r = table.get_item(Key={'PK': f'USER#{phone}', 'SK': 'PROFILE'})
+        return (r.get('Item') or {}).get('dialect', 'hi') or 'hi'
+    except Exception as e:
+        logger.warning(f"dialect lookup failed for voice ack: {e}")
+        return 'hi'
+
+
+def send_voice_received_ack(from_number: str) -> None:
+    """Immediate feedback before SQS + Voice Lambda (avoids queue/cold-start delay)."""
+    try:
+        dialect = get_user_dialect(from_number)
+        text = VOICE_RECEIVED_ACK.get(dialect, VOICE_RECEIVED_ACK['hi'])
+        send_whatsapp_message(from_number, text)
+    except Exception as e:
+        logger.warning(f"Voice received ack failed (continuing to queue): {e}")
+
+
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Handle WhatsApp webhook events
@@ -225,6 +247,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 logger.error(f"Error checking idempotency: {e}")
                 # Continue processing even if dedup check fails
             
+            voice_queue_url = os.environ.get('VOICE_QUEUE_URL')
+            if message_type == 'audio' and voice_queue_url:
+                # Before detector write + SQS + Voice Lambda — minimizes perceived ACK delay
+                send_voice_received_ack(from_number)
+
             # Store message in DynamoDB for response detector (via DynamoDB Streams)
             import time
             message_ttl = int(time.time()) + (7 * 24 * 60 * 60)  # 7 days
@@ -246,7 +273,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             if message_type == 'audio':
                 logger.info(f"Audio message detected - routing to voice processor")
                 try:
-                    voice_queue_url = os.environ.get('VOICE_QUEUE_URL')
                     if voice_queue_url:
                         sqs.send_message(
                             QueueUrl=voice_queue_url,

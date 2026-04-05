@@ -96,7 +96,7 @@ def test_template_language_code_selection(monkeypatch):
     monkeypatch.setattr(sender, "send_whatsapp_message", lambda *args, **kwargs: None)
     monkeypatch.setattr(sender, "create_reminder_schedule", lambda *args, **kwargs: None)
 
-    sender.lambda_handler({"location": "Aurangabad", "weather": {"wind_speed": 8.5}, "activity": "spray"}, None)
+    sender.lambda_handler({"location": "Latur", "weather": {"wind_speed": 8.5}, "activity": "spray"}, None)
 
     assert captured["template_name"] == "weather_nudge_spray"
     assert captured["language_code"] == "mr"

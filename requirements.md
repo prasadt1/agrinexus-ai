@@ -369,7 +369,7 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 ## 5. Acceptance Criteria
 
-### 5.1 Canonical Demo Scenario: Aurangabad Cotton Farmer
+### 5.1 Canonical Demo Scenario: Latur Cotton Farmer
 
 **AC-DEMO-001**: When a user sends "Namaste", the system shall respond within 2s with dialect/crop selection via WhatsApp interactive buttons.
 

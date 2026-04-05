@@ -20,34 +20,39 @@ table = dynamodb.Table(TABLE_NAME)
 DONE_KEYWORDS = {
     'hi': ['हो गया', 'कर दिया', 'हो गया है', 'कर लिया', 'done', 'completed'],
     'mr': ['झाला', 'केला', 'पूर्ण झाला', 'done'],
-    'te': ['అయ్యింది', 'చేశాను', 'పూర్తయింది', 'done']
+    'te': ['అయ్యింది', 'చేశాను', 'పూర్తయింది', 'done'],
+    'en': ['done', 'completed', 'finished']
 }
 
 NOT_YET_KEYWORDS = {
     'hi': ['अभी नहीं', 'बाद में', 'नहीं किया', 'not yet', 'later'],
     'mr': ['नाही झाला', 'नंतर', 'अजून नाही', 'not yet'],
-    'te': ['ఇంకా లేదు', 'తర్వాత', 'చేయలేదు', 'not yet']
+    'te': ['ఇంకా లేదు', 'తర్వాత', 'చేయలేదు', 'not yet'],
+    'en': ['not yet', 'later', 'not done', 'not now']
 }
 
 # Confirmation messages by dialect
 CONFIRMATION_MESSAGES = {
     'hi': 'बहुत अच्छा! आपका काम पूरा हो गया। धन्यवाद! 🎉',
     'mr': 'खूप छान! तुमचे काम पूर्ण झाले. धन्यवाद! 🎉',
-    'te': 'చాలా బాగుంది! మీ పని పూర్తయింది. ధన్యవాదాలు! 🎉'
+    'te': 'చాలా బాగుంది! మీ పని పూర్తయింది. ధన్యవాదాలు! 🎉',
+    'en': 'Great! Your task is complete. Thank you! 🎉'
 }
 
 # NOT YET acknowledgment messages by dialect
 NOT_YET_MESSAGES = {
     'hi': 'कोई बात नहीं। मैं आपको बाद में याद दिलाऊंगा। 👍',
     'mr': 'काही हरकत नाही. मी तुम्हाला नंतर आठवण करून देईन. 👍',
-    'te': 'పర్వాలేదు. నేను మీకు తర్వాత గుర్తు చేస్తాను. 👍'
+    'te': 'పర్వాలేదు. నేను మీకు తర్వాత గుర్తు చేస్తాను. 👍',
+    'en': 'No problem. I will remind you later. 👍'
 }
 
 # NOT YET final acknowledgment (after T+48h reminder)
 NOT_YET_FINAL_MESSAGES = {
     'hi': 'कोई बात नहीं। जब आप तैयार हों तो कर लें। अगली बार मौसम अच्छा होगा तो मैं फिर से याद दिलाऊंगा। 👍',
     'mr': 'काही हरकत नाही. तुम्ही तयार असाल तेव्हा करा. पुढच्या वेळी हवामान चांगले असेल तर मी पुन्हा आठवण करून देईन. 👍',
-    'te': 'పర్వాలేదు. మీరు సిద్ధంగా ఉన్నప్పుడు చేయండి. తదుపరిసారి వాతావరణం మంచిగా ఉంటే నేను మళ్లీ గుర్తు చేస్తాను. 👍'
+    'te': 'పర్వాలేదు. మీరు సిద్ధంగా ఉన్నప్పుడు చేయండి. తదుపరిసారి వాతావరణం మంచిగా ఉంటే నేను మళ్లీ గుర్తు చేస్తాను. 👍',
+    'en': 'No problem. Do it when you are ready. I will remind you again when the weather is good next time. 👍'
 }
 
 
@@ -84,7 +89,7 @@ def get_active_nudges(phone_number: str) -> List[Dict[str, Any]]:
         }
     )
     
-    # Filter for SENT or REMINDED status
+    # Filter for SENT or REMINDED status (but not EXPIRED)
     return [
         item for item in response.get('Items', [])
         if item.get('status') in ['SENT', 'REMINDED']
@@ -106,7 +111,7 @@ def get_user_dialect(phone_number: str) -> str:
 
 
 def delete_scheduled_reminders(nudge_id: str):
-    """Delete EventBridge Scheduler reminders"""
+    """Delete EventBridge Scheduler reminders and expiry"""
     # Apply same transformation as sender: replace : and # with -
     safe_nudge_id = nudge_id.replace(':', '-').replace('#', '-')
     
@@ -123,6 +128,13 @@ def delete_scheduled_reminders(nudge_id: str):
         print(f"Deleted schedule: {schedule_name}")
     except Exception as e:
         print(f"Failed to delete 48h schedule: {e}")
+    
+    try:
+        schedule_name = f'expiry-{safe_nudge_id}'
+        scheduler.delete_schedule(Name=schedule_name)
+        print(f"Deleted expiry schedule: {schedule_name}")
+    except Exception as e:
+        print(f"Failed to delete expiry schedule: {e}")
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -205,6 +217,21 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 # If last reminder was T+48h, this is the final response
                 if last_reminder == 'T+48h':
                     is_final_reminder = True
+                    
+                    # Mark nudge as EXPIRED (no more reminders)
+                    nudge_sk = latest_nudge['SK']
+                    table.update_item(
+                        Key={
+                            'PK': pk,
+                            'SK': nudge_sk
+                        },
+                        UpdateExpression='SET #status = :status',
+                        ExpressionAttributeNames={'#status': 'status'},
+                        ExpressionAttributeValues={
+                            ':status': 'EXPIRED'
+                        }
+                    )
+                    print(f"Marked nudge as EXPIRED (farmer declined after T+48h)")
             
             # Send appropriate acknowledgment
             if is_final_reminder:

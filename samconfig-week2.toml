@@ -9,12 +9,16 @@ s3_prefix = "agrinexus-week2"
 region = "us-east-1"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
+# After rebuilding KB on S3 Vectors, set KnowledgeBaseId to the new ID from Bedrock.
+# Set WeatherApiKey to your OpenWeatherMap key for production nudges (or pass at deploy time).
 parameter_overrides = [
     "Environment=dev",
     "TableName=agrinexus-data",
-    "KnowledgeBaseId=H81XLD3YWY",
+    "TableStreamArn=arn:aws:dynamodb:us-east-1:043624892076:table/agrinexus-data/stream/2026-02-16T07:55:35.380",
+    "KnowledgeBaseId=ARZ4XQEBCU",
     "GuardrailId=\"\"",
-    "GuardrailVersion=1"
+    "GuardrailVersion=1",
+    "WeatherApiKey=f00ea294289b451f4d8e43a325fcf5ca"
 ]
 
 [default.build]

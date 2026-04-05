@@ -196,7 +196,7 @@ SK: PROFILE
 Attributes:
 - entityType: "UserProfile"
 - userId: "+919876543210"
-- location: {district: "Aurangabad District", state: "Maharashtra", country: "India"}
+- location: {district: "Latur District", state: "Maharashtra", country: "India"}
 - crops: ["cotton", "soybean"]
 - language: "hi" (Hindi)
 - dialect: "Marathi"
@@ -232,7 +232,7 @@ PK: USER#+919876543210
 SK: NUDGE#1707955200#spray-pesticide
 Attributes:
 - entityType: "Nudge"
-- nudgeId: "2026-02-14-spray-pesticide-aurangabad"
+- nudgeId: "2026-02-14-spray-pesticide-latur"
 - activity: "spray_pesticide"
 - sentAt: 1707955200
 - scheduledReminderAt: 1708041600 (T+24h)
@@ -829,16 +829,16 @@ jobs:
 
 **Tasks**:
 - [ ] CloudWatch Dashboard (Completion Rate metric, DLQ depth, latency)
-- [ ] End-to-end integration tests for Aurangabad demo scenario
+- [ ] End-to-end integration tests for Latur demo scenario
 - [ ] Run guardrail test suite (20 scenarios) and RAG golden questions
 - [ ] Performance testing (p95 latency with 10 concurrent users)
-- [ ] End-to-End Demo Video (Aurangabad Farmer scenario)
+- [ ] End-to-End Demo Video (Latur Farmer scenario)
 - [ ] Article publication on AWS Builder Center (#aideas-2025, #EMEA tags)
 - [ ] Cost audit: verify actual spend vs. $214/month estimate (OpenSearch ~$174 + variable ~$40)
 
 **Acceptance**:
 - Dashboard shows Completion Rate metric, DLQ depth, latency
-- "Aurangabad Farmer" scenario recorded without manual intervention
+- "Latur Farmer" scenario recorded without manual intervention
 - All tests pass with required thresholds
 - Article submitted before March 13 deadline
 - Actual cost ≤ $60/month
@@ -892,7 +892,7 @@ jobs:
 - 90% RAG accuracy on golden questions across all three dialects
 
 **Competition Metrics**:
-- Working demo for judges (Aurangabad Cotton Farmer scenario)
+- Working demo for judges (Latur Cotton Farmer scenario)
 - All promised features functional (Tier 1 + Tier 2)
 - Clear differentiation from reactive information systems
 - Compelling "closed loop" demonstration with real-time dashboard

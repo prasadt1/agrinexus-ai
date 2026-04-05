@@ -73,7 +73,7 @@ test_user = {
     'entityType': 'UserProfile',
     'userId': '+919876543210',
     'location': {
-        'region': 'Aurangabad District',
+        'region': 'Latur District',
         'state': 'Maharashtra',
         'country': 'India'
     },

@@ -5,7 +5,7 @@
   "userId": {"S": "+919876543210"},
   "location": {
     "M": {
-      "region": {"S": "Aurangabad District"},
+      "region": {"S": "Latur District"},
       "state": {"S": "Maharashtra"},
       "country": {"S": "India"}
     }

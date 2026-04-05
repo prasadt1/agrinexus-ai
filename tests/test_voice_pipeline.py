@@ -33,7 +33,7 @@ def setup_test_user(dialect='hi'):
             'SK': 'PROFILE',
             'phone': TEST_PHONE,
             'dialect': dialect,
-            'district': 'Aurangabad',
+            'district': 'Latur',
             'crop': 'cotton',
             'consent': True,
             'onboardingComplete': True,
