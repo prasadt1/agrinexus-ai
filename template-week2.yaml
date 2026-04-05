@@ -33,12 +33,6 @@ Parameters:
     Type: String
     Default: "1"
     Description: Bedrock Guardrail Version from Week 1 (optional)
-  
-  WeatherApiKey:
-    Type: String
-    Default: ""
-    NoEcho: true
-    Description: OpenWeatherMap API Key (get free key at https://openweathermap.org/api)
 
 Globals:
   Function:
@@ -343,13 +337,18 @@ Resources:
         Variables:
           STATE_MACHINE_ARN: !Ref NudgeStateMachine
           MOCK_WEATHER: "false"
-          WEATHER_API_KEY: !Ref WeatherApiKey
+          WEATHER_API_KEY_SECRET: agrinexus/weather/api-key
           WEATHER_API_BASE: "https://api.openweathermap.org/data/2.5/weather"
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref TableName
         - StepFunctionsExecutionPolicy:
             StateMachineName: !GetAtt NudgeStateMachine.Name
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus/weather/api-key-*
       Events:
         ScheduledPoll:
           Type: Schedule

@@ -17,8 +17,7 @@ parameter_overrides = [
     "TableStreamArn=arn:aws:dynamodb:us-east-1:043624892076:table/agrinexus-data/stream/2026-02-16T07:55:35.380",
     "KnowledgeBaseId=ARZ4XQEBCU",
     "GuardrailId=\"\"",
-    "GuardrailVersion=1",
-    "WeatherApiKey=f00ea294289b451f4d8e43a325fcf5ca"
+    "GuardrailVersion=1"
 ]
 
 [default.build]

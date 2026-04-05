@@ -13,6 +13,7 @@ import urllib.parse
 
 dynamodb = boto3.resource('dynamodb')
 stepfunctions = boto3.client('stepfunctions')
+secretsmanager = boto3.client('secretsmanager')
 
 TABLE_NAME = os.environ['TABLE_NAME']
 STATE_MACHINE_ARN = os.environ.get('STATE_MACHINE_ARN')
@@ -20,8 +21,29 @@ STATE_MACHINE_ARN = os.environ.get('STATE_MACHINE_ARN')
 table = dynamodb.Table(TABLE_NAME)
 
 MOCK_WEATHER = os.environ.get('MOCK_WEATHER', 'false').lower() == 'true'
-WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY')
+WEATHER_API_KEY_SECRET = os.environ.get('WEATHER_API_KEY_SECRET')
 WEATHER_API_BASE = os.environ.get('WEATHER_API_BASE', 'https://api.openweathermap.org/data/2.5/weather')
+
+# Cache the API key to avoid repeated Secrets Manager calls
+_weather_api_key_cache = None
+
+def get_weather_api_key() -> str:
+    """Get weather API key from Secrets Manager (with caching)"""
+    global _weather_api_key_cache
+    
+    if _weather_api_key_cache:
+        return _weather_api_key_cache
+    
+    if not WEATHER_API_KEY_SECRET:
+        return None
+    
+    try:
+        response = secretsmanager.get_secret_value(SecretId=WEATHER_API_KEY_SECRET)
+        _weather_api_key_cache = response['SecretString']
+        return _weather_api_key_cache
+    except Exception as e:
+        print(f"Error fetching weather API key from Secrets Manager: {e}")
+        return None
 
 # District -> coordinates (approximate; used for geo-based story and weather lookup)
 DISTRICT_COORDS = {
@@ -86,14 +108,16 @@ def check_weather_real(location: str) -> Dict[str, Any]:
     if not coords:
         print(f"Weather: no coordinates for {location}, using mock")
         return check_weather_mock(location)
-    if not WEATHER_API_KEY:
-        print("Weather: WEATHER_API_KEY not set, using mock fallback")
+    
+    weather_api_key = get_weather_api_key()
+    if not weather_api_key:
+        print("Weather: WEATHER_API_KEY not available, using mock fallback")
         return check_weather_mock(location)
 
     query = urllib.parse.urlencode({
         'lat': coords['lat'],
         'lon': coords['lon'],
-        'appid': WEATHER_API_KEY,
+        'appid': weather_api_key,
         'units': 'metric'
     })
     url = f"{WEATHER_API_BASE}?{query}"
