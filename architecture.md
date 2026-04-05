@@ -830,7 +830,7 @@ jobs:
 
 **Acceptance**:
 - User asks crop question, gets Hindi response with FAO citation
-- Voice round-trip completes <10s
+- Voice round-trip on MVP batch path ~30–45s p95 with immediate voice-received ACK; Phase 2 targets sub-10s (`docs/VOICE-LATENCY-PHASE2-PLAN.md`)
 - Cotton pest identified correctly from test image within 15s
 - Failed processing sends apology message in user's dialect
 - Guardrail tests achieve 100% refusal rate
@@ -850,13 +850,11 @@ jobs:
 - Dashboard shows Completion Rate metric, DLQ depth, latency
 - Latur demo scenario works end-to-end
 - All tests pass with required thresholds
-- Article submitted before March 13 deadline
-- Actual cost ≤ $60/monthtur Farmer" scenario recorded without manual intervention
-- All tests pass with required thresholds
-- Article submitted before March 13 deadline
-- Actual cost ≤ $60/month
+- End-to-end demo video (Latur farmer scenario) recorded without manual intervention
+- Article submitted before the applicable Builder Center / competition deadline (confirm current date)
+- Actual cost ≤ $60/month (verify against live billing)
 
-**Note**: Confirm Builder Center article submission deadline aligns with March 13 competition deadline. If the article is a competition requirement, prioritize it early in Week 4.
+**Note**: Competition and article deadlines change by year—confirm against the active program schedule.
 
 ## 10. Risk Mitigation
 

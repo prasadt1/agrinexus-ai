@@ -15,7 +15,7 @@ This document specifies the functional and non-functional requirements for AgriN
 AgriNexus AI delivers agronomic advice through WhatsApp, using Amazon Bedrock for dialect-aware conversations (Hindi, Marathi, Telugu), EventBridge Scheduler for behavioral nudges, Claude 3 Vision for pest diagnosis, and Amazon Transcribe + Polly for voice accessibility. The system prioritizes trust through dialect-native voice interactions and evidence-backed citations from validated FAO sources.
 
 ### 1.3 Architecture
-Serverless architecture with pay-as-you-go Bedrock. Estimated cost: ~$214/month for 1,000 farmers, with OpenSearch Serverless (~$174 fixed) and Bedrock (~$25 variable) as the primary cost drivers. At 10,000 farmers, cost drops to ~$0.70/farmer/year.
+Serverless architecture with pay-as-you-go Bedrock. **Current stack** (Bedrock Knowledge Base with **S3 Vectors**, migrated April 2026): estimated **~$53/month** for 1,000 active farmers (S3 vectors ~$1.30 + Bedrock ~$39 + other ~$13—see `README.md`). Older documentation referenced OpenSearch Serverless (~$174/month fixed) and **~$214/month** totals; that cost model applies only to historical deployments. At 10,000 farmers, modeled cost is on the order of **~$0.54–0.70/farmer/year** depending on usage.
 
 ### 1.4 EARS Syntax Convention
 All functional requirements follow EARS (Easy Approach to Requirements Syntax):
@@ -285,7 +285,7 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **REQ-COST-004**: The system shall use CloudWatch Logs with retention policies to limit log storage costs.
 
-**REQ-COST-005**: The system shall target ~$214/month operational cost for 1,000 farmers (~$174 fixed OpenSearch + ~$40 variable), scaling to ~$0.70/farmer/year at 10,000 farmers.
+**REQ-COST-005**: The system shall target sustainable operational cost for 1,000 farmers using **S3 Vectors + Bedrock** (order of **~$53/month** all-in at light–moderate usage per `README.md`), not legacy OpenSearch-fixed **~$214/month** economics. At 10,000 farmers, target on the order of **~$0.54–0.70/farmer/year** (usage-dependent).
 
 ### 3.4 Security
 

@@ -1,5 +1,7 @@
 # Complete Setup Guide - Step by Step
 
+For **WhatsApp + nudges + voice** deployment, prefer **`README.md`**, **`CLAUDE.md`**, and **`template-week2.yaml`**. This guide mixes general tooling setup with older stack references—verify any Bedrock/OpenSearch cost lines against **`README.md`**.
+
 ## Step 1: Install Homebrew (if needed)
 
 ```bash

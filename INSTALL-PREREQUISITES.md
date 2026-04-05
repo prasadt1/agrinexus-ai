@@ -154,7 +154,7 @@ Your AWS user needs these permissions:
 - DynamoDB (create tables)
 - S3 (create buckets, upload files)
 - Bedrock (create knowledge bases, invoke models)
-- OpenSearch Serverless (create collections)
+- Bedrock Knowledge Base / vector store (S3 Vectors for current path; OpenSearch Serverless only if you maintain a legacy collection)
 - IAM (create roles for Bedrock)
 - Lambda (create functions)
 
@@ -162,20 +162,13 @@ Your AWS user needs these permissions:
 
 ## Cost Estimate
 
-Before deploying, understand the costs:
+Before deploying, use **`README.md`** as the source of truth for **current** costs. Summary:
 
-**Fixed (always-on):**
-- OpenSearch Serverless: ~$174/month (minimum 0.5 OCU × 2 at $0.24/OCU-hr)
+**Current stack (S3 Vectors + Bedrock, post–April 2026):** on the order of **~$53/month** for ~1,000 farmers (mostly Bedrock usage; S3 vectors ~$1.30).
 
-**Variable (pay-per-use for 1K farmers):**
-- Bedrock (RAG + Vision): ~$25/month
-- Transcribe: ~$12/month (500 voice minutes)
-- Polly, DynamoDB, EventBridge: ~$3/month
-- Lambda, S3, SQS, API Gateway: $0 (free tier)
+**Legacy note:** OpenSearch Serverless was **~$174/month fixed** and drove **~$214/month** totals in early deployments—replaced by S3 Vectors for this project.
 
-**Total: ~$214/month for 1,000 farmers**
-
-> **Cost optimization**: Replace OpenSearch Serverless with Pinecone free tier or Aurora PostgreSQL + pgvector to reduce fixed costs to near-zero (~$40/month).
+> **Detail:** See `architecture.md` and `REBUILD-KB-WITH-S3-VECTORS.md`.
 
 ## Ready to Deploy?
 

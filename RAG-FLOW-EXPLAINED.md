@@ -130,7 +130,7 @@
 "Cotton mein aphids ka control kaise karein?"
 → [0.234, -0.567, ...]  # length set by the embedding model (not always 1536)
 
-# FAO content embeddings (stored in OpenSearch)
+# FAO content embeddings (stored in the KB vector index, e.g. S3 Vectors)
 "Aphid Control: Use neem oil..."
 → [0.245, -0.543, 0.876, 0.134, ...]  # Similar vector!
 

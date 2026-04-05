@@ -1,5 +1,7 @@
 # AgriNexus AI - Week 1 Deployment Guide
 
+> **2026 note:** Active production and WhatsApp demos use **`template-week2.yaml`**, **`samconfig-week2.toml`**, and the flow in **`README.md`** / **`CLAUDE.md`**. This file is the **legacy Week 1** stack (`setup-week1.sh`, `agrinexus-dev`). Use it only if you are reproducing the original DynamoDB+KB bootstrap; otherwise deploy Week 2.
+
 ## Quick Start
 
 ```bash
@@ -42,7 +44,7 @@ sam deploy \
 This creates:
 - DynamoDB table: `agrinexus-data`
 - S3 bucket: `agrinexus-kb-{account-id}-{region}`
-- Bedrock Knowledge Base with OpenSearch Serverless
+- Bedrock Knowledge Base with a vector store (historical docs used OpenSearch Serverless; **current** deployments use **S3 Vectors**—see `REBUILD-KB-WITH-S3-VECTORS.md`)
 - Bedrock Guardrails
 
 **Expected time:** 5-10 minutes
