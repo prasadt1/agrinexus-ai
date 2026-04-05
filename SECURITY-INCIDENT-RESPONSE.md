@@ -9,13 +9,9 @@
 
 ## What Happened
 
-The OpenWeatherMap API key was committed to the git repository in multiple files:
-- `samconfig-week2.toml` (SAM deployment config)
-- `TEST-REPORT.md` (internal documentation)
-- `DEPLOYMENT-STATUS.md` (internal documentation)
-- `READY-FOR-TESTING.md` (internal documentation)
+The OpenWeatherMap API key was committed to the git repository in multiple files (e.g. SAM config and internal notes). **Do not paste real keys in incident write-ups** — the value was **rotated** and is not reproduced here.
 
-The exposed key: `f00ea294289b451f4d8e43a325fcf5ca`
+**Redacted reference**: a 32-character hex key was exposed; it was **revoked** on OpenWeatherMap and replaced. Never commit keys even in incident postmortems.
 
 ## Impact Assessment
 
@@ -46,9 +42,9 @@ The exposed key: `f00ea294289b451f4d8e43a325fcf5ca`
 - Added IAM policy for secretsmanager:GetSecretValue
 
 ✅ **Remove from Code**
-- Removed `WeatherApiKey` parameter from `template-week2.yaml`
-- Removed key from `samconfig-week2.toml`
-- Updated `src/weather/handler.py` to use Secrets Manager
+- Weather Lambda reads the key from **AWS Secrets Manager** (`WEATHER_API_KEY_SECRET`, e.g. `agrinexus/weather/api-key`), not from `samconfig` or template parameters
+- Removed plain-text / deploy-parameter key usage from tracked config
+- `src/weather/handler.py` uses `get_secret_value` with in-memory cache
 
 ### 2. Deployment
 

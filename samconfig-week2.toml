@@ -10,7 +10,7 @@ region = "us-east-1"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
 # After rebuilding KB on S3 Vectors, set KnowledgeBaseId to the new ID from Bedrock.
-# Set WeatherApiKey to your OpenWeatherMap key for production nudges (or pass at deploy time).
+# OpenWeatherMap key: store in Secrets Manager (agrinexus/weather/api-key); see WEATHER-API-SETUP.md.
 parameter_overrides = [
     "Environment=dev",
     "TableName=agrinexus-data",

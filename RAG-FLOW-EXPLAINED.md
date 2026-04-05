@@ -12,8 +12,8 @@
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ 2. PYTHON CODE CALLS BEDROCK API                               │
-│    bedrock_agent.retrieve_and_generate()                       │
+│ 2. LAMBDA CALLS BEDROCK AGENT RUNTIME                          │
+│    bedrock_agent.retrieve_and_generate() (see handler.py)      │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -24,8 +24,10 @@
 │    ├── Convert question to embedding vector                    │
 │    │   [0.234, -0.567, 0.891, ...]                            │
 │    │                                                            │
-│    ├── Search OpenSearch Serverless                            │
-│    │   Query: Find similar vectors                             │
+│    ├── Vector search over the Knowledge Base index             │
+│    │   (S3 Vectors in current AWS setup; older deployments     │
+│    │    used OpenSearch Serverless — same retrieve API)       │
+│    │   Query: Find similar embeddings                          │
 │    │                                                            │
 │    └── Return top 5 relevant chunks from FAO PDFs              │
 │        ┌─────────────────────────────────────────┐            │
@@ -44,7 +46,7 @@
 │        │ Source: pesticide-application.pdf, p12  │            │
 │        └─────────────────────────────────────────┘            │
 │                                                                 │
-│    Step B: AUGMENT (Add context to prompt)                     │
+│    Step B: AUGMENT (RAG prompt with $query$ + $search_results$)│
 │    ├── Take retrieved chunks                                   │
 │    ├── Build enhanced prompt:                                  │
 │    │   "You are an agricultural advisor.                       │
@@ -53,7 +55,8 @@
 │    │    Answer in Hindi: Cotton mein aphids ka control        │
 │    │    kaise karein?"                                         │
 │    │                                                            │
-│    └── Send to Claude 3 Sonnet                                 │
+│    └── Send to the foundation model (default Claude 3 Sonnet   │
+│        in code; override with MODEL_ARN env if set)            │
 │                                                                 │
 │    Step C: GENERATE (LLM creates response)                     │
 │    ├── Claude reads FAO content                                │
@@ -65,11 +68,11 @@
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ 4. GUARDRAILS CHECK (Before returning)                         │
-│    ├── Check for banned pesticides ❌ Paraquat                 │
-│    ├── Check for medical advice ❌ Human health                │
-│    ├── Anonymize PII ❌ Phone numbers                          │
-│    └── If blocked → Return KVK redirect message                │
+│ 4. GUARDRAILS (Optional — if GUARDRAIL_ID is set on Lambda)    │
+│    generationConfiguration.guardrailConfiguration in Bedrock   │
+│    Policy depends on your guardrail in Bedrock (e.g. banned     │
+│    substances, off-topic). If GUARDRAIL_ID is empty, this step │
+│    is skipped — only the prompt’s domain rules apply.          │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -125,14 +128,14 @@
 ```python
 # Question embedding
 "Cotton mein aphids ka control kaise karein?"
-→ [0.234, -0.567, 0.891, 0.123, ...]  # 1536 dimensions
+→ [0.234, -0.567, ...]  # length set by the embedding model (not always 1536)
 
 # FAO content embeddings (stored in OpenSearch)
 "Aphid Control: Use neem oil..."
 → [0.245, -0.543, 0.876, 0.134, ...]  # Similar vector!
 
-# Cosine similarity = 0.92 (very similar!)
-# This chunk gets retrieved
+# Cosine similarity ranks chunks; top results feed the model.
+# Embedding dimension depends on the model (e.g. Titan Embed Text v2 → 1024 dims).
 ```
 
 ### 3. **Citations Prove Grounding**
@@ -143,39 +146,19 @@ Every response includes:
 
 This prevents hallucinations - Claude can only use what's in the PDFs.
 
-### 4. **Guardrails Work at Two Points**
+### 4. **Guardrails (when configured)**
 
-**Input Guardrails** (before LLM):
-```
-Question: "Paraquat kahan se milega?"
-→ Guardrail detects "Paraquat" (banned pesticide)
-→ Blocks request
-→ Returns: "I cannot provide advice on banned pesticides. 
-           Please contact your local KVK."
-```
-
-**Output Guardrails** (after LLM):
-```
-If Claude somehow mentions banned content:
-→ Guardrail blocks output
-→ Returns safe message instead
-```
+Bedrock Knowledge Bases can attach a **guardrail** to generation. This project passes `guardrailConfiguration` only when `GUARDRAIL_ID` is non-empty (`src/processor/handler.py`). Behavior (input vs output interception) is defined in the Bedrock guardrail resource, not in this repo’s Python code.
 
 ## Testing the Logic
 
-### Option 1: Run the example script
+### Option 1: Golden-question tests (recommended)
 ```bash
-# After deploying infrastructure
-python3 test_rag_example.py
-```
-
-### Option 2: Run full test suite
-```bash
-# Tests all 20 golden questions
+export KNOWLEDGE_BASE_ID=your_kb_id   # required — tests skip if unset
 pytest tests/test_golden_questions.py -v
 ```
 
-### Option 3: Manual test with AWS CLI
+### Option 2: Manual test with AWS CLI
 ```bash
 KB_ID="your-kb-id"
 
@@ -196,8 +179,8 @@ aws bedrock-agent-runtime retrieve-and-generate \
 1. **Grounded in Facts**: Only uses FAO content (no hallucinations)
 2. **Multilingual**: Handles Hindi, Marathi, Telugu automatically
 3. **Cited Sources**: Every answer includes references
-4. **Safety Guardrails**: Blocks harmful content
-5. **Scalable**: OpenSearch handles millions of queries
+4. **Safety Guardrails**: When `GUARDRAIL_ID` is set, Bedrock applies your guardrail; otherwise domain rules rely on the prompt
+5. **Scalable**: Managed vector storage (S3 Vectors or OpenSearch) behind the same API
 6. **Monitored**: CloudWatch tracks latency, errors, costs
 
 ## Common Issues & Solutions
@@ -225,11 +208,8 @@ aws bedrock-agent start-ingestion-job \
 **Cause**: Guardrails blocked content or KB misconfigured
 **Solution**: Check guardrail logs in CloudWatch
 
-## Next Steps
+## Production stack (this repo)
 
-Once Week 1 RAG is working:
-- Week 2: Connect to WhatsApp (real user queries)
-- Week 3: Add voice I/O (Transcribe + Polly)
-- Week 4: Add vision (pest diagnosis with Claude Vision)
+RAG answers are invoked from the **MessageProcessor** Lambda after WhatsApp → SQS. Voice and vision use separate paths (Transcribe/Polly and Bedrock Vision) but text RAG uses the same `retrieve_and_generate` flow described above.
 
-The RAG foundation you're building now powers all of these features!
+See `architecture.md` and `README.md` for the full pipeline and KB rebuild notes (`REBUILD-KB-WITH-S3-VECTORS.md` if you use S3 Vectors).
