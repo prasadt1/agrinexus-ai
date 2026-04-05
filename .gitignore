@@ -99,3 +99,4 @@ docs/*.html
 *.jpg
 *.jpeg
 !README.md
+data/fao-pdfs/**/*.pdf

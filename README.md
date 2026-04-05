@@ -100,6 +100,30 @@ aws secretsmanager create-secret \
 # Subscribe to 'messages' field
 ```
 
+### Knowledge Base Setup
+
+**Important**: The source PDF documents are **not included in this repository** due to copyright considerations. You need to obtain and upload them separately.
+
+See [data/fao-pdfs/README.md](data/fao-pdfs/README.md) for:
+- List of required documents with download links
+- Copyright and licensing information
+- Instructions for uploading to S3
+- Alternative knowledge sources
+
+Quick setup:
+```bash
+# 1. Download PDFs from sources listed in data/fao-pdfs/README.md
+# 2. Place them in data/fao-pdfs/en/
+# 3. Upload to S3
+aws s3 sync data/fao-pdfs/en/ s3://agrinexus-knowledge-base-dev/en/ \
+    --exclude "*.DS_Store" --exclude "README.md"
+
+# 4. Trigger Bedrock ingestion
+aws bedrock-agent start-ingestion-job \
+    --knowledge-base-id YOUR_KB_ID \
+    --data-source-id YOUR_DATA_SOURCE_ID
+```
+
 ### WhatsApp integration (webhook, secrets, templates)
 
 - **Webhook URL**: After deploy, use the stack output `WebhookUrl` (e.g. `https://<api-id>.execute-api.us-east-1.amazonaws.com/dev/webhook`). In Meta Developer Portal → WhatsApp → Configuration, set this as **Callback URL** and subscribe to **messages**.
