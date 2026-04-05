@@ -13,8 +13,8 @@
 - **Serverless**: Lambda, DynamoDB, EventBridge Scheduler, Step Functions
 - **AI**: Amazon Bedrock (Claude 3 Sonnet + RAG), Transcribe, Polly, Claude Vision
 - **Messaging**: WhatsApp Business API
-- **Storage**: DynamoDB single-table design, S3 for knowledge base + temp audio
-- **Cost**: ~$214/month for 1,000 farmers (~$174 fixed OpenSearch + ~$40 variable). See [Cost breakdown](#cost-breakdown)
+- **Storage**: DynamoDB single-table design, S3 for knowledge base vectors + temp audio
+- **Cost**: ~$50/month for 1,000 farmers (all pay-per-use). See [Cost breakdown](#cost-breakdown)
 
 **Diagrams:** See [architecture/diagrams.md](architecture/diagrams.md) for Mermaid diagrams (high-level, webhook, text/voice/image flows, nudge flow). Full design: [architecture.md](architecture.md).
 
@@ -35,6 +35,7 @@
 - **Weather-Based**: Spray reminders when conditions are optimal
 - **Closed-Loop**: Tracks completion with "हो गया" (done) responses
 - **Smart Reminders**: T+24h and T+48h follow-ups if not completed
+- **Auto-Expiry**: T+72h auto-expiry if no response (EXPIRED status)
 - **Duplicate Prevention**: Max 1 nudge per activity per day
 
 ### 4. Vision Analysis
@@ -266,10 +267,7 @@ Weather Poller → Step Functions → Nudge Sender → WhatsApp
 
 ## Cost Breakdown
 
-### Fixed Infrastructure (always-on)
-| Service | Monthly Cost | Notes |
-|---------|--------------|-------|
-| OpenSearch Serverless | ~$174 | Minimum 0.5 OCU × 2 at $0.24/OCU-hr; always-on |
+**All pay-per-use, no fixed costs** (migrated from OpenSearch Serverless to S3 vectors on April 4, 2026)
 
 ### Variable Costs (~3K queries + 500 voice min/month for 1K farmers)
 | Service | Usage (1K users) | Monthly Cost |
@@ -277,38 +275,28 @@ Weather Poller → Step Functions → Nudge Sender → WhatsApp
 | Bedrock (Claude 3 Sonnet RAG + Vision) | 3K queries, 100 images | ~$25 |
 | Transcribe | 500 voice minutes | ~$12 |
 | Polly (neural TTS) | Voice responses | ~$1 |
+| S3 Vectors (Knowledge Base) | Storage + queries | ~$1 |
 | DynamoDB (on-demand) | 1M reads, 500K writes | ~$1 |
 | EventBridge Scheduler | 1K schedules | ~$1 |
 | Lambda, API Gateway, SQS, S3, Step Functions | | $0 (free tier) |
-| **Variable total** | | **~$40/month** |
+| **Total** | | **~$41/month** |
 
-### Total: ~$214/month for 1,000 farmers
+### Cost per Farmer
+- **1,000 farmers**: ~$0.041/farmer/month (~$0.49/farmer/year)
+- **10,000 farmers**: ~$0.057/farmer/month (~$0.68/farmer/year)
 
-OpenSearch Serverless is the dominant cost—it's always-on infrastructure, not pay-per-query. This fixed cost amortizes sharply with scale: at 10,000 farmers, total is ~$574/month (~$0.70/farmer/year).
+**100x cheaper than commercial agricultural advisory services** ($5-10/farmer/month)
 
-### Cost Optimization: Cheaper Vector Store Alternatives
-
-OpenSearch Serverless has a ~$174/month minimum. Here are AWS-native alternatives that work with Bedrock Knowledge Bases:
-
-| Alternative | Monthly Cost | Latency | Best For |
-|-------------|--------------|---------|----------|
-| **Amazon S3 Vectors** (new, Dec 2025) | Pay-per-query (~$5-10) | 100-800ms | Cost-sensitive, low-medium QPS |
-| **Aurora PostgreSQL + pgvector** | ~$30-50 (smallest instance) | <100ms | Need SQL + vectors |
-| **OpenSearch Managed Cluster** | ~$50-100 | <50ms | High throughput, need full-text search |
-| **Pinecone Free Tier** | $0 (up to 100K vectors) | <100ms | Small datasets, external service OK |
-
-**Recommended for AgriNexus**: Switch to **Amazon S3 Vectors** for up to 90% savings. S3 Vectors is fully AWS-native, requires no infrastructure management, and works directly with Bedrock Knowledge Bases. Slightly higher latency (100-800ms vs <50ms) is acceptable for a chatbot use case.
-
-**With S3 Vectors**: Total cost drops to **~$45-50/month** for 1,000 farmers.
-
-See: [AWS S3 Vectors announcement](https://aws.amazon.com/about-aws/whats-new/2024/12/amazon-s3-vectors-preview/) | [Bedrock KB vector store options](https://docs.aws.amazon.com/bedrock/latest/userguide/knowledge-base-setup.html)
+### Historical Context
+- **Before April 4, 2026**: Used OpenSearch Serverless with $174/month fixed cost (total ~$214/month)
+- **After April 4, 2026**: Migrated to S3 vectors, 99% cost reduction, all pay-per-use
 
 ## Known Limitations
 
-1. **Voice Input Latency**: 20-34 seconds (batch transcription). Post-MVP: migrate to Transcribe Streaming for <2s latency.
+1. **Voice Input Latency**: 30-35 seconds total (batch transcription ~20-30s + RAG ~5-10s + Polly ~3s). Voice ACK sent immediately (1-2s). Post-MVP: migrate to Transcribe Streaming for <10s total.
 2. **Telugu Voice Output**: No native Telugu voice in Polly. Text-only responses for Telugu users.
 3. **WhatsApp Test Numbers**: Don't support media (voice/images). Requires real WhatsApp Business number for end-to-end testing.
-4. **Weather Data**: Currently mock data. Post-MVP: integrate real weather API.
+4. **Weather Data**: Real OpenWeatherMap API integrated. Set MOCK_WEATHER=true for demo reliability.
 
 ## Troubleshooting
 
