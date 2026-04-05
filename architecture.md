@@ -33,8 +33,8 @@ The architecture is a serverless system with pay-as-you-go Bedrock. Estimated co
 │                    AWS Cloud                                 │
 │                                                              │
 │  ┌──────────────┐      ┌─────────────────┐                 │
-│  │ API Gateway  │─────▶│  Lambda         │                 │
-│  │  (Webhook)   │      │  (Orchestrator) │                 │
+│  │ API Gateway  │─────▶│  Webhook Lambda │                 │
+│  │  (Webhook)   │      │  (+ SQS routes) │                 │
 │  └──────────────┘      └────────┬────────┘                 │
 │                                  │                           │
 │                    ┌─────────────┼─────────────┐            │
@@ -84,17 +84,18 @@ The architecture is a serverless system with pay-as-you-go Bedrock. Estimated co
 
 **Responsibilities**:
 - Receive incoming WhatsApp messages via webhook
-- Validate webhook signatures (Twilio/Meta)
+- Validate webhook signatures (Meta `X-Hub-Signature-256` + app secret)
 - Extract message content (text, images, audio)
 - Route to appropriate processing Lambda
 - Send responses back to WhatsApp
 
 **Data Flow**:
 1. WhatsApp → API Gateway (POST /webhook)
-2. API Gateway → Lambda (webhook-handler)
-3. Lambda validates signature
-4. Lambda extracts message type and content
-5. Lambda invokes appropriate processor (conversation or vision)
+2. API Gateway → Lambda (webhook handler)
+3. Lambda validates signature, deduplicates by `wamid`
+4. For **audio**: optional **voice-received** text to user (Common layer + Graph API), then SQS **Voice** queue → Voice Processor → Transcribe → message queue
+5. For **text/image**: SQS **message** queue → Message Processor (RAG / Vision)
+6. Lambdas call WhatsApp Cloud API for outbound messages (no separate “orchestrator” service)
 
 **AWS Services**:
 - API Gateway (REST API)
@@ -501,7 +502,7 @@ Target: Step Functions (NudgeFlow)
 7. Send audio via WhatsApp
 8. Delete temp files from S3
 
-**Performance Target**: Voice round-trip ≤ 10 seconds
+**Performance (actual MVP)**: Voice end-to-end typically **~30–45s** (batch Transcribe + RAG + Polly). **Phase 2** target: streaming STT and/or async pipeline to reduce perceived latency (see `docs/VOICE-LATENCY-PHASE2-PLAN.md`).
 
 **AWS Services**:
 - Amazon Transcribe (speech-to-text)
@@ -531,7 +532,7 @@ Target: Step Functions (NudgeFlow)
 **WhatsApp Webhook**:
 - Signature validation using shared secret
 - HTTPS only (TLS 1.2+)
-- API Gateway resource policy (IP whitelist for Twilio/Meta)
+- API Gateway: HTTPS only; optional resource policy (Meta has no fixed webhook IP list—signature verification is primary)
 
 **IAM Roles** (Least Privilege):
 ```
@@ -621,7 +622,8 @@ SEARCH('{AgriNexus, Phone} MetricName="NudgesSent"', 'Sum', 300) * 100
 - Step Functions execution failures > 0
 - DLQDepth > 5 messages
 - Estimated monthly cost > $75 (billing alarm)
-- ModelLatency p95 > 10 seconds
+- Bedrock RAG invocation latency p95 > 15 seconds (text queries; tune the threshold per model and environment)
+- Optional separate checks: voice pipeline (Transcribe → RAG → Polly) often ~30–45s batch path — use logs or custom metrics rather than the same threshold as text
 
 **Notification**: SNS topic → Email to dev team
 
@@ -891,7 +893,7 @@ jobs:
 **Technical Metrics**:
 - 95% of text messages processed within 5 seconds (p95)
 - 95% of vision analysis within 15 seconds
-- 95% of voice round-trip within 10 seconds
+- Voice: batch pipeline; track p95 end-to-end time and optimize in Phase 2 (streaming STT)—**not** a sub-10s target until then
 - 99% uptime during business hours (6 AM - 10 PM IST)
 - Zero security vulnerabilities in code scans
 - <$60 total AWS costs during MVP phase

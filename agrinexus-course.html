@@ -1,0 +1,2236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How AgriNexus AI Works — Interactive Course</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* ===== CSS DESIGN SYSTEM ===== */
+    :root {
+      /* Backgrounds */
+      --color-bg: #FAF7F2;
+      --color-bg-warm: #F5F0E8;
+      --color-bg-code: #1E1E2E;
+      --color-text: #2C2A28;
+      --color-text-secondary: #6B6560;
+      --color-text-muted: #9E9790;
+      --color-border: #E5DFD6;
+      --color-border-light: #EEEBE5;
+      --color-surface: #FFFFFF;
+      --color-surface-warm: #FDF9F3;
+
+      /* Accent - Forest Green for agriculture */
+      --color-accent: #2D8B55;
+      --color-accent-hover: #247345;
+      --color-accent-light: #E8F5EE;
+      --color-accent-muted: #5AAA7B;
+
+      /* Semantic */
+      --color-success: #2D8B55;
+      --color-success-light: #E8F5EE;
+      --color-error: #C93B3B;
+      --color-error-light: #FDE8E8;
+      --color-info: #2A7B9B;
+      --color-info-light: #E4F2F7;
+
+      /* Actor colors */
+      --color-actor-1: #2D8B55; /* WhatsApp/Webhook - green */
+      --color-actor-2: #2A7B9B; /* Processor - teal */
+      --color-actor-3: #7B6DAA; /* Bedrock AI - purple */
+      --color-actor-4: #D4A843; /* DynamoDB - golden */
+      --color-actor-5: #D94F30; /* Nudge System - vermillion */
+
+      /* Typography */
+      --font-display: 'Bricolage Grotesque', Georgia, serif;
+      --font-body: 'DM Sans', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+
+      --text-xs: 0.75rem;
+      --text-sm: 0.875rem;
+      --text-base: 1rem;
+      --text-lg: 1.125rem;
+      --text-xl: 1.25rem;
+      --text-2xl: 1.5rem;
+      --text-3xl: 1.875rem;
+      --text-4xl: 2.25rem;
+      --text-5xl: 3rem;
+      --text-6xl: 3.75rem;
+
+      --leading-tight: 1.15;
+      --leading-snug: 1.3;
+      --leading-normal: 1.6;
+
+      /* Spacing */
+      --space-1: 0.25rem;
+      --space-2: 0.5rem;
+      --space-3: 0.75rem;
+      --space-4: 1rem;
+      --space-5: 1.25rem;
+      --space-6: 1.5rem;
+      --space-8: 2rem;
+      --space-10: 2.5rem;
+      --space-12: 3rem;
+      --space-16: 4rem;
+      --space-20: 5rem;
+
+      --content-width: 800px;
+      --content-width-wide: 1000px;
+      --nav-height: 50px;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-full: 9999px;
+
+      /* Shadows */
+      --shadow-sm: 0 1px 2px rgba(44, 42, 40, 0.05);
+      --shadow-md: 0 4px 12px rgba(44, 42, 40, 0.08);
+      --shadow-lg: 0 8px 24px rgba(44, 42, 40, 0.1);
+
+      /* Animation */
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --duration-fast: 150ms;
+      --duration-normal: 300ms;
+      --duration-slow: 500ms;
+      --stagger-delay: 120ms;
+    }
+
+    /* Reset */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      scroll-snap-type: y proximity;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      line-height: var(--leading-normal);
+      color: var(--color-text);
+      background: var(--color-bg);
+      background-image: radial-gradient(ellipse at 20% 50%, rgba(45, 139, 85, 0.03) 0%, transparent 50%);
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: var(--radius-full); }
+
+    /* Navigation */
+    .nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: var(--nav-height);
+      background: rgba(250, 247, 242, 0.95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--color-border-light);
+      z-index: 1000;
+    }
+    .progress-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 3px;
+      background: var(--color-accent);
+      width: 0%;
+      transition: width 100ms;
+    }
+    .nav-inner {
+      max-width: var(--content-width-wide);
+      margin: 0 auto;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 var(--space-6);
+    }
+    .nav-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: var(--text-lg);
+      color: var(--color-text);
+    }
+    .nav-dots {
+      display: flex;
+      gap: var(--space-3);
+    }
+    .nav-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid var(--color-text-muted);
+      background: transparent;
+      cursor: pointer;
+      transition: all var(--duration-fast);
+      position: relative;
+    }
+    .nav-dot:hover { border-color: var(--color-accent); }
+    .nav-dot.active {
+      border-color: var(--color-accent);
+      background: var(--color-accent);
+      box-shadow: 0 0 0 3px var(--color-accent-light);
+    }
+    .nav-dot[data-tooltip]::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--color-bg-code);
+      color: #CDD6F4;
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-sm);
+      font-size: var(--text-xs);
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity var(--duration-fast);
+    }
+    .nav-dot:hover[data-tooltip]::after { opacity: 1; }
+
+    /* Module Layout */
+    .module {
+      min-height: 100dvh;
+      min-height: 100vh;
+      scroll-snap-align: start;
+      padding: var(--space-16) var(--space-6);
+      padding-top: calc(var(--nav-height) + var(--space-12));
+    }
+    .module:nth-child(odd) { background: var(--color-bg); }
+    .module:nth-child(even) { background: var(--color-bg-warm); }
+    .module-content {
+      max-width: var(--content-width);
+      margin: 0 auto;
+    }
+    .module-header { margin-bottom: var(--space-12); }
+    .module-number {
+      font-family: var(--font-display);
+      font-size: var(--text-6xl);
+      font-weight: 800;
+      color: var(--color-accent);
+      opacity: 0.15;
+      line-height: 1;
+    }
+    .module-title {
+      font-family: var(--font-display);
+      font-size: var(--text-4xl);
+      font-weight: 700;
+      line-height: var(--leading-tight);
+      margin-top: var(--space-2);
+    }
+    .module-subtitle {
+      font-size: var(--text-lg);
+      color: var(--color-text-secondary);
+      margin-top: var(--space-3);
+    }
+
+    /* Screen sections within modules */
+    .screen {
+      margin-bottom: var(--space-16);
+    }
+    .screen-heading {
+      font-family: var(--font-display);
+      font-size: var(--text-2xl);
+      font-weight: 600;
+      margin-bottom: var(--space-6);
+      color: var(--color-text);
+    }
+    .screen p {
+      margin-bottom: var(--space-4);
+      max-width: 65ch;
+    }
+
+    /* Animation */
+    .animate-in {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity var(--duration-slow) var(--ease-out), transform var(--duration-slow) var(--ease-out);
+    }
+    .animate-in.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Code blocks */
+    pre, code {
+      font-family: var(--font-mono);
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-x: hidden;
+    }
+
+    /* Translation blocks */
+    .translation-block {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      box-shadow: var(--shadow-md);
+      margin: var(--space-8) 0;
+    }
+    .translation-code {
+      background: var(--color-bg-code);
+      color: #CDD6F4;
+      padding: var(--space-6);
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      line-height: 1.7;
+      position: relative;
+      overflow-x: hidden;
+    }
+    .translation-english {
+      background: var(--color-surface-warm);
+      padding: var(--space-6);
+      font-size: var(--text-sm);
+      line-height: 1.7;
+      border-left: 3px solid var(--color-accent);
+    }
+    .translation-label {
+      position: absolute;
+      top: var(--space-2);
+      right: var(--space-3);
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      opacity: 0.5;
+    }
+    .translation-english .translation-label {
+      position: relative;
+      display: block;
+      margin-bottom: var(--space-3);
+      color: var(--color-text-muted);
+    }
+    .translation-lines p {
+      margin-bottom: var(--space-2);
+      padding-left: var(--space-3);
+      border-left: 2px solid var(--color-border-light);
+    }
+
+    /* Syntax highlighting */
+    .code-keyword { color: #CBA6F7; }
+    .code-string { color: #A6E3A1; }
+    .code-function { color: #89B4FA; }
+    .code-comment { color: #6C7086; }
+    .code-number { color: #FAB387; }
+    .code-property { color: #F9E2AF; }
+    .code-operator { color: #94E2D5; }
+
+    /* Callout boxes */
+    .callout {
+      display: flex;
+      gap: var(--space-4);
+      padding: var(--space-5);
+      border-radius: var(--radius-md);
+      margin: var(--space-6) 0;
+    }
+    .callout-accent {
+      background: var(--color-accent-light);
+      border-left: 4px solid var(--color-accent);
+    }
+    .callout-info {
+      background: var(--color-info-light);
+      border-left: 4px solid var(--color-info);
+    }
+    .callout-icon { font-size: 1.5rem; flex-shrink: 0; }
+    .callout-title {
+      font-weight: 600;
+      margin-bottom: var(--space-1);
+    }
+    .callout-content p { margin: 0; }
+
+    /* Pattern cards */
+    .pattern-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: var(--space-4);
+      margin: var(--space-8) 0;
+    }
+    .pattern-card {
+      background: var(--color-surface);
+      border-radius: var(--radius-md);
+      padding: var(--space-6);
+      box-shadow: var(--shadow-sm);
+      transition: transform var(--duration-normal) var(--ease-out), box-shadow var(--duration-normal);
+    }
+    .pattern-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-md);
+    }
+    .pattern-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin-bottom: var(--space-4);
+    }
+    .pattern-title {
+      font-family: var(--font-display);
+      font-weight: 600;
+      margin-bottom: var(--space-2);
+    }
+    .pattern-desc {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+    }
+
+    /* Icon rows */
+    .icon-rows {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+      margin: var(--space-6) 0;
+    }
+    .icon-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      padding: var(--space-4);
+      background: var(--color-surface);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+    }
+    .icon-row p { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); }
+    .icon-circle {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      flex-shrink: 0;
+      color: white;
+    }
+
+    /* Step cards */
+    .step-cards {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      margin: var(--space-6) 0;
+    }
+    .step-card {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-4);
+      padding: var(--space-4) var(--space-5);
+      background: var(--color-surface);
+      border-radius: var(--radius-md);
+      border-left: 3px solid var(--color-accent);
+      box-shadow: var(--shadow-sm);
+    }
+    .step-num {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--color-accent);
+      color: white;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      flex-shrink: 0;
+    }
+    .step-body strong { display: block; }
+    .step-body p { margin: var(--space-1) 0 0; color: var(--color-text-secondary); font-size: var(--text-sm); }
+
+    /* Chat animation */
+    .chat-window {
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md);
+      overflow: hidden;
+      margin: var(--space-8) 0;
+    }
+    .chat-header {
+      background: var(--color-bg-code);
+      color: #CDD6F4;
+      padding: var(--space-3) var(--space-4);
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+    }
+    .chat-messages {
+      padding: var(--space-4);
+      min-height: 300px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .chat-message {
+      display: flex;
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+      animation: fadeSlideUp 0.3s var(--ease-out);
+    }
+    .chat-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: var(--text-sm);
+      flex-shrink: 0;
+    }
+    .chat-bubble {
+      background: var(--color-bg);
+      padding: var(--space-3) var(--space-4);
+      border-radius: var(--radius-md);
+      max-width: 80%;
+    }
+    .chat-sender {
+      font-weight: 600;
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: block;
+      margin-bottom: var(--space-1);
+    }
+    .chat-bubble p { margin: 0; font-size: var(--text-sm); }
+    .chat-typing {
+      display: flex;
+      gap: var(--space-3);
+      padding: var(--space-4);
+      align-items: center;
+    }
+    .chat-typing-dots {
+      display: flex;
+      gap: 4px;
+    }
+    .typing-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--color-text-muted);
+      animation: typingBounce 1.4s infinite;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    .chat-controls {
+      padding: var(--space-3) var(--space-4);
+      border-top: 1px solid var(--color-border-light);
+      display: flex;
+      gap: var(--space-3);
+      align-items: center;
+    }
+    .chat-controls button {
+      padding: var(--space-2) var(--space-4);
+      border: none;
+      border-radius: var(--radius-sm);
+      background: var(--color-accent);
+      color: white;
+      font-family: var(--font-body);
+      font-size: var(--text-sm);
+      cursor: pointer;
+      transition: background var(--duration-fast);
+    }
+    .chat-controls button:hover { background: var(--color-accent-hover); }
+    .chat-progress {
+      margin-left: auto;
+      font-size: var(--text-sm);
+      color: var(--color-text-muted);
+    }
+
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes typingBounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-6px); }
+    }
+
+    /* Quiz styles */
+    .quiz-container {
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      padding: var(--space-6);
+      box-shadow: var(--shadow-md);
+      margin: var(--space-8) 0;
+    }
+    .quiz-question {
+      font-family: var(--font-display);
+      font-size: var(--text-xl);
+      font-weight: 600;
+      margin-bottom: var(--space-4);
+    }
+    .quiz-options {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+    .quiz-option {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-4);
+      border: 2px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-surface);
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      transition: border-color var(--duration-fast), background var(--duration-fast);
+    }
+    .quiz-option:hover { border-color: var(--color-accent-muted); }
+    .quiz-option.selected { border-color: var(--color-accent); background: var(--color-accent-light); }
+    .quiz-option.correct { border-color: var(--color-success); background: var(--color-success-light); }
+    .quiz-option.incorrect { border-color: var(--color-error); background: var(--color-error-light); }
+    .quiz-option-radio {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid var(--color-border);
+      flex-shrink: 0;
+      transition: all var(--duration-fast);
+    }
+    .quiz-option.selected .quiz-option-radio {
+      border-color: var(--color-accent);
+      background: var(--color-accent);
+      box-shadow: inset 0 0 0 3px white;
+    }
+    .quiz-feedback {
+      max-height: 0;
+      overflow: hidden;
+      opacity: 0;
+      transition: max-height var(--duration-normal), opacity var(--duration-normal);
+    }
+    .quiz-feedback.show {
+      max-height: 200px;
+      opacity: 1;
+      padding: var(--space-3);
+      margin-top: var(--space-3);
+      border-radius: var(--radius-sm);
+    }
+    .quiz-feedback.success { background: var(--color-success-light); color: var(--color-success); }
+    .quiz-feedback.error { background: var(--color-error-light); color: var(--color-error); }
+    .quiz-buttons {
+      display: flex;
+      gap: var(--space-3);
+      margin-top: var(--space-4);
+    }
+    .quiz-btn {
+      padding: var(--space-2) var(--space-5);
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-body);
+      font-size: var(--text-sm);
+      cursor: pointer;
+      transition: all var(--duration-fast);
+    }
+    .quiz-btn-check {
+      background: var(--color-accent);
+      color: white;
+    }
+    .quiz-btn-check:hover { background: var(--color-accent-hover); }
+    .quiz-btn-reset {
+      background: var(--color-border-light);
+      color: var(--color-text);
+    }
+    .quiz-btn-reset:hover { background: var(--color-border); }
+
+    /* Glossary tooltips */
+    .term {
+      border-bottom: 1.5px dashed var(--color-accent-muted);
+      cursor: pointer;
+    }
+    .term:hover, .term.active {
+      border-bottom-color: var(--color-accent);
+      color: var(--color-accent);
+    }
+    .term-tooltip {
+      position: fixed;
+      background: var(--color-bg-code);
+      color: #CDD6F4;
+      padding: var(--space-3) var(--space-4);
+      border-radius: var(--radius-sm);
+      font-size: var(--text-sm);
+      font-family: var(--font-body);
+      line-height: var(--leading-normal);
+      width: max(200px, min(320px, 80vw));
+      box-shadow: var(--shadow-lg);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity var(--duration-fast);
+      z-index: 10000;
+    }
+    .term-tooltip::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: var(--color-bg-code);
+    }
+    .term-tooltip.visible { opacity: 1; }
+    .term-tooltip.flip::after {
+      top: auto;
+      bottom: 100%;
+      border-top-color: transparent;
+      border-bottom-color: var(--color-bg-code);
+    }
+
+    /* Flow animation */
+    .flow-animation {
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      padding: var(--space-6);
+      box-shadow: var(--shadow-md);
+      margin: var(--space-8) 0;
+    }
+    .flow-actors {
+      display: flex;
+      justify-content: space-around;
+      gap: var(--space-4);
+      flex-wrap: wrap;
+      margin-bottom: var(--space-6);
+    }
+    .flow-actor {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-4);
+      border-radius: var(--radius-md);
+      border: 2px solid var(--color-border);
+      transition: all var(--duration-normal) var(--ease-out);
+      min-width: 100px;
+    }
+    .flow-actor.active {
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 3px var(--color-accent-light), 0 0 20px rgba(45, 139, 85, 0.2);
+      transform: scale(1.05);
+    }
+    .flow-actor-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      color: white;
+    }
+    .flow-actor span {
+      font-size: var(--text-sm);
+      font-weight: 600;
+      text-align: center;
+    }
+    .flow-step-label {
+      text-align: center;
+      padding: var(--space-4);
+      background: var(--color-bg);
+      border-radius: var(--radius-sm);
+      font-size: var(--text-base);
+      min-height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .flow-controls {
+      display: flex;
+      gap: var(--space-3);
+      justify-content: center;
+      margin-top: var(--space-4);
+      align-items: center;
+    }
+    .flow-controls button {
+      padding: var(--space-2) var(--space-4);
+      border: none;
+      border-radius: var(--radius-sm);
+      background: var(--color-accent);
+      color: white;
+      font-family: var(--font-body);
+      cursor: pointer;
+      transition: background var(--duration-fast);
+    }
+    .flow-controls button:hover { background: var(--color-accent-hover); }
+    .flow-progress {
+      font-size: var(--text-sm);
+      color: var(--color-text-muted);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      :root {
+        --text-4xl: 1.875rem;
+        --text-5xl: 2.25rem;
+        --text-6xl: 3rem;
+      }
+      .translation-block { grid-template-columns: 1fr; }
+      .translation-english { border-left: none; border-top: 3px solid var(--color-accent); }
+      .pattern-cards { grid-template-columns: 1fr 1fr; }
+      .flow-actors { gap: var(--space-2); }
+      .flow-actor { min-width: 80px; padding: var(--space-3); }
+    }
+    @media (max-width: 480px) {
+      :root {
+        --text-4xl: 1.5rem;
+        --text-5xl: 1.875rem;
+        --text-6xl: 2.25rem;
+      }
+      .module { padding: var(--space-8) var(--space-4); }
+      .pattern-cards { grid-template-columns: 1fr; }
+      .nav-title { font-size: var(--text-base); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="progress-bar" id="progress-bar"></div>
+    <div class="nav-inner">
+      <span class="nav-title">AgriNexus AI</span>
+      <div class="nav-dots">
+        <button class="nav-dot active" data-target="module-0" data-tooltip="Welcome" onclick="scrollToModule(0)"></button>
+        <button class="nav-dot" data-target="module-1" data-tooltip="The Journey" onclick="scrollToModule(1)"></button>
+        <button class="nav-dot" data-target="module-2" data-tooltip="The Actors" onclick="scrollToModule(2)"></button>
+        <button class="nav-dot" data-target="module-3" data-tooltip="The Brain" onclick="scrollToModule(3)"></button>
+        <button class="nav-dot" data-target="module-4" data-tooltip="Nudges" onclick="scrollToModule(4)"></button>
+        <button class="nav-dot" data-target="module-5" data-tooltip="Debugging" onclick="scrollToModule(5)"></button>
+        <button class="nav-dot" data-target="module-6" data-tooltip="Big Picture" onclick="scrollToModule(6)"></button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Module 0: Welcome -->
+  <section class="module" id="module-0">
+    <div class="module-content">
+      <header class="module-header animate-in">
+        <span class="module-number">00</span>
+        <h1 class="module-title">Welcome to AgriNexus AI</h1>
+        <p class="module-subtitle">How a WhatsApp chatbot helps farmers grow better crops</p>
+      </header>
+
+      <div class="screen animate-in">
+        <p>Imagine you're a cotton farmer in rural India. You wake up at dawn, check your crops, and notice strange spots on the leaves. Is it a pest? A disease? Something you can fix with the right spray?</p>
+        <p>You don't have an agronomist nearby. The nearest agricultural office is hours away. But you have one thing: <strong>WhatsApp on your phone</strong>.</p>
+        <p>You snap a photo of the damaged leaf, send it to a number, and within seconds, you get a reply in your own language telling you exactly what's wrong and how to fix it.</p>
+        <p><strong>That's AgriNexus AI.</strong></p>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">What You'll Learn</h2>
+        <p>This course takes you behind the scenes of AgriNexus AI. By the end, you'll understand:</p>
+
+        <div class="icon-rows">
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-1)">📱</div>
+            <div>
+              <strong>How messages flow</strong>
+              <p>From a farmer's WhatsApp to AI and back again</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-3)">🧠</div>
+            <div>
+              <strong>How the AI thinks</strong>
+              <p>Finding answers in agricultural knowledge bases</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-5)">⏰</div>
+            <div>
+              <strong>How nudges change behavior</strong>
+              <p>Sending reminders at just the right moment</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-2)">🔧</div>
+            <div>
+              <strong>How to debug problems</strong>
+              <p>What to check when things go wrong</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen animate-in">
+        <div class="callout callout-accent">
+          <div class="callout-icon">🎯</div>
+          <div class="callout-content">
+            <strong class="callout-title">Who This Course Is For</strong>
+            <p>You don't need to know how to code. This course explains everything in plain language, with interactive diagrams and real examples. If you can use an app, you can understand this.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Module 1: The Journey of a Message -->
+  <section class="module" id="module-1">
+    <div class="module-content">
+      <header class="module-header animate-in">
+        <span class="module-number">01</span>
+        <h1 class="module-title">The Journey of a Message</h1>
+        <p class="module-subtitle">What happens when a farmer sends a WhatsApp message</p>
+      </header>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">A Real Scenario</h2>
+        <p>Let's follow a real message through the system. A farmer named Ramesh in Latur sends a WhatsApp message asking:</p>
+        <div style="background: var(--color-surface); padding: var(--space-4); border-radius: var(--radius-md); border-left: 4px solid #25D366; margin: var(--space-4) 0;">
+          <p style="margin: 0; font-style: italic;">"मेरे कपास के पत्तों पर सफेद मक्खी है। क्या करूं?"</p>
+          <p style="margin: var(--space-2) 0 0; font-size: var(--text-sm); color: var(--color-text-secondary);">(There are whiteflies on my cotton leaves. What should I do?)</p>
+        </div>
+        <p>Watch what happens next in the system.</p>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">The Message Flow</h2>
+
+        <div class="flow-animation" id="flow-1">
+          <div class="flow-actors">
+            <div class="flow-actor" id="flow1-whatsapp">
+              <div class="flow-actor-icon" style="background: #25D366;">📱</div>
+              <span>WhatsApp</span>
+            </div>
+            <div class="flow-actor" id="flow1-webhook">
+              <div class="flow-actor-icon" style="background: var(--color-actor-1);">🚪</div>
+              <span>Webhook</span>
+            </div>
+            <div class="flow-actor" id="flow1-queue">
+              <div class="flow-actor-icon" style="background: var(--color-actor-4);">📬</div>
+              <span>Queue</span>
+            </div>
+            <div class="flow-actor" id="flow1-processor">
+              <div class="flow-actor-icon" style="background: var(--color-actor-2);">⚙️</div>
+              <span>Processor</span>
+            </div>
+            <div class="flow-actor" id="flow1-ai">
+              <div class="flow-actor-icon" style="background: var(--color-actor-3);">🧠</div>
+              <span>AI Brain</span>
+            </div>
+          </div>
+
+          <div class="flow-step-label" id="flow1-label">Click "Next Step" to follow the message</div>
+
+          <div class="flow-controls">
+            <button onclick="flow1Next()">Next Step</button>
+            <button onclick="flow1Reset()">Restart</button>
+            <span class="flow-progress" id="flow1-progress">Step 0 / 6</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">Why This Design?</h2>
+        <p>You might wonder: why so many steps? Why not just send the message directly to the AI?</p>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">The Post Office Analogy</strong>
+            <p>Think of it like a post office. When you mail a letter, it doesn't go directly to the recipient. It goes through sorting facilities, gets stamped, and moves through a reliable chain. If one worker is sick, another can pick up. If there's a rush, letters wait in an orderly queue. This system is designed the same way.</p>
+          </div>
+        </div>
+
+        <div class="pattern-cards">
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-1);">
+            <div class="pattern-icon" style="background: var(--color-actor-1);">🛡️</div>
+            <h4 class="pattern-title">Security First</h4>
+            <p class="pattern-desc">The webhook checks every message is really from WhatsApp, not an imposter.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-4);">
+            <div class="pattern-icon" style="background: var(--color-actor-4);">📦</div>
+            <h4 class="pattern-title">Nothing Gets Lost</h4>
+            <p class="pattern-desc">The queue holds messages safely until the processor is ready to handle them.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-2);">
+            <div class="pattern-icon" style="background: var(--color-actor-2);">⚡</div>
+            <h4 class="pattern-title">Fast Response</h4>
+            <p class="pattern-desc">WhatsApp gets an instant "message received" while the real work happens in the background.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">The Code Behind the Webhook</h2>
+        <p>Here's the actual code that checks if a message is really from WhatsApp:</p>
+
+        <div class="translation-block">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+<pre><code><span class="code-keyword">def</span> <span class="code-function">verify_signature</span>(payload, signature):
+    <span class="code-property">expected</span> <span class="code-operator">=</span> hmac.new(
+        app_secret.encode(),
+        payload,
+        hashlib.sha256
+    ).hexdigest()
+    <span class="code-keyword">return</span> hmac.compare_digest(
+        <span class="code-string">f"sha256={expected}"</span>,
+        signature
+    )</code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p>Create a function called "verify_signature" that takes the message and its signature...</p>
+              <p>Calculate what the signature SHOULD be using our secret password and the message content...</p>
+              <p>The calculation uses a cryptographic recipe called SHA-256 (like a fingerprint for data)...</p>
+              <p>Compare our calculated signature with what WhatsApp sent — if they match, it's genuine.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🔐</div>
+          <div class="callout-content">
+            <strong class="callout-title">Digital Signatures</strong>
+            <p>This is like a wax seal on an old letter. Only someone with the right seal (secret key) can create it. If the seal is broken or fake, you know the letter was tampered with. This same pattern protects bank transactions, passwords, and almost everything secure on the internet.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">Test Your Understanding</h2>
+
+        <div class="quiz-container" id="quiz-1">
+          <h3 class="quiz-question">A farmer sends a message but the AI is busy processing 100 other messages. What happens?</h3>
+          <div class="quiz-options">
+            <button class="quiz-option" data-value="a" onclick="selectOption(this)">
+              <div class="quiz-option-radio"></div>
+              <span>The message is lost and the farmer never gets a response</span>
+            </button>
+            <button class="quiz-option" data-value="b" onclick="selectOption(this)">
+              <div class="quiz-option-radio"></div>
+              <span>WhatsApp shows an error to the farmer</span>
+            </button>
+            <button class="quiz-option" data-value="c" onclick="selectOption(this)">
+              <div class="quiz-option-radio"></div>
+              <span>The message waits safely in the queue until it's processed</span>
+            </button>
+          </div>
+          <div class="quiz-feedback" id="quiz-1-feedback"></div>
+          <div class="quiz-buttons">
+            <button class="quiz-btn quiz-btn-check" onclick="checkQuiz1()">Check Answer</button>
+            <button class="quiz-btn quiz-btn-reset" onclick="resetQuiz1()">Try Again</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Module 2: Meet the Actors -->
+  <section class="module" id="module-2">
+    <div class="module-content">
+      <header class="module-header animate-in">
+        <span class="module-number">02</span>
+        <h1 class="module-title">Meet the Actors</h1>
+        <p class="module-subtitle">The components that make AgriNexus work</p>
+      </header>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">The Cast of Characters</h2>
+        <p>Every software system has "actors" — components that each have a specific job. Think of them like employees in a company, each with their own desk and responsibilities.</p>
+
+        <div class="pattern-cards">
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-1);">
+            <div class="pattern-icon" style="background: var(--color-actor-1);">🚪</div>
+            <h4 class="pattern-title">Webhook Handler</h4>
+            <p class="pattern-desc">The front door. Receives all incoming WhatsApp messages, checks they're legitimate, and passes them along.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-2);">
+            <div class="pattern-icon" style="background: var(--color-actor-2);">⚙️</div>
+            <h4 class="pattern-title">Message Processor</h4>
+            <p class="pattern-desc">The brain's assistant. Figures out what the farmer wants, asks the AI, and sends back the answer.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-3);">
+            <div class="pattern-icon" style="background: var(--color-actor-3);">🧠</div>
+            <h4 class="pattern-title">Bedrock AI</h4>
+            <p class="pattern-desc">The expert. Searches through agricultural documents to find relevant answers.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-4);">
+            <div class="pattern-icon" style="background: var(--color-actor-4);">🗄️</div>
+            <h4 class="pattern-title">DynamoDB</h4>
+            <p class="pattern-desc">The filing cabinet. Remembers each farmer's language, location, crop, and conversation history.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-5);">
+            <div class="pattern-icon" style="background: var(--color-actor-5);">⏰</div>
+            <h4 class="pattern-title">Nudge System</h4>
+            <p class="pattern-desc">The reminder service. Watches weather and sends timely advice like "Good day to spray!"</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid #2A7B9B;">
+            <div class="pattern-icon" style="background: #2A7B9B;">🎤</div>
+            <h4 class="pattern-title">Voice Processor</h4>
+            <p class="pattern-desc">The translator. Converts voice messages to text so farmers can speak naturally.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">Watch Them Talk</h2>
+        <p>Here's a conversation between the actors when a farmer sends a question:</p>
+
+        <div class="chat-window">
+          <div class="chat-header">🎬 Actor Communication</div>
+          <div class="chat-messages" id="chat2-messages">
+            <div class="chat-message" data-msg="0" style="display: none;">
+              <div class="chat-avatar" style="background: var(--color-actor-1);">W</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-1);">Webhook</span>
+                <p>Hey Processor, got a new message from +91-98765. It's in Hindi about whiteflies on cotton.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="1" style="display: none;">
+              <div class="chat-avatar" style="background: var(--color-actor-2);">P</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2);">Processor</span>
+                <p>Got it! Let me check their profile first. Hey DynamoDB, what do we know about this farmer?</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="2" style="display: none;">
+              <div class="chat-avatar" style="background: var(--color-actor-4);">D</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-4);">DynamoDB</span>
+                <p>Ramesh from Latur. Grows cotton. Prefers Hindi. He's been with us for 3 months.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="3" style="display: none;">
+              <div class="chat-avatar" style="background: var(--color-actor-2);">P</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2);">Processor</span>
+                <p>Perfect! Bedrock, I need help. Cotton farmer in Maharashtra asking about whitefly treatment. Reply in Hindi please.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="4" style="display: none;">
+              <div class="chat-avatar" style="background: var(--color-actor-3);">B</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-3);">Bedrock AI</span>
+                <p>Found it! The ICAR-CICR guide recommends neem oil spray at 5ml/L for whitefly. I'll compose the answer in Hindi with the source citation.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="5" style="display: none;">
+              <div class="chat-avatar" style="background: var(--color-actor-2);">P</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2);">Processor</span>
+                <p>Sent! Ramesh should see the reply on WhatsApp now. Logging this conversation to DynamoDB for next time.</p>
+              </div>
+            </div>
+          </div>
+          <div class="chat-typing" id="chat2-typing" style="display: none;">
+            <div class="chat-avatar" id="chat2-typing-avatar" style="background: var(--color-text-muted);">?</div>
+            <div class="chat-typing-dots">
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+            </div>
+          </div>
+          <div class="chat-controls">
+            <button onclick="chat2Next()">Next Message</button>
+            <button onclick="chat2PlayAll()">Play All</button>
+            <button onclick="chat2Reset()">Replay</button>
+            <span class="chat-progress" id="chat2-progress">0 / 6 messages</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">Separation of Concerns</h2>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Key Insight</strong>
+            <p>This pattern — splitting responsibilities into focused roles — is one of the most important ideas in software engineering. Engineers call it <span class="term" data-definition="Separation of concerns means each piece of code has one job. Like a hospital where doctors diagnose, nurses monitor, and pharmacists dispense — each expert focuses on what they do best.">"separation of concerns."</span> Each actor does one thing well, making the system easier to understand, test, and fix.</p>
+          </div>
+        </div>
+
+        <p>Why does this matter for you? When something breaks, you know exactly where to look:</p>
+
+        <div class="step-cards">
+          <div class="step-card">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <strong>Messages not arriving?</strong>
+              <p>Check the Webhook — is WhatsApp reaching us?</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <strong>Wrong language in replies?</strong>
+              <p>Check DynamoDB — is the farmer's profile correct?</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <strong>Bad advice being given?</strong>
+              <p>Check Bedrock — is the knowledge base up to date?</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">Test Your Understanding</h2>
+
+        <div class="quiz-container" id="quiz-2">
+          <h3 class="quiz-question">A farmer's responses are coming back in English instead of Hindi. Which actor would you check first?</h3>
+          <div class="quiz-options">
+            <button class="quiz-option" data-value="a" onclick="selectOption(this)">
+              <div class="quiz-option-radio"></div>
+              <span>Webhook Handler — it might be losing the language info</span>
+            </button>
+            <button class="quiz-option" data-value="b" onclick="selectOption(this)">
+              <div class="quiz-option-radio"></div>
+              <span>DynamoDB — the farmer's language preference might be wrong</span>
+            </button>
+            <button class="quiz-option" data-value="c" onclick="selectOption(this)">
+              <div class="quiz-option-radio"></div>
+              <span>Voice Processor — it might be translating incorrectly</span>
+            </button>
+          </div>
+          <div class="quiz-feedback" id="quiz-2-feedback"></div>
+          <div class="quiz-buttons">
+            <button class="quiz-btn quiz-btn-check" onclick="checkQuiz2()">Check Answer</button>
+            <button class="quiz-btn quiz-btn-reset" onclick="resetQuiz2()">Try Again</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Module 3: The AI Brain -->
+  <section class="module" id="module-3">
+    <div class="module-content">
+      <header class="module-header animate-in">
+        <span class="module-number">03</span>
+        <h1 class="module-title">The AI Brain</h1>
+        <p class="module-subtitle">How the system finds answers in agricultural knowledge</p>
+      </header>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">Not Just ChatGPT</h2>
+        <p>When you hear "AI chatbot," you might think of ChatGPT — a general-purpose AI that knows a little about everything. AgriNexus is different.</p>
+        <p>It uses a technique called <span class="term" data-definition="RAG (Retrieval-Augmented Generation) is like an AI with a textbook. Instead of guessing from memory, it looks up the answer in trusted documents first, then explains what it found. This makes answers more accurate and trustworthy.">RAG — Retrieval-Augmented Generation</span>. Think of it as giving the AI a curated library of agricultural textbooks to consult before answering.</p>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">📚</div>
+          <div class="callout-content">
+            <strong class="callout-title">The Library Analogy</strong>
+            <p>Imagine asking a librarian a question. They don't just make up an answer — they go to the shelves, find relevant books, read the passages, and then explain what the books say. RAG works the same way. The AI searches through FAO manuals, ICAR research papers, and local agricultural guides before composing its answer.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">How RAG Works</h2>
+
+        <div class="step-cards">
+          <div class="step-card">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <strong>Understand the Question</strong>
+              <p>The AI figures out what the farmer is really asking — even if it's in Hindi or with typos</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <strong>Search the Knowledge Base</strong>
+              <p>It looks through hundreds of agricultural documents to find relevant paragraphs</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <strong>Read and Synthesize</strong>
+              <p>The AI reads the found passages and combines them into a clear answer</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">4</div>
+            <div class="step-body">
+              <strong>Translate and Respond</strong>
+              <p>The answer is delivered in the farmer's language with source citations</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">The Code That Queries Bedrock</h2>
+
+        <div class="translation-block">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+<pre><code><span class="code-property">response</span> <span class="code-operator">=</span> bedrock.retrieve_and_generate(
+    <span class="code-property">input</span><span class="code-operator">=</span>{
+        <span class="code-string">'text'</span>: <span class="code-string">f"Answer in {dialect}: {query}"</span>
+    },
+    <span class="code-property">retrieveAndGenerateConfiguration</span><span class="code-operator">=</span>{
+        <span class="code-string">'knowledgeBaseConfiguration'</span>: {
+            <span class="code-string">'knowledgeBaseId'</span>: kb_id,
+            <span class="code-string">'modelArn'</span>: <span class="code-string">'claude-3-sonnet'</span>
+        }
+    }
+)</code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p>Ask AWS Bedrock to find an answer and generate a response...</p>
+              <p>The input is the farmer's question, with instructions to reply in their language...</p>
+              <p>Tell Bedrock which knowledge base to search (our agricultural documents)...</p>
+              <p>Use Claude 3 Sonnet as the AI model to read the documents and compose the answer.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">The Knowledge Base</h2>
+        <p>What's actually in the knowledge base? Real agricultural research:</p>
+
+        <div class="pattern-cards">
+          <div class="pattern-card" style="border-top: 3px solid var(--color-info);">
+            <div class="pattern-icon" style="background: var(--color-info);">🌍</div>
+            <h4 class="pattern-title">FAO Manuals</h4>
+            <p class="pattern-desc">Global best practices for cotton production from the UN Food and Agriculture Organization.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-accent);">
+            <div class="pattern-icon" style="background: var(--color-accent);">🇮🇳</div>
+            <h4 class="pattern-title">ICAR-CICR Research</h4>
+            <p class="pattern-desc">Indian Council of Agricultural Research — pest advisories specific to Maharashtra conditions.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-4);">
+            <div class="pattern-icon" style="background: var(--color-actor-4);">📖</div>
+            <h4 class="pattern-title">PAU Guidelines</h4>
+            <p class="pattern-desc">Punjab Agricultural University's package of practices — seasonal farming calendars.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">✅</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why Sources Matter</strong>
+            <p>Every answer includes a citation like "Source: ICAR-CICR Pest Advisory 2024". This builds trust — farmers know the advice comes from real agricultural research, not AI hallucination.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">Safety Guardrails</h2>
+        <p>The AI has built-in safety rules. It refuses to:</p>
+
+        <div class="icon-rows">
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-error);">🚫</div>
+            <div>
+              <strong>Recommend Banned Pesticides</strong>
+              <p>Substances like Endosulfan are blocked even if asked directly</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-error);">🚫</div>
+            <div>
+              <strong>Give Medical Advice</strong>
+              <p>Questions about human health are redirected to doctors</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-error);">🚫</div>
+            <div>
+              <strong>Answer Outside Its Knowledge</strong>
+              <p>If unsure, it says so instead of guessing</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">Test Your Understanding</h2>
+
+        <div class="quiz-container" id="quiz-3">
+          <h3 class="quiz-question">Why does AgriNexus use RAG instead of just asking a general AI like ChatGPT?</h3>
+          <div class="quiz-options">
+            <button class="quiz-option" data-value="a" onclick="selectOption(this)">
+              <div class="quiz-option-radio"></div>
+              <span>RAG is faster and cheaper</span>
+            </button>
+            <button class="quiz-option" data-value="b" onclick="selectOption(this)">
+              <div class="quiz-option-radio"></div>
+              <span>RAG gives answers grounded in trusted agricultural documents, with citations</span>
+            </button>
+            <button class="quiz-option" data-value="c" onclick="selectOption(this)">
+              <div class="quiz-option-radio"></div>
+              <span>General AI doesn't support Hindi</span>
+            </button>
+          </div>
+          <div class="quiz-feedback" id="quiz-3-feedback"></div>
+          <div class="quiz-buttons">
+            <button class="quiz-btn quiz-btn-check" onclick="checkQuiz3()">Check Answer</button>
+            <button class="quiz-btn quiz-btn-reset" onclick="resetQuiz3()">Try Again</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Module 4: Behavioral Nudges -->
+  <section class="module" id="module-4">
+    <div class="module-content">
+      <header class="module-header animate-in">
+        <span class="module-number">04</span>
+        <h1 class="module-title">Behavioral Nudges</h1>
+        <p class="module-subtitle">Sending the right advice at the right moment</p>
+      </header>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">The Problem with Advice</h2>
+        <p>Here's a hard truth: giving good advice isn't enough. Farmers might know they should spray pesticide when wind is low, but life gets busy. They forget. The moment passes.</p>
+        <p>AgriNexus doesn't just answer questions — it proactively sends <span class="term" data-definition="A nudge is a gentle push in the right direction. Instead of lecturing someone, you make the good choice easy and timely. Think of a phone reminder right when you need to leave for an appointment.">nudges</span> when conditions are perfect for action.</p>
+
+        <div style="background: var(--color-surface); padding: var(--space-4); border-radius: var(--radius-md); border-left: 4px solid var(--color-actor-5); margin: var(--space-4) 0;">
+          <p style="margin: 0; font-style: italic;">"आज कपास में कीटनाशक स्प्रे के लिए अच्छा मौसम है। हवा 8.5 km/h है। 🌱"</p>
+          <p style="margin: var(--space-2) 0 0; font-size: var(--text-sm); color: var(--color-text-secondary);">(Today is good weather for pesticide spray on cotton. Wind is 8.5 km/h.)</p>
+        </div>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">How Nudges Work</h2>
+
+        <div class="flow-animation" id="flow-nudge">
+          <div class="flow-actors">
+            <div class="flow-actor" id="flownudge-weather">
+              <div class="flow-actor-icon" style="background: #2A7B9B;">🌤️</div>
+              <span>Weather Check</span>
+            </div>
+            <div class="flow-actor" id="flownudge-step">
+              <div class="flow-actor-icon" style="background: var(--color-actor-3);">⚙️</div>
+              <span>Step Functions</span>
+            </div>
+            <div class="flow-actor" id="flownudge-sender">
+              <div class="flow-actor-icon" style="background: var(--color-actor-5);">📨</div>
+              <span>Nudge Sender</span>
+            </div>
+            <div class="flow-actor" id="flownudge-schedule">
+              <div class="flow-actor-icon" style="background: var(--color-actor-4);">⏰</div>
+              <span>Scheduler</span>
+            </div>
+          </div>
+
+          <div class="flow-step-label" id="flownudge-label">Click "Next Step" to see the nudge workflow</div>
+
+          <div class="flow-controls">
+            <button onclick="flowNudgeNext()">Next Step</button>
+            <button onclick="flowNudgeReset()">Restart</button>
+            <span class="flow-progress" id="flownudge-progress">Step 0 / 5</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">Closing the Loop</h2>
+        <p>A nudge isn't complete until the farmer responds. The system tracks whether advice was followed:</p>
+
+        <div class="step-cards">
+          <div class="step-card">
+            <div class="step-num">T+0</div>
+            <div class="step-body">
+              <strong>Nudge Sent</strong>
+              <p>Farmer receives: "Good day to spray!" with buttons: [हो गया] [अभी नहीं]</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">T+24h</div>
+            <div class="step-body">
+              <strong>First Reminder</strong>
+              <p>If no response, sends: "Reminder: Did you spray yesterday?"</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">T+48h</div>
+            <div class="step-body">
+              <strong>Final Reminder</strong>
+              <p>If still no response, sends: "Last reminder about the spray"</p>
+            </div>
+          </div>
+        </div>
+
+        <p style="margin-top: var(--space-6);">When the farmer taps "हो गया" (Done), the system:</p>
+
+        <div class="icon-rows">
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-success);">✓</div>
+            <div>
+              <strong>Marks the task complete</strong>
+              <p>Updates the nudge status in the database</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-success);">🗑️</div>
+            <div>
+              <strong>Cancels reminders</strong>
+              <p>No more follow-up messages needed</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-success);">📊</div>
+            <div>
+              <strong>Logs the completion</strong>
+              <p>Tracks success rate across all farmers</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">The Response Detector Code</h2>
+
+        <div class="translation-block">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+<pre><code><span class="code-property">DONE_KEYWORDS</span> <span class="code-operator">=</span> {
+    <span class="code-string">'hi'</span>: [<span class="code-string">'हो गया'</span>, <span class="code-string">'कर दिया'</span>, <span class="code-string">'done'</span>],
+    <span class="code-string">'mr'</span>: [<span class="code-string">'झाला'</span>, <span class="code-string">'done'</span>],
+    <span class="code-string">'te'</span>: [<span class="code-string">'అయ్యింది'</span>, <span class="code-string">'done'</span>],
+    <span class="code-string">'en'</span>: [<span class="code-string">'done'</span>, <span class="code-string">'completed'</span>]
+}
+
+<span class="code-keyword">if</span> <span class="code-function">any</span>(kw <span class="code-keyword">in</span> text.lower()
+    <span class="code-keyword">for</span> kw <span class="code-keyword">in</span> DONE_KEYWORDS[dialect]):
+    mark_nudge_complete(phone, nudge_id)</code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p>Define what "done" sounds like in each language...</p>
+              <p>Hindi: "हो गया", "कर दिया", or "done"</p>
+              <p>Marathi: "झाला" or "done"</p>
+              <p>Telugu: "అయ్యింది" or "done"</p>
+              <p>English: "done" or "completed"</p>
+              <p>Check if the farmer's message contains any of these words...</p>
+              <p>If yes, mark the nudge as complete in the database.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">Test Your Understanding</h2>
+
+        <div class="quiz-container" id="quiz-4">
+          <h3 class="quiz-question">A farmer receives a spray nudge on Monday but doesn't respond. What happens on Wednesday?</h3>
+          <div class="quiz-options">
+            <button class="quiz-option" data-value="a" onclick="selectOption(this)">
+              <div class="quiz-option-radio"></div>
+              <span>Nothing — the system assumes they did it</span>
+            </button>
+            <button class="quiz-option" data-value="b" onclick="selectOption(this)">
+              <div class="quiz-option-radio"></div>
+              <span>The system sends a final reminder (T+48h)</span>
+            </button>
+            <button class="quiz-option" data-value="c" onclick="selectOption(this)">
+              <div class="quiz-option-radio"></div>
+              <span>The farmer is blocked from the service</span>
+            </button>
+          </div>
+          <div class="quiz-feedback" id="quiz-4-feedback"></div>
+          <div class="quiz-buttons">
+            <button class="quiz-btn quiz-btn-check" onclick="checkQuiz4()">Check Answer</button>
+            <button class="quiz-btn quiz-btn-reset" onclick="resetQuiz4()">Try Again</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Module 5: When Things Break -->
+  <section class="module" id="module-5">
+    <div class="module-content">
+      <header class="module-header animate-in">
+        <span class="module-number">05</span>
+        <h1 class="module-title">When Things Break</h1>
+        <p class="module-subtitle">Debugging like a detective</p>
+      </header>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">The Debugging Mindset</h2>
+        <p>Every system breaks sometimes. What separates good engineers from great ones is how they find and fix problems.</p>
+        <p>The key insight: <strong>follow the data</strong>. If something isn't working, trace where the data went wrong.</p>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🔍</div>
+          <div class="callout-content">
+            <strong class="callout-title">The Detective Analogy</strong>
+            <p>Debugging is like being a detective. You have a crime (the bug). You need to find when it happened, where it happened, and what caused it. You gather clues (logs), interview witnesses (test the components), and eventually catch the culprit (fix the code).</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">Common Issues and Where to Look</h2>
+
+        <div class="pattern-cards">
+          <div class="pattern-card" style="border-top: 3px solid var(--color-error);">
+            <div class="pattern-icon" style="background: var(--color-error);">📵</div>
+            <h4 class="pattern-title">"No response at all"</h4>
+            <p class="pattern-desc"><strong>Check:</strong> Webhook → Is WhatsApp reaching the system? Look at API Gateway logs.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-error);">
+            <div class="pattern-icon" style="background: var(--color-error);">🌐</div>
+            <h4 class="pattern-title">"Wrong language reply"</h4>
+            <p class="pattern-desc"><strong>Check:</strong> DynamoDB → Is the user's dialect stored correctly? Query their profile.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-error);">
+            <div class="pattern-icon" style="background: var(--color-error);">❓</div>
+            <h4 class="pattern-title">"AI gives bad advice"</h4>
+            <p class="pattern-desc"><strong>Check:</strong> Knowledge Base → Is the information up to date? Are the right documents indexed?</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-error);">
+            <div class="pattern-icon" style="background: var(--color-error);">🔇</div>
+            <h4 class="pattern-title">"Voice not working"</h4>
+            <p class="pattern-desc"><strong>Check:</strong> Voice Processor → Is Transcribe running? Check the S3 bucket for audio files.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">The Dead Letter Queue</h2>
+        <p>What happens when a message completely fails to process after multiple tries?</p>
+        <p>It goes to the <span class="term" data-definition="A Dead Letter Queue (DLQ) is where failed messages go to die peacefully. Instead of being lost forever, they're stored so engineers can investigate what went wrong. It's like an emergency room for messages.">Dead Letter Queue</span> — a special holding area for failed messages.</p>
+
+        <div class="translation-block">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+<pre><code><span class="code-keyword">def</span> <span class="code-function">handle_dlq_message</span>(event):
+    phone <span class="code-operator">=</span> extract_phone(event)
+    dialect <span class="code-operator">=</span> get_user_dialect(phone)
+
+    apology <span class="code-operator">=</span> APOLOGY_MESSAGES[dialect]
+    send_whatsapp_message(phone, apology)</code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p>When a message lands in the failure queue...</p>
+              <p>Find out which farmer it was from...</p>
+              <p>Look up their preferred language...</p>
+              <p>Send them an apology in that language: "Sorry, we're having technical issues."</p>
+            </div>
+          </div>
+        </div>
+
+        <p style="margin-top: var(--space-4);">The farmer gets an honest apology instead of silence. That's good user experience even when things break.</p>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">Test Your Understanding</h2>
+
+        <div class="quiz-container" id="quiz-5">
+          <h3 class="quiz-question">A farmer reports their voice messages aren't being understood. Where would you start investigating?</h3>
+          <div class="quiz-options">
+            <button class="quiz-option" data-value="a" onclick="selectOption(this)">
+              <div class="quiz-option-radio"></div>
+              <span>Check the Bedrock AI logs</span>
+            </button>
+            <button class="quiz-option" data-value="b" onclick="selectOption(this)">
+              <div class="quiz-option-radio"></div>
+              <span>Check the Voice Processor and Transcribe service</span>
+            </button>
+            <button class="quiz-option" data-value="c" onclick="selectOption(this)">
+              <div class="quiz-option-radio"></div>
+              <span>Check the Nudge Sender</span>
+            </button>
+          </div>
+          <div class="quiz-feedback" id="quiz-5-feedback"></div>
+          <div class="quiz-buttons">
+            <button class="quiz-btn quiz-btn-check" onclick="checkQuiz5()">Check Answer</button>
+            <button class="quiz-btn quiz-btn-reset" onclick="resetQuiz5()">Try Again</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Module 6: The Big Picture -->
+  <section class="module" id="module-6">
+    <div class="module-content">
+      <header class="module-header animate-in">
+        <span class="module-number">06</span>
+        <h1 class="module-title">The Big Picture</h1>
+        <p class="module-subtitle">Seeing the full architecture</p>
+      </header>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">Everything Together</h2>
+        <p>Let's zoom out and see how all the pieces connect.</p>
+
+        <div style="background: var(--color-surface); padding: var(--space-6); border-radius: var(--radius-lg); margin: var(--space-6) 0; box-shadow: var(--shadow-md);">
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); text-align: center;">
+            <!-- Row 1: Entry -->
+            <div></div>
+            <div style="background: #25D366; color: white; padding: var(--space-4); border-radius: var(--radius-md);">
+              <strong>WhatsApp</strong><br>
+              <span style="font-size: var(--text-sm);">Farmer's phone</span>
+            </div>
+            <div></div>
+
+            <!-- Arrow -->
+            <div></div>
+            <div style="font-size: 2rem;">↓</div>
+            <div></div>
+
+            <!-- Row 2: Webhook -->
+            <div></div>
+            <div style="background: var(--color-actor-1); color: white; padding: var(--space-4); border-radius: var(--radius-md);">
+              <strong>Webhook</strong><br>
+              <span style="font-size: var(--text-sm);">Security gate</span>
+            </div>
+            <div></div>
+
+            <!-- Arrow -->
+            <div></div>
+            <div style="font-size: 2rem;">↓</div>
+            <div></div>
+
+            <!-- Row 3: Queue + Processor -->
+            <div style="background: var(--color-actor-4); color: white; padding: var(--space-4); border-radius: var(--radius-md);">
+              <strong>SQS Queue</strong><br>
+              <span style="font-size: var(--text-sm);">Waiting room</span>
+            </div>
+            <div style="font-size: 2rem;">→</div>
+            <div style="background: var(--color-actor-2); color: white; padding: var(--space-4); border-radius: var(--radius-md);">
+              <strong>Processor</strong><br>
+              <span style="font-size: var(--text-sm);">Coordinator</span>
+            </div>
+
+            <!-- Row 4: Services -->
+            <div style="background: var(--color-actor-3); color: white; padding: var(--space-4); border-radius: var(--radius-md);">
+              <strong>Bedrock AI</strong><br>
+              <span style="font-size: var(--text-sm);">Knowledge</span>
+            </div>
+            <div style="background: var(--color-actor-4); color: white; padding: var(--space-4); border-radius: var(--radius-md);">
+              <strong>DynamoDB</strong><br>
+              <span style="font-size: var(--text-sm);">Memory</span>
+            </div>
+            <div style="background: var(--color-actor-5); color: white; padding: var(--space-4); border-radius: var(--radius-md);">
+              <strong>Nudge System</strong><br>
+              <span style="font-size: var(--text-sm);">Reminders</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">Key Takeaways</h2>
+
+        <div class="icon-rows">
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-accent);">1</div>
+            <div>
+              <strong>Serverless = No servers to manage</strong>
+              <p>AWS runs everything. You pay only when farmers send messages.</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-accent);">2</div>
+            <div>
+              <strong>RAG = AI with a textbook</strong>
+              <p>Answers come from trusted agricultural documents, not AI guessing.</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-accent);">3</div>
+            <div>
+              <strong>Nudges = Behavior change</strong>
+              <p>Proactive advice at the right moment, with follow-up reminders.</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-accent);">4</div>
+            <div>
+              <strong>Separation of concerns = Easy debugging</strong>
+              <p>Each component has one job, so you know where to look when things break.</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-accent);">5</div>
+            <div>
+              <strong>Multi-language from day one</strong>
+              <p>Hindi, Marathi, Telugu, English — the system adapts to each farmer.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">The Cost of Helping 1,000 Farmers</h2>
+        <p>Running this system costs about <strong>$214/month</strong> — that's 21 cents per farmer per month, or about $2.50 per farmer per year.</p>
+
+        <div class="pattern-cards">
+          <div class="pattern-card" style="border-top: 3px solid var(--color-info);">
+            <div class="pattern-icon" style="background: var(--color-info);">🗄️</div>
+            <h4 class="pattern-title">OpenSearch</h4>
+            <p class="pattern-desc">$174/mo — The knowledge base search engine (biggest cost)</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-3);">
+            <div class="pattern-icon" style="background: var(--color-actor-3);">🧠</div>
+            <h4 class="pattern-title">Bedrock AI</h4>
+            <p class="pattern-desc">$25/mo — Answering ~3,000 questions</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-2);">
+            <div class="pattern-icon" style="background: var(--color-actor-2);">🎤</div>
+            <h4 class="pattern-title">Transcribe</h4>
+            <p class="pattern-desc">$12/mo — Converting voice messages to text</p>
+          </div>
+        </div>
+
+        <p style="margin-top: var(--space-4);">At 10,000 farmers, the cost per farmer drops to about <strong>70 cents per year</strong> — cheaper than a single SMS.</p>
+      </div>
+
+      <div class="screen animate-in">
+        <h2 class="screen-heading">Final Quiz</h2>
+
+        <div class="quiz-container" id="quiz-6">
+          <h3 class="quiz-question">If you wanted to add support for a new crop (say, rice), what would you need to update?</h3>
+          <div class="quiz-options">
+            <button class="quiz-option" data-value="a" onclick="selectOption(this)">
+              <div class="quiz-option-radio"></div>
+              <span>Just the Knowledge Base — add rice farming documents</span>
+            </button>
+            <button class="quiz-option" data-value="b" onclick="selectOption(this)">
+              <div class="quiz-option-radio"></div>
+              <span>Rewrite the entire system from scratch</span>
+            </button>
+            <button class="quiz-option" data-value="c" onclick="selectOption(this)">
+              <div class="quiz-option-radio"></div>
+              <span>Knowledge Base + onboarding flow to let farmers select rice</span>
+            </button>
+          </div>
+          <div class="quiz-feedback" id="quiz-6-feedback"></div>
+          <div class="quiz-buttons">
+            <button class="quiz-btn quiz-btn-check" onclick="checkQuiz6()">Check Answer</button>
+            <button class="quiz-btn quiz-btn-reset" onclick="resetQuiz6()">Try Again</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen animate-in">
+        <div style="text-align: center; padding: var(--space-12) 0;">
+          <h2 style="font-family: var(--font-display); font-size: var(--text-3xl); margin-bottom: var(--space-4);">🎉 Congratulations!</h2>
+          <p style="font-size: var(--text-lg); color: var(--color-text-secondary); max-width: 50ch; margin: 0 auto;">You now understand how AgriNexus AI works — from message flow to AI knowledge retrieval to behavioral nudges. You can debug issues, explain the architecture, and even suggest improvements.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- JavaScript -->
+  <script>
+    // ===== SCROLL ANIMATIONS =====
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { rootMargin: '0px 0px -10% 0px', threshold: 0.1 });
+
+    document.querySelectorAll('.animate-in').forEach(el => observer.observe(el));
+
+    // ===== PROGRESS BAR =====
+    const progressBar = document.getElementById('progress-bar');
+    function updateProgress() {
+      const scrollTop = window.scrollY;
+      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const progress = (scrollTop / scrollHeight) * 100;
+      progressBar.style.width = progress + '%';
+    }
+    window.addEventListener('scroll', () => requestAnimationFrame(updateProgress), { passive: true });
+
+    // ===== NAV DOTS =====
+    const modules = document.querySelectorAll('.module');
+    const navDots = document.querySelectorAll('.nav-dot');
+
+    function updateActiveDot() {
+      const scrollPos = window.scrollY + window.innerHeight / 3;
+      modules.forEach((mod, i) => {
+        if (mod.offsetTop <= scrollPos && mod.offsetTop + mod.offsetHeight > scrollPos) {
+          navDots.forEach(d => d.classList.remove('active'));
+          navDots[i].classList.add('active');
+        }
+      });
+    }
+    window.addEventListener('scroll', () => requestAnimationFrame(updateActiveDot), { passive: true });
+
+    function scrollToModule(index) {
+      modules[index].scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // ===== KEYBOARD NAV =====
+    document.addEventListener('keydown', (e) => {
+      if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+      const currentIndex = Array.from(navDots).findIndex(d => d.classList.contains('active'));
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+        if (currentIndex < modules.length - 1) scrollToModule(currentIndex + 1);
+        e.preventDefault();
+      }
+      if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+        if (currentIndex > 0) scrollToModule(currentIndex - 1);
+        e.preventDefault();
+      }
+    });
+
+    // ===== FLOW ANIMATION 1 =====
+    const flow1Steps = [
+      { highlight: 'flow1-whatsapp', label: '📱 Farmer sends message: "मेरे कपास के पत्तों पर सफेद मक्खी है"' },
+      { highlight: 'flow1-webhook', label: '🚪 Webhook receives it, checks the digital signature — it\'s really from WhatsApp!' },
+      { highlight: 'flow1-webhook', label: '🛡️ Webhook stores message ID to prevent duplicates, then says "OK" to WhatsApp' },
+      { highlight: 'flow1-queue', label: '📬 Message goes into the queue — waiting its turn to be processed' },
+      { highlight: 'flow1-processor', label: '⚙️ Processor picks up the message, fetches farmer\'s profile, asks the AI' },
+      { highlight: 'flow1-ai', label: '🧠 AI searches agricultural documents, composes answer in Hindi with citations' }
+    ];
+    let flow1Step = 0;
+
+    function flow1Next() {
+      if (flow1Step >= flow1Steps.length) return;
+      const step = flow1Steps[flow1Step];
+      document.querySelectorAll('#flow-1 .flow-actor').forEach(a => a.classList.remove('active'));
+      document.getElementById(step.highlight).classList.add('active');
+      document.getElementById('flow1-label').textContent = step.label;
+      flow1Step++;
+      document.getElementById('flow1-progress').textContent = `Step ${flow1Step} / ${flow1Steps.length}`;
+    }
+
+    function flow1Reset() {
+      flow1Step = 0;
+      document.querySelectorAll('#flow-1 .flow-actor').forEach(a => a.classList.remove('active'));
+      document.getElementById('flow1-label').textContent = 'Click "Next Step" to follow the message';
+      document.getElementById('flow1-progress').textContent = `Step 0 / ${flow1Steps.length}`;
+    }
+
+    // ===== FLOW ANIMATION NUDGE =====
+    const flowNudgeSteps = [
+      { highlight: 'flownudge-weather', label: '🌤️ Every 6 hours, Weather Check looks at conditions in each district' },
+      { highlight: 'flownudge-weather', label: '✅ Wind is 8.5 km/h in Latur — perfect for spraying!' },
+      { highlight: 'flownudge-step', label: '⚙️ Step Functions orchestrator starts the nudge workflow' },
+      { highlight: 'flownudge-sender', label: '📨 Nudge Sender finds all cotton farmers in Latur, sends each a message' },
+      { highlight: 'flownudge-schedule', label: '⏰ Scheduler sets reminders for T+24h and T+48h in case they don\'t respond' }
+    ];
+    let flowNudgeStep = 0;
+
+    function flowNudgeNext() {
+      if (flowNudgeStep >= flowNudgeSteps.length) return;
+      const step = flowNudgeSteps[flowNudgeStep];
+      document.querySelectorAll('#flow-nudge .flow-actor').forEach(a => a.classList.remove('active'));
+      document.getElementById(step.highlight).classList.add('active');
+      document.getElementById('flownudge-label').textContent = step.label;
+      flowNudgeStep++;
+      document.getElementById('flownudge-progress').textContent = `Step ${flowNudgeStep} / ${flowNudgeSteps.length}`;
+    }
+
+    function flowNudgeReset() {
+      flowNudgeStep = 0;
+      document.querySelectorAll('#flow-nudge .flow-actor').forEach(a => a.classList.remove('active'));
+      document.getElementById('flownudge-label').textContent = 'Click "Next Step" to see the nudge workflow';
+      document.getElementById('flownudge-progress').textContent = `Step 0 / ${flowNudgeSteps.length}`;
+    }
+
+    // ===== CHAT ANIMATION =====
+    const chat2Messages = document.querySelectorAll('#chat2-messages .chat-message');
+    const chat2Avatars = {
+      'W': { color: 'var(--color-actor-1)' },
+      'P': { color: 'var(--color-actor-2)' },
+      'D': { color: 'var(--color-actor-4)' },
+      'B': { color: 'var(--color-actor-3)' }
+    };
+    let chat2Index = 0;
+
+    function chat2Next() {
+      if (chat2Index >= chat2Messages.length) return;
+      const msg = chat2Messages[chat2Index];
+      const avatar = msg.querySelector('.chat-avatar');
+      const initial = avatar.textContent;
+
+      const typing = document.getElementById('chat2-typing');
+      const typingAvatar = document.getElementById('chat2-typing-avatar');
+      typingAvatar.textContent = initial;
+      typingAvatar.style.background = chat2Avatars[initial]?.color || 'var(--color-text-muted)';
+      typing.style.display = 'flex';
+
+      setTimeout(() => {
+        typing.style.display = 'none';
+        msg.style.display = 'flex';
+        chat2Index++;
+        document.getElementById('chat2-progress').textContent = `${chat2Index} / ${chat2Messages.length} messages`;
+      }, 600);
+    }
+
+    function chat2PlayAll() {
+      const interval = setInterval(() => {
+        if (chat2Index >= chat2Messages.length) { clearInterval(interval); return; }
+        chat2Next();
+      }, 1000);
+    }
+
+    function chat2Reset() {
+      chat2Index = 0;
+      chat2Messages.forEach(m => m.style.display = 'none');
+      document.getElementById('chat2-typing').style.display = 'none';
+      document.getElementById('chat2-progress').textContent = `0 / ${chat2Messages.length} messages`;
+    }
+
+    // ===== QUIZ FUNCTIONS =====
+    function selectOption(btn) {
+      const container = btn.closest('.quiz-container');
+      container.querySelectorAll('.quiz-option').forEach(o => o.classList.remove('selected'));
+      btn.classList.add('selected');
+    }
+
+    function checkQuiz1() {
+      const container = document.getElementById('quiz-1');
+      const selected = container.querySelector('.quiz-option.selected');
+      const feedback = document.getElementById('quiz-1-feedback');
+      if (!selected) { feedback.textContent = 'Please select an answer'; feedback.className = 'quiz-feedback show error'; return; }
+
+      if (selected.dataset.value === 'c') {
+        selected.classList.add('correct');
+        feedback.innerHTML = '<strong>Exactly!</strong> The queue safely holds messages until they can be processed. This is why we use queues — they prevent message loss during busy times.';
+        feedback.className = 'quiz-feedback show success';
+      } else {
+        selected.classList.add('incorrect');
+        container.querySelector('[data-value="c"]').classList.add('correct');
+        feedback.innerHTML = '<strong>Not quite.</strong> The queue ensures no messages are lost. Even if processing takes time, the message waits safely.';
+        feedback.className = 'quiz-feedback show error';
+      }
+      container.querySelectorAll('.quiz-option').forEach(o => o.disabled = true);
+    }
+
+    function resetQuiz1() {
+      const container = document.getElementById('quiz-1');
+      container.querySelectorAll('.quiz-option').forEach(o => {
+        o.classList.remove('selected', 'correct', 'incorrect');
+        o.disabled = false;
+      });
+      document.getElementById('quiz-1-feedback').className = 'quiz-feedback';
+    }
+
+    function checkQuiz2() {
+      const container = document.getElementById('quiz-2');
+      const selected = container.querySelector('.quiz-option.selected');
+      const feedback = document.getElementById('quiz-2-feedback');
+      if (!selected) { feedback.textContent = 'Please select an answer'; feedback.className = 'quiz-feedback show error'; return; }
+
+      if (selected.dataset.value === 'b') {
+        selected.classList.add('correct');
+        feedback.innerHTML = '<strong>Exactly!</strong> Language preference is stored in DynamoDB. If responses are in the wrong language, the profile data is the first place to check.';
+        feedback.className = 'quiz-feedback show success';
+      } else {
+        selected.classList.add('incorrect');
+        container.querySelector('[data-value="b"]').classList.add('correct');
+        feedback.innerHTML = '<strong>Not quite.</strong> DynamoDB stores user profiles including language preference. That\'s where language issues usually originate.';
+        feedback.className = 'quiz-feedback show error';
+      }
+      container.querySelectorAll('.quiz-option').forEach(o => o.disabled = true);
+    }
+
+    function resetQuiz2() {
+      const container = document.getElementById('quiz-2');
+      container.querySelectorAll('.quiz-option').forEach(o => {
+        o.classList.remove('selected', 'correct', 'incorrect');
+        o.disabled = false;
+      });
+      document.getElementById('quiz-2-feedback').className = 'quiz-feedback';
+    }
+
+    function checkQuiz3() {
+      const container = document.getElementById('quiz-3');
+      const selected = container.querySelector('.quiz-option.selected');
+      const feedback = document.getElementById('quiz-3-feedback');
+      if (!selected) { feedback.textContent = 'Please select an answer'; feedback.className = 'quiz-feedback show error'; return; }
+
+      if (selected.dataset.value === 'b') {
+        selected.classList.add('correct');
+        feedback.innerHTML = '<strong>Exactly!</strong> RAG ensures answers come from real agricultural research with citations. Farmers can trust the advice because it\'s backed by authoritative sources.';
+        feedback.className = 'quiz-feedback show success';
+      } else {
+        selected.classList.add('incorrect');
+        container.querySelector('[data-value="b"]').classList.add('correct');
+        feedback.innerHTML = '<strong>Not quite.</strong> The key advantage of RAG is grounding answers in trusted documents with citations — building trust through verifiable sources.';
+        feedback.className = 'quiz-feedback show error';
+      }
+      container.querySelectorAll('.quiz-option').forEach(o => o.disabled = true);
+    }
+
+    function resetQuiz3() {
+      const container = document.getElementById('quiz-3');
+      container.querySelectorAll('.quiz-option').forEach(o => {
+        o.classList.remove('selected', 'correct', 'incorrect');
+        o.disabled = false;
+      });
+      document.getElementById('quiz-3-feedback').className = 'quiz-feedback';
+    }
+
+    function checkQuiz4() {
+      const container = document.getElementById('quiz-4');
+      const selected = container.querySelector('.quiz-option.selected');
+      const feedback = document.getElementById('quiz-4-feedback');
+      if (!selected) { feedback.textContent = 'Please select an answer'; feedback.className = 'quiz-feedback show error'; return; }
+
+      if (selected.dataset.value === 'b') {
+        selected.classList.add('correct');
+        feedback.innerHTML = '<strong>Exactly!</strong> The T+48h reminder fires on Wednesday. The system gently persists without being annoying — one reminder per day max.';
+        feedback.className = 'quiz-feedback show success';
+      } else {
+        selected.classList.add('incorrect');
+        container.querySelector('[data-value="b"]').classList.add('correct');
+        feedback.innerHTML = '<strong>Not quite.</strong> The nudge system sends reminders at T+24h and T+48h. Wednesday is 48 hours after Monday, so that\'s when the final reminder goes out.';
+        feedback.className = 'quiz-feedback show error';
+      }
+      container.querySelectorAll('.quiz-option').forEach(o => o.disabled = true);
+    }
+
+    function resetQuiz4() {
+      const container = document.getElementById('quiz-4');
+      container.querySelectorAll('.quiz-option').forEach(o => {
+        o.classList.remove('selected', 'correct', 'incorrect');
+        o.disabled = false;
+      });
+      document.getElementById('quiz-4-feedback').className = 'quiz-feedback';
+    }
+
+    function checkQuiz5() {
+      const container = document.getElementById('quiz-5');
+      const selected = container.querySelector('.quiz-option.selected');
+      const feedback = document.getElementById('quiz-5-feedback');
+      if (!selected) { feedback.textContent = 'Please select an answer'; feedback.className = 'quiz-feedback show error'; return; }
+
+      if (selected.dataset.value === 'b') {
+        selected.classList.add('correct');
+        feedback.innerHTML = '<strong>Exactly!</strong> Voice issues trace back to the Voice Processor and Amazon Transcribe. Check if audio files are being downloaded and if transcription jobs are completing.';
+        feedback.className = 'quiz-feedback show success';
+      } else {
+        selected.classList.add('incorrect');
+        container.querySelector('[data-value="b"]').classList.add('correct');
+        feedback.innerHTML = '<strong>Not quite.</strong> Follow the data! Voice messages go through the Voice Processor which uses Transcribe. That\'s where voice-specific issues live.';
+        feedback.className = 'quiz-feedback show error';
+      }
+      container.querySelectorAll('.quiz-option').forEach(o => o.disabled = true);
+    }
+
+    function resetQuiz5() {
+      const container = document.getElementById('quiz-5');
+      container.querySelectorAll('.quiz-option').forEach(o => {
+        o.classList.remove('selected', 'correct', 'incorrect');
+        o.disabled = false;
+      });
+      document.getElementById('quiz-5-feedback').className = 'quiz-feedback';
+    }
+
+    function checkQuiz6() {
+      const container = document.getElementById('quiz-6');
+      const selected = container.querySelector('.quiz-option.selected');
+      const feedback = document.getElementById('quiz-6-feedback');
+      if (!selected) { feedback.textContent = 'Please select an answer'; feedback.className = 'quiz-feedback show error'; return; }
+
+      if (selected.dataset.value === 'c') {
+        selected.classList.add('correct');
+        feedback.innerHTML = '<strong>Exactly!</strong> You\'d add rice documents to the Knowledge Base for the AI to reference, and update the onboarding flow so farmers can select rice as their crop. The architecture is designed to scale to new crops easily!';
+        feedback.className = 'quiz-feedback show success';
+      } else {
+        selected.classList.add('incorrect');
+        container.querySelector('[data-value="c"]').classList.add('correct');
+        feedback.innerHTML = '<strong>Not quite.</strong> Good architecture means adding features is surgical, not a rewrite. You\'d add rice documents AND let farmers select rice during onboarding.';
+        feedback.className = 'quiz-feedback show error';
+      }
+      container.querySelectorAll('.quiz-option').forEach(o => o.disabled = true);
+    }
+
+    function resetQuiz6() {
+      const container = document.getElementById('quiz-6');
+      container.querySelectorAll('.quiz-option').forEach(o => {
+        o.classList.remove('selected', 'correct', 'incorrect');
+        o.disabled = false;
+      });
+      document.getElementById('quiz-6-feedback').className = 'quiz-feedback';
+    }
+
+    // ===== GLOSSARY TOOLTIPS =====
+    let activeTooltip = null;
+
+    function positionTooltip(term, tip) {
+      const rect = term.getBoundingClientRect();
+      const tipWidth = 300;
+      let left = rect.left + rect.width / 2 - tipWidth / 2;
+      left = Math.max(8, Math.min(left, window.innerWidth - tipWidth - 8));
+
+      document.body.appendChild(tip);
+      const tipHeight = tip.offsetHeight;
+
+      if (rect.top - tipHeight - 8 < 0) {
+        tip.style.top = (rect.bottom + 8) + 'px';
+        tip.classList.add('flip');
+      } else {
+        tip.style.top = (rect.top - tipHeight - 8) + 'px';
+        tip.classList.remove('flip');
+      }
+      tip.style.left = left + 'px';
+    }
+
+    document.querySelectorAll('.term').forEach(term => {
+      const tip = document.createElement('span');
+      tip.className = 'term-tooltip';
+      tip.textContent = term.dataset.definition;
+
+      term.addEventListener('mouseenter', () => {
+        if (activeTooltip && activeTooltip !== tip) {
+          activeTooltip.classList.remove('visible');
+          activeTooltip.remove();
+        }
+        positionTooltip(term, tip);
+        requestAnimationFrame(() => tip.classList.add('visible'));
+        activeTooltip = tip;
+      });
+
+      term.addEventListener('mouseleave', () => {
+        tip.classList.remove('visible');
+        setTimeout(() => { if (!tip.classList.contains('visible')) tip.remove(); }, 150);
+        activeTooltip = null;
+      });
+
+      term.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (activeTooltip && activeTooltip !== tip) {
+          activeTooltip.classList.remove('visible');
+          activeTooltip.remove();
+        }
+        if (tip.classList.contains('visible')) {
+          tip.classList.remove('visible');
+          tip.remove();
+          activeTooltip = null;
+        } else {
+          positionTooltip(term, tip);
+          requestAnimationFrame(() => tip.classList.add('visible'));
+          activeTooltip = tip;
+        }
+      });
+    });
+
+    document.addEventListener('click', () => {
+      if (activeTooltip) {
+        activeTooltip.classList.remove('visible');
+        activeTooltip.remove();
+        activeTooltip = null;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -35,14 +35,15 @@ flowchart TB
 
     WA -->|2 POST| API --> WH
     WH -->|3a text/image| MQ --> Proc
-    WH -->|3b audio| VQ --> VoiceProc
+    WH -->|3b audio: ACK then| VQ --> VoiceProc
+    VoiceProc --> Transcribe
     VoiceProc -->|transcript| MQ
     Proc --> DDB
     Proc --> Bedrock
     Proc --> KB
     Proc --> Vision
-    Proc --> Transcribe
     Proc --> Polly
+    WH -.->|voice ACK text| WA
     Proc -->|4 reply| WA
     NudgeSend -->|4 nudge| WA
     RemindSend -->|4 reminder| WA
@@ -57,7 +58,7 @@ flowchart TB
     NudgeSend -.->|create| EBS --> RemindSend
 ```
 
-**Flow summary:** (1) Farmer → WhatsApp. (2) WhatsApp → API Gateway → Webhook Lambda. (3) Webhook → SQS (message or voice queue) → Message Processor or Voice Processor. Processors use DynamoDB and AI services (Bedrock RAG, Transcribe, Polly, Vision). (4) Processors and nudge/reminder Lambdas send replies **directly to WhatsApp Cloud API** (HTTP). Nudges: EventBridge → Weather Poller → Step Functions → Nudge Sender → WhatsApp; reminders via EventBridge Scheduler → Reminder Sender → WhatsApp.
+**Flow summary:** (1) Farmer → WhatsApp. (2) WhatsApp → API Gateway → Webhook Lambda. (3) Webhook → SQS (message or voice queue) → Message Processor or Voice Processor. For **audio**, webhook sends a short **voice-received** text (after dedup, before queue) using Secrets Manager + Graph API. **Transcribe** runs only in **Voice Processor**; Message Processor uses Bedrock RAG, Polly, Vision. (4) Processors and nudge/reminder Lambdas send replies **directly to WhatsApp Cloud API** (HTTP). Nudges: EventBridge → Weather Poller → Step Functions → Nudge Sender → WhatsApp; reminders via EventBridge Scheduler → Reminder Sender → WhatsApp.
 
 ---
 
@@ -104,7 +105,10 @@ flowchart LR
     Verify -->|No| 403[403 Forbidden]
     Verify -->|Yes| Dedup{Dedup\nWAMID?}
     Dedup -->|Duplicate| Skip[Skip]
-    Dedup -->|New| Store[Store MSG\nin DynamoDB]
+    Dedup -->|New| AudioQ{Audio?}
+    AudioQ -->|yes| Ack[Voice received ACK\nWhatsApp Graph API]
+    Ack --> Store[Store MSG\nin DynamoDB]
+    AudioQ -->|no| Store
     Store --> Type{Message\nType?}
     Type -->|audio| VQ[Voice Queue]
     Type -->|text/image| MQ[Message Queue]
@@ -153,8 +157,9 @@ sequenceDiagram
 
     U->>WA: Voice note
     WA->>WH: POST (audio ref)
+    WH->>WA: Voice received ACK (after dedup)
     WH->>VQ: Send to Voice Queue
-    VP->>WA: Download media
+    VP->>WA: Download media (Graph)
     VP->>S3: Upload audio
     VP->>Transcribe: Start job
     Transcribe->>VP: Transcript
@@ -211,8 +216,10 @@ flowchart LR
 |-------------|---------|
 | `agrinexus/whatsapp/verify-token` | GET webhook verification (hub.verify_token) |
 | `agrinexus/whatsapp/app-secret` | HMAC signature verification (X-Hub-Signature-256) |
-| `agrinexus/whatsapp/access-token` | Send messages via WhatsApp Cloud API |
+| `agrinexus/whatsapp/access-token` | Send messages via WhatsApp Cloud API (processor, nudge, **webhook** voice ACK) |
 | `agrinexus/whatsapp/phone-number-id` | Sender phone number ID |
+
+The **webhook** Lambda uses the Common layer and these two secrets to send the **voice-received** text for inbound audio (after dedup; see `src/webhook/handler.py`).
 
 **Webhook:** `https://<api-id>.execute-api.<region>.amazonaws.com/dev/webhook`  
 - **GET:** `hub.mode=subscribe&hub.verify_token=<token>&hub.challenge=<challenge>` → return `hub.challenge`.  

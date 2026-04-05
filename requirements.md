@@ -179,7 +179,7 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **REQ-VOICE-005**: Marathi and Telugu voice output is best-effort — if Polly lacks native voices, the system shall respond with text in those dialects.
 
-**REQ-VOICE-006**: The system shall complete voice round-trip (transcribe → Bedrock → Polly) within 10 seconds.
+**REQ-VOICE-006**: The MVP shall complete voice round-trip (batch Transcribe → Bedrock → Polly → WhatsApp) with typical end-to-end latency **~30–45 seconds**; a short **voice-received** text is sent from the webhook immediately after accept. **Phase 2** (streaming STT / pipeline optimization) targets **sub-10s** — see `docs/VOICE-LATENCY-PHASE2-PLAN.md`.
 
 **REQ-VOICE-007**: Amazon Transcribe support for Marathi and Telugu shall be verified; if unavailable, voice input falls back to Hindi-only for MVP while text input works for all three dialects.
 
@@ -265,7 +265,7 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **REQ-PERF-004**: Text-processing Lambda functions shall execute within 1 second (excluding Bedrock API calls).
 
-**REQ-PERF-005**: Voice round-trip (Transcribe + Bedrock + Polly) shall complete within 10 seconds.
+**REQ-PERF-005**: Voice round-trip (batch Transcribe + Bedrock + Polly) is expected **~30–45s p95** in MVP; **Phase 2** targets **<10s** with streaming STT.
 
 **REQ-PERF-006**: The system shall achieve 99% uptime during business hours (6 AM - 10 PM IST).
 
@@ -361,7 +361,7 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **REQ-TEST-006**: The system shall perform load testing with 10 concurrent users achieving p95 text response ≤5s.
 
-**REQ-TEST-007**: The system shall test voice round-trip: voice note → Transcribe → Bedrock → Polly → audio response ≤10s.
+**REQ-TEST-007**: The system shall test voice round-trip: voice note → Transcribe → Bedrock → Polly → audio response; assert pipeline completes and record end-to-end time (MVP batch path **~30–45s**; Phase 2 **≤10s** target).
 
 **REQ-TEST-008**: The system shall test vision happy path: cotton pest image → diagnosis in Hindi with confidence ≥70% within 15s.
 
@@ -373,7 +373,7 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **AC-DEMO-001**: When a user sends "Namaste", the system shall respond within 2s with dialect/crop selection via WhatsApp interactive buttons.
 
-**AC-DEMO-002**: When a user sends Hindi voice note "Mere cotton mein kab spray karein?", the system shall transcribe and respond with audio citation within 5s.
+**AC-DEMO-002**: When a user sends Hindi voice note "Mere cotton mein kab spray karein?", the system shall transcribe and respond with audio citation; MVP batch pipeline typically **~30–45s** end-to-end (webhook ACK within seconds).
 
 **AC-DEMO-003**: When a user sends photo of spotted cotton leaf, the system shall return diagnosis with confidence and FAO source reference within 15s.
 
@@ -381,7 +381,7 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **AC-DEMO-005**: When a user replies voice/text "Ho gaya", the system shall log SUCCESS in DynamoDB and increment completion metric.
 
-**AC-DEMO-006**: When a judge views CloudWatch Dashboard, it shall reflect +1 nudge sent, +1 completed, 100% completion rate, p95 latency <5s.
+**AC-DEMO-006**: When a judge views CloudWatch Dashboard, it shall reflect +1 nudge sent, +1 completed, 100% completion rate; **text** p95 latency **<5s** where applicable (voice end-to-end tracked separately).
 
 ### 5.2 General Acceptance Criteria
 

@@ -116,12 +116,13 @@ aws secretsmanager create-secret \
 
 ## 6.6 Weather API Key (Optional)
 
-If you want real weather data (post-MVP), create an OpenWeatherMap API key and set:
+For real spray-condition checks, create an OpenWeatherMap API key and pass it at deploy time:
 
 ```bash
-USE_REAL_WEATHER=true
-WEATHER_API_KEY="YOUR_OPENWEATHER_API_KEY"
+sam deploy --config-file samconfig-week2.toml --parameter-overrides WeatherApiKey=YOUR_OPENWEATHER_API_KEY
 ```
+
+Ensure `MOCK_WEATHER` is false on the Weather poller for production (default in `template-week2.yaml`).
 
 ## Troubleshooting
 

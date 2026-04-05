@@ -10,6 +10,7 @@
 
 ## Architecture
 
+- **Onboarding**: Language → district (**Latur**, **Jalna**, **Nagpur**) → crop → nudge consent (`src/processor/handler.py`)
 - **Serverless**: Lambda, DynamoDB, EventBridge Scheduler, Step Functions
 - **AI**: Amazon Bedrock (Claude 3 Sonnet + RAG), Transcribe, Polly, Claude Vision
 - **Messaging**: WhatsApp Business API
@@ -129,7 +130,7 @@ aws bedrock-agent start-ingestion-job \
 - **Webhook URL**: After deploy, use the stack output `WebhookUrl` (e.g. `https://<api-id>.execute-api.us-east-1.amazonaws.com/dev/webhook`). In Meta Developer Portal → WhatsApp → Configuration, set this as **Callback URL** and subscribe to **messages**.
 - **Verification (GET)**: Meta sends `hub.mode=subscribe`, `hub.verify_token`, `hub.challenge`. The webhook Lambda reads `agrinexus/whatsapp/verify-token` from Secrets Manager and returns `hub.challenge` if the token matches.
 - **Signatures (POST)**: Incoming message payloads are verified with `X-Hub-Signature-256` (HMAC-SHA256) using `agrinexus/whatsapp/app-secret`. Reject if invalid.
-- **Sending messages**: The processor and nudge Lambdas use `agrinexus/whatsapp/access-token` and `agrinexus/whatsapp/phone-number-id` to call the WhatsApp Cloud API (text, interactive buttons, or template messages where used).
+- **Sending messages**: The **webhook** Lambda (via Common layer), **processor**, and **nudge** Lambdas use `agrinexus/whatsapp/access-token` and `agrinexus/whatsapp/phone-number-id` to call the WhatsApp Cloud API. For **inbound audio**, the webhook sends a short “received / preparing reply” text **immediately after deduplication** (before SQS → Voice Processor) so feedback is not delayed by queue or Transcribe. Text/interactive/template sends work as before.
 - **Production number cutover** (new eSIM / WABA / templates): see [docs/WHATSAPP-PRODUCTION-NUMBER-CUTOVER.md](docs/WHATSAPP-PRODUCTION-NUMBER-CUTOVER.md).
 - **Deploy / test handoff** (e.g. for Kiro): [docs/KIRO-DEPLOY-AND-TEST.md](docs/KIRO-DEPLOY-AND-TEST.md).
 - **Message types**: Inbound text, image, and audio are supported. Outbound: text, optional interactive buttons (e.g. language/location during onboarding), and template messages for nudges (see [architecture/diagrams.md](architecture/diagrams.md)).
@@ -256,9 +257,9 @@ Then send a new language keyword (`हिंदी` / `मराठी` / `త�
 ## Architecture Details
 
 ### Lambda Functions
-1. **WebhookHandler**: Receives WhatsApp messages, routes to appropriate queue
-2. **MessageProcessor**: Handles text/image messages, RAG queries, voice output
-3. **VoiceProcessor**: Transcribes voice notes, queues as text
+1. **WebhookHandler**: Validates signature, deduplicates, stores messages for the response detector, routes **text/image** to the message queue and **audio** to the voice queue; for **audio**, sends localized **voice-received ACK** via WhatsApp (before enqueue) using the Common layer + secrets
+2. **MessageProcessor**: Handles text/image messages, RAG queries, Polly voice output; **does not** send a duplicate “preparing answer” ack for transcribed voice (`_source: voice`)
+3. **VoiceProcessor**: Downloads media, **Transcribe** batch job, queues transcribed text to the message queue
 4. **NudgeSender**: Sends behavioral nudges, schedules reminders
 5. **ReminderSender**: Sends T+24h and T+48h reminders
 6. **ResponseDetector**: Detects DONE/NOT YET responses via DynamoDB Streams
@@ -274,8 +275,9 @@ WhatsApp → Webhook → SQS → Processor → Bedrock RAG → WhatsApp
 
 **Voice Query:**
 ```
-WhatsApp → Webhook → VoiceQueue → VoiceProcessor → Transcribe → SQS → Processor → Bedrock RAG → Polly → WhatsApp
+WhatsApp → Webhook → (optional ACK text to user) → VoiceQueue → VoiceProcessor → Transcribe → Message queue → Processor → Bedrock RAG → Polly → WhatsApp
 ```
+(ACK is sent from the **webhook** right after dedup + profile dialect lookup, not from VoiceProcessor.)
 
 **Image Query:**
 ```
@@ -318,7 +320,7 @@ Weather Poller → Step Functions → Nudge Sender → WhatsApp
 
 ## Known Limitations
 
-1. **Voice Input Latency**: 30-35 seconds total (batch transcription ~20-30s + RAG ~5-10s + Polly ~3s). Voice ACK sent immediately (1-2s). Post-MVP: migrate to Transcribe Streaming for <10s total.
+1. **Voice round-trip latency**: Typically **~30–40s** end-to-end (batch **Transcribe** ~15–30s + **Bedrock RAG** ~5–15s + **Polly** + WhatsApp media). The **voice-received** text line is sent from the **webhook** as soon as possible after dedup (often **~1–3s**; **cold start** on first request can add more). **Phase 2:** streaming STT / pipeline changes — see `docs/VOICE-LATENCY-PHASE2-PLAN.md`.
 2. **Telugu Voice Output**: No native Telugu voice in Polly. Text-only responses for Telugu users.
 3. **WhatsApp Test Numbers**: Don't support media (voice/images). Requires real WhatsApp Business number for end-to-end testing.
 4. **Weather Data**: Real OpenWeatherMap API integrated. Set MOCK_WEATHER=true for demo reliability.
