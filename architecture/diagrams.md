@@ -24,7 +24,7 @@ flowchart TB
         DDB[(DynamoDB)]
         subgraph AI["AI services"]
             Bedrock[Bedrock\nClaude + RAG]
-            KB[Knowledge Base\nS3/OpenSearch]
+            KB[Knowledge Base\nS3 Vectors]
             Transcribe[Transcribe]
             Polly[Polly]
             Vision[Claude Vision]
@@ -175,12 +175,14 @@ flowchart TB
     Check -->|Yes| SF[Step Functions\nNudge Workflow]
     SF --> Send[Nudge Sender]
     Send --> WA[WhatsApp\nTemplate/Text]
-    Send --> Sched[EventBridge\nT+24h, T+48h]
+    Send --> Sched[EventBridge\nT+24h, T+48h, T+72h]
     Sched --> Remind[Reminder Sender]
     Remind --> WA
     Stream[DynamoDB Streams] --> Detector[Response Detector]
-    Detector -->|DONE/NOT YET| Update[Update nudge state]
-    Update --> Cancel[Cancel reminders\nif DONE]
+    Detector -->|DONE| UpdateDone[Status: DONE\nCancel schedules]
+    Detector -->|NOT YET after T+48h| UpdateExpired[Status: EXPIRED\nCancel schedules]
+    Detector -->|NOT YET before T+48h| Ack[Acknowledge\nKeep schedules]
+    Sched -->|T+72h no response| AutoExpire[Auto-expire\nStatus: EXPIRED]
 ```
 
 ## WhatsApp integration (secrets and webhook)

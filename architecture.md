@@ -9,13 +9,13 @@
 
 AgriNexus AI is a behavioral intervention engine and behavioral AI extension agent designed to close the "last mile" gap in agricultural extension for smallholder farmers. Unlike reactive information systems, AgriNexus utilizes a proactive, weather-timed behavioral nudge engine with closed-loop accountability to ensure agronomic advice translates into field action. The system prioritizes trust through dialect-native voice interactions (Hindi, Marathi, Telugu) and evidence-backed citations from validated FAO sources.
 
-The architecture is a serverless system with pay-as-you-go Bedrock. Estimated cost: ~$214/month for 1,000 farmers, with OpenSearch Serverless (~$174 fixed) and Bedrock (~$25 variable) as the primary cost drivers. At 10,000 farmers, cost drops to ~$0.70/farmer/year as fixed costs amortize. The system leverages Amazon Bedrock (Claude 3 Sonnet) for dialect-aware conversations, EventBridge Scheduler for behavioral nudges, Claude 3 Vision for pest diagnosis, and Amazon Transcribe + Polly for voice accessibility.
+The architecture is a serverless system with pay-as-you-go Bedrock. Estimated cost: ~$53/month for 1,000 farmers, with S3 vectors (~$1.30) and Bedrock (~$39 variable) as the primary cost drivers. The system leverages Amazon Bedrock (Claude 3 Sonnet) for dialect-aware conversations, S3 for vector storage (migrated from OpenSearch Serverless on April 4, 2026 for 75% cost reduction), EventBridge Scheduler for behavioral nudges, Claude 3 Vision for pest diagnosis, and Amazon Transcribe + Polly for voice accessibility.
 
 ## 2. Architecture Principles
 
 - **Serverless First**: Use Lambda, DynamoDB, and managed services to minimize operational overhead and costs
 - **Event-Driven**: Leverage EventBridge Scheduler and Step Functions for asynchronous workflows
-- **Cost-Conscious**: Serverless architecture with pay-as-you-go Bedrock (~$214/month for 1,000 farmers; ~$0.70/farmer/year at 10K scale)
+- **Cost-Conscious**: Serverless architecture with pay-as-you-go Bedrock (~$53/month for 1,000 farmers; ~$0.64/farmer/year)
 - **Scalable**: Design for 1,000 farmers in MVP with ability to scale to 10,000 post-MVP
 - **Secure by Default**: Implement encryption, least-privilege IAM, and input validation throughout
 - **Behavioral Closed Loop**: Track nudge → action → confirmation cycle with Nudge Completion Rate as primary metric
@@ -136,14 +136,16 @@ s3://agrinexus-knowledge-base/
 
 **Bedrock Configuration**:
 - Model: Claude 3 Sonnet (cost-effective, multilingual)
-- Knowledge Base: S3 + OpenSearch Serverless vector store (~$174/month for 0.5 OCU × 2, always-on)
+- Knowledge Base: S3 for document storage + S3 vectors for embeddings (~$1.30/month, pay-per-query)
 - Guardrails: Block banned pesticides (Paraquat, Endosulfan), escalate medical/veterinary queries to KVK, include label disclaimers
 - Agent Instructions: "You are an agricultural extension agent. Provide practical, actionable advice grounded in FAO data. Handle code-switching (e.g., Hinglish - mixed Hindi/English) naturally. Respond in the farmer's preferred language (Hindi, Marathi, or Telugu). Include simplified source citations."
 - Language Support: Hindi (primary), Marathi, Telugu, and code-switched variants (Hinglish)
 
+**Historical Note**: Originally used OpenSearch Serverless (~$174/month fixed cost). Migrated to S3 vectors on April 4, 2026 for 75% cost reduction (~$214/month → ~$53/month).
+
 **AWS Services**:
-- Amazon Bedrock (Agent + Knowledge Base with OpenSearch Serverless vector store)
-- S3 (document storage)
+- Amazon Bedrock (Agent + Knowledge Base with S3 vectors)
+- S3 (document storage + vector embeddings)
 
 ### 4.3 Visual Verification (Claude 3 Vision)
 
@@ -236,12 +238,18 @@ Attributes:
 - activity: "spray_pesticide"
 - sentAt: 1707955200
 - scheduledReminderAt: 1708041600 (T+24h)
-- status: "sent" | "reminded" | "done" | "not_yet" | "no_response"
+- status: "SENT" | "REMINDED" | "DONE" | "EXPIRED"
 - responseAt: Unix timestamp (optional)
 - responseText: "Ho gaya" (optional)
 - weatherCondition: {temperature: 28, rainfall: 0, windSpeed: 6}
 - TTL: 1723507200 (180 days)
 ```
+
+**Status Flow**:
+- SENT: Initial nudge sent
+- REMINDED: After T+24h or T+48h reminder sent
+- DONE: Farmer clicked "Done" button (all schedules deleted)
+- EXPIRED: Either farmer clicked "Not Yet" after T+48h OR no response by T+72h auto-expiry
 
 **Global Secondary Indexes**:
 
@@ -290,12 +298,13 @@ CreateEventBridgeSchedulerRecords (Lambda)
 END (execution completes)
 
 Separate EventBridge Scheduler Records:
-  T+24h: Triggers Reminder Lambda → checks DynamoDB status → if not DONE, sends first reminder
-  T+48h: Triggers Reminder Lambda → checks DynamoDB status → if not DONE, sends second reminder
-  T+72h: Triggers Timeout Lambda → marks nudge as "no_response" in DynamoDB
+  T+24h: Triggers Reminder Lambda → checks DynamoDB status → if not DONE/EXPIRED, sends first reminder
+  T+48h: Triggers Reminder Lambda → checks DynamoDB status → if not DONE/EXPIRED, sends second reminder
+  T+72h: Triggers Expiry Lambda → marks nudge as "EXPIRED" in DynamoDB if no response
 
 Real-time Response Detection (separate flow):
-  DynamoDB Streams → response-detector Lambda → if DONE keyword matched, updates nudge status, deletes pending Scheduler records
+  DynamoDB Streams → response-detector Lambda → if DONE keyword matched, updates nudge status to DONE, deletes pending Scheduler records
+  DynamoDB Streams → response-detector Lambda → if NOT YET keyword matched after T+48h, updates nudge status to EXPIRED, deletes pending Scheduler records
 ```
 
 **State Machine Definition** (ASL - Simplified):
@@ -402,13 +411,13 @@ def create_reminder_schedules(nudge_id, user_id, language):
         FlexibleTimeWindow={'Mode': 'OFF'}
     )
     
-    # T+72h timeout
+    # T+72h expiry (auto-expire if no response)
     scheduler.create_schedule(
-        Name=f'{nudge_id}-timeout',
+        Name=f'{nudge_id}-expiry',
         ScheduleExpression=f'at({calculate_time(72, "hours")})',
         Target={
-            'Arn': 'arn:aws:lambda:REGION:ACCOUNT:function:timeout-handler',
-            'Input': json.dumps({'nudgeId': nudge_id, 'userId': user_id})
+            'Arn': 'arn:aws:lambda:REGION:ACCOUNT:function:reminder-handler',
+            'Input': json.dumps({'nudgeId': nudge_id, 'userId': user_id, 'reminderType': 'EXPIRY'})
         },
         FlexibleTimeWindow={'Mode': 'OFF'}
     )
@@ -430,11 +439,20 @@ def lambda_handler(event, context):
                 # Pre-filter: only check for pending nudges if keywords match
                 if any(kw in text_lower for kw in (DONE_KEYWORDS | NOT_YET_KEYWORDS)):
                     is_done = any(kw in text_lower for kw in DONE_KEYWORDS)
-                    handle_nudge_response(message, status='done' if is_done else 'not_yet')
                     
                     if is_done:
+                        handle_nudge_response(message, status='DONE')
                         # Delete pending EventBridge Scheduler records
                         delete_pending_schedules(message['userId'])
+                    else:
+                        # NOT YET after T+48h → mark as EXPIRED
+                        nudge = get_pending_nudge(message['userId'])
+                        if nudge and nudge['sentAt'] < (time.time() - 48*3600):
+                            handle_nudge_response(message, status='EXPIRED')
+                            delete_pending_schedules(message['userId'])
+                        else:
+                            # NOT YET before T+48h → acknowledge but keep reminders
+                            send_acknowledgment(message['userId'], message['dialect'])
 ```
 
 **EventBridge Rule** (Weather Polling):
@@ -725,32 +743,20 @@ jobs:
 | Lambda | 500,000 invocations | 1M free | $0 |
 | Lambda | 200,000 GB-sec | 400,000 free | $0 |
 | API Gateway | 300,000 requests | 1M free | $0 |
-| DynamoDB | 50M read units | 25M free | ~$12.50 |
-| DynamoDB | 10M write units | 25M free | $0 |
+| DynamoDB | On-demand | 25M RCU/WCU free | ~$0.90 |
 | S3 Storage | 5 GB | 5 GB free | $0 |
 | S3 Requests | 50,000 PUT | 2,000 free | ~$0.24 |
-| OpenSearch Serverless | 0.5 OCU × 2 (indexing + search) | Always-on | ~$174 |
-| Bedrock (Claude 3 Sonnet RAG + Vision) | 3K queries, 100 images | Pay-as-you-go | ~$25 |
+| S3 Vectors | 300K queries | Pay-per-query | ~$1.30 |
+| Bedrock (Claude 3 Sonnet RAG) | 3M input + 1.5M output tokens | Pay-as-you-go | ~$32 |
+| Bedrock (Claude 3 Vision) | 100 images | Pay-as-you-go | ~$5 |
 | Transcribe | 500 voice minutes | $0.024/min | ~$12 |
-| Polly | 30,000 characters | 5M free | ~$1 |
-| DynamoDB | On-demand | | ~$1 |
+| Polly | 200 min output | $4/1M chars | ~$2 |
 | Step Functions | 10,000 transitions | 4,000 free | ~$0.15 |
-| EventBridge Scheduler | 8,000 schedules | Free | ~$1 |
+| EventBridge Scheduler | 8,000 schedules | Free | ~$0.01 |
 | Lambda, API Gateway, SQS, S3 | | Free tier | $0 |
-| **Total (1K farmers)** | | | **~$214/month** |
+| **Total (1K farmers)** | | | **~$53/month** |
 
-**Note**: OpenSearch Serverless is the dominant cost (~81% of total). It's always-on infrastructure, not pay-per-query. At 10,000 farmers, total is ~$574/month (~$0.70/farmer/year) as fixed costs amortize.
-
-**Vector Store Alternatives** (to eliminate $174/month OpenSearch cost):
-
-| Alternative | Monthly Cost | Latency | Notes |
-|-------------|--------------|---------|-------|
-| **Amazon S3 Vectors** | ~$5-10 (pay-per-query) | 100-800ms | AWS-native, 90% cheaper, new Dec 2025 |
-| **Aurora PostgreSQL + pgvector** | ~$30-50 | <100ms | Managed RDS, SQL + vectors |
-| **Pinecone Free Tier** | $0 | <100ms | 100K vectors free, external service |
-| **OpenSearch Managed Cluster** | ~$50-100 | <50ms | Cheaper than Serverless |
-
-**Recommended**: Switch to **Amazon S3 Vectors** for Bedrock Knowledge Base. Reduces total cost to ~$45-50/month for 1K farmers. Higher latency (100-800ms) is acceptable for chatbot use cases.
+**Historical Note**: Originally used OpenSearch Serverless (~$174/month fixed cost). Migrated to S3 vectors on April 4, 2026 for 75% cost reduction (~$214/month → ~$53/month). S3 vectors are pay-per-query with 100-800ms latency, acceptable for chatbot use cases.
 
 **Other Cost Optimization Strategies**:
 - Implement response caching for common queries (reduce Bedrock calls)
@@ -759,7 +765,9 @@ jobs:
 
 ### 8.2 Scaling Projections (10,000 farmers - Post-MVP)
 
-**Estimated Monthly Cost**: ~$574 with OpenSearch Serverless (~$174 fixed + ~$400 variable), or ~$450 with S3 Vectors
+**Estimated Monthly Cost**: ~$450 with S3 Vectors (~$13 vectors + ~$437 variable)
+
+**Cost per Farmer per Year**: ~$0.54 (10K farmers) vs ~$0.64 (1K farmers) - minimal economies of scale with pay-per-query model
 
 **Bottlenecks**:
 - DynamoDB read/write capacity
@@ -779,14 +787,14 @@ jobs:
 
 **Tasks**:
 - [ ] SAM setup with single-table DynamoDB (`agrinexus-data` with GSIs)
-- [ ] FAO PDF upload and Bedrock KB index
+- [ ] FAO PDF upload and Bedrock KB index with S3 vectors
 - [ ] Configure Bedrock Guardrails (banned pesticides, KVK escalation)
 - [ ] Test Bedrock responses in Hindi, Marathi, Telugu from English source docs
 - [ ] Implement 20 golden questions for RAG quality testing
 
 **Acceptance**:
 - Table created, PutItem/Query works
-- S3 `en/` contains manuals; KB passes 20 golden questions
+- S3 `en/` contains manuals; KB with S3 vectors passes 20 golden questions
 - Bot refuses request for "Paraquat" and medical advice
 - Coherent responses in all three dialects
 
@@ -834,11 +842,14 @@ jobs:
 - [ ] Performance testing (p95 latency with 10 concurrent users)
 - [ ] End-to-End Demo Video (Latur Farmer scenario)
 - [ ] Article publication on AWS Builder Center (#aideas-2025, #EMEA tags)
-- [ ] Cost audit: verify actual spend vs. $214/month estimate (OpenSearch ~$174 + variable ~$40)
+- [ ] Cost audit: verify actual spend vs. $53/month estimate (S3 vectors ~$1.30 + Bedrock ~$39 + other ~$13)
 
 **Acceptance**:
 - Dashboard shows Completion Rate metric, DLQ depth, latency
-- "Latur Farmer" scenario recorded without manual intervention
+- Latur demo scenario works end-to-end
+- All tests pass with required thresholds
+- Article submitted before March 13 deadline
+- Actual cost ≤ $60/monthtur Farmer" scenario recorded without manual intervention
 - All tests pass with required thresholds
 - Article submitted before March 13 deadline
 - Actual cost ≤ $60/month
