@@ -14,7 +14,7 @@
 - **AI**: Amazon Bedrock (Claude 3 Sonnet + RAG), Transcribe, Polly, Claude Vision
 - **Messaging**: WhatsApp Business API
 - **Storage**: DynamoDB single-table design, S3 for knowledge base vectors + temp audio
-- **Cost**: ~$50/month for 1,000 farmers (all pay-per-use). See [Cost breakdown](#cost-breakdown)
+- **Cost**: ~$53/month for 1,000 farmers (all pay-per-use). See [Cost breakdown](#cost-breakdown)
 
 **Diagrams:** See [architecture/diagrams.md](architecture/diagrams.md) for Mermaid diagrams (high-level, webhook, text/voice/image flows, nudge flow). Full design: [architecture.md](architecture.md).
 
@@ -272,24 +272,25 @@ Weather Poller → Step Functions → Nudge Sender → WhatsApp
 ### Variable Costs (~3K queries + 500 voice min/month for 1K farmers)
 | Service | Usage (1K users) | Monthly Cost |
 |---------|------------------|--------------|
-| Bedrock (Claude 3 Sonnet RAG + Vision) | 3K queries, 100 images | ~$25 |
+| Bedrock Claude 3 Sonnet (RAG) | 3K queries (3M input + 1.5M output tokens) | ~$32 |
+| Bedrock Claude Vision | 100 images | ~$5 |
 | Transcribe | 500 voice minutes | ~$12 |
-| Polly (neural TTS) | Voice responses | ~$1 |
-| S3 Vectors (Knowledge Base) | Storage + queries | ~$1 |
-| DynamoDB (on-demand) | 1M reads, 500K writes | ~$1 |
-| EventBridge Scheduler | 1K schedules | ~$1 |
+| Polly (neural TTS) | 200 min voice output | ~$2 |
+| S3 Vectors (Knowledge Base) | Storage + 3K queries | ~$1.30 |
+| DynamoDB (on-demand) | 1M reads, 500K writes | ~$0.90 |
+| EventBridge Scheduler | 1K schedules | ~$0.01 |
 | Lambda, API Gateway, SQS, S3, Step Functions | | $0 (free tier) |
-| **Total** | | **~$41/month** |
+| **Total** | | **~$53/month** |
 
 ### Cost per Farmer
-- **1,000 farmers**: ~$0.041/farmer/month (~$0.49/farmer/year)
-- **10,000 farmers**: ~$0.057/farmer/month (~$0.68/farmer/year)
+- **1,000 farmers**: ~$0.053/farmer/month (~$0.64/farmer/year)
+- **10,000 farmers**: ~$0.058/farmer/month (~$0.70/farmer/year)
 
 **100x cheaper than commercial agricultural advisory services** ($5-10/farmer/month)
 
 ### Historical Context
 - **Before April 4, 2026**: Used OpenSearch Serverless with $174/month fixed cost (total ~$214/month)
-- **After April 4, 2026**: Migrated to S3 vectors, 99% cost reduction, all pay-per-use
+- **After April 4, 2026**: Migrated to S3 vectors, 75% cost reduction, all pay-per-use
 
 ## Known Limitations
 
