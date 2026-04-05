@@ -380,7 +380,7 @@ The dashboard includes a completion rate widget based on these metrics.
 
 ## Real Weather API (Optional)
 
-Production uses **OpenWeatherMap** when `MOCK_WEATHER` is false and `WEATHER_API_KEY` is set (see `template-week2.yaml` and `sam deploy ... WeatherApiKey=`). Set `MOCK_WEATHER=true` on the Weather poller only for deterministic demo weather.
+Production uses **OpenWeatherMap** when `MOCK_WEATHER` is false and the API key is available from **Secrets Manager** (`WEATHER_API_KEY_SECRET` on the Weather Lambda, e.g. `agrinexus/weather/api-key`). Store the key in Secrets Manager—do not put it in `samconfig` or git. Set `MOCK_WEATHER=true` on the Weather poller only for deterministic demo weather. See `WEATHER-API-SETUP.md`.
 
 ## Requirements Methodology: EARS
 

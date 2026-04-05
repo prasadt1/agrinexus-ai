@@ -16,20 +16,18 @@ Write a new finalist article by **April 17, 11:59 PM PT** (13 days)
 - Excellent documentation with diagrams
 - Massive impact potential (100M+ farmers)
 
-## ⚠️ Critical Issue: RAG Pipeline Broken
+## ✅ RAG pipeline (April 2026)
 
-**Problem**: OpenSearch deleted (was $174/month), RAG queries will fail
+**Current path:** Bedrock Knowledge Base backed by **S3 Vectors** (migrated from legacy OpenSearch). Real `retrieve_and_generate` RAG is **working** when ingestion is `COMPLETE` and `KnowledgeBaseId` in `samconfig-week2.toml` matches Bedrock.
 
-**Solution**: Rebuild with S3 Vectors ($17/month, 90% savings)
-
-**Time**: 3 hours total (1.5 hours active + 1 hour ingestion)
+**If RAG fails in a new account:** Rebuild KB + ingestion per **`REBUILD-KB-WITH-S3-VECTORS.md`** (do not recreate OpenSearch Serverless for cost reasons).
 
 ## 📋 Your 13-Day Plan
 
-### Days 1-2 (April 4-5): Fix RAG
-- [ ] Follow `REBUILD-KB-WITH-S3-VECTORS.md`
-- [ ] Test RAG via WhatsApp
-- [ ] Verify real AI responses working
+### Days 1-2 (April 4-5): Verify RAG (if not already done)
+- [ ] Confirm Bedrock KB ingestion **COMPLETE** and KB ID matches deploy
+- [ ] Test RAG via WhatsApp or `pytest tests/test_golden_questions.py`
+- [ ] Only if needed: follow `REBUILD-KB-WITH-S3-VECTORS.md` in a fresh account
 
 ### Days 3-4 (April 6-7): Demo Video
 - [ ] Record < 3 min demo showing:
@@ -73,10 +71,9 @@ Write a new finalist article by **April 17, 11:59 PM PT** (13 days)
 
 ## 💰 Cost Story for Article
 
-**Before**: $174/month OpenSearch (fixed cost)  
-**After**: $17/month S3 Vectors (pay-per-use)  
-**Savings**: 90%  
-**Result**: $0.54/farmer/year at 10K scale
+**Legacy**: ~$174/month OpenSearch Serverless (fixed) → **~$214/month** all-in at small scale.  
+**Current**: **S3 Vectors + Bedrock** — order of **~$53/month** for ~1K farmers per `README.md` (vector store ~$1.30 + Bedrock usage).  
+**Narrative**: fixed vector infra → pay-per-use S3 Vectors; cite **`architecture.md`** for numbers you publish.
 
 ## 🎯 Article Key Messages
 

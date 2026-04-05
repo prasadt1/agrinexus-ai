@@ -116,13 +116,9 @@ aws secretsmanager create-secret \
 
 ## 6.6 Weather API Key (Optional)
 
-For real spray-condition checks, create an OpenWeatherMap API key and pass it at deploy time:
+For real spray-condition checks, create an OpenWeatherMap key and store it in **Secrets Manager** as `agrinexus/weather/api-key` (see `WEATHER-API-SETUP.md` and `scripts/rotate-weather-api-key.sh`). The Weather Lambda uses `WEATHER_API_KEY_SECRET`—**do not** pass the key via `sam deploy` parameters or commit it to git.
 
-```bash
-sam deploy --config-file samconfig-week2.toml --parameter-overrides WeatherApiKey=YOUR_OPENWEATHER_API_KEY
-```
-
-Ensure `MOCK_WEATHER` is false on the Weather poller for production (default in `template-week2.yaml`).
+Ensure `MOCK_WEATHER` is false on the Weather poller for production when you want live weather.
 
 ## Troubleshooting
 

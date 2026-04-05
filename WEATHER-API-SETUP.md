@@ -26,24 +26,23 @@ AgriNexus uses real-time weather data from OpenWeatherMap to trigger timely farm
 
 ## Configure AgriNexus
 
-### Option 1: During Deployment
-```bash
-sam deploy --parameter-overrides WeatherApiKey=YOUR_API_KEY
-```
+The Weather Lambda reads the key from **AWS Secrets Manager** (`get_weather_api_key()` in `src/weather/handler.py`). The template sets `WEATHER_API_KEY_SECRET` (e.g. `agrinexus/weather/api-key`)—**not** a plain `WEATHER_API_KEY` env var.
 
-### Option 2: Update Existing Stack
+### Option 1: Store or rotate the secret (recommended)
 ```bash
-aws lambda update-function-configuration \
-  --function-name agrinexus-weather-dev \
-  --environment "Variables={WEATHER_API_KEY=YOUR_API_KEY,MOCK_WEATHER=false}"
+aws secretsmanager put-secret-value \
+  --secret-id agrinexus/weather/api-key \
+  --secret-string "YOUR_OPENWEATHER_API_KEY" \
+  --region us-east-1
 ```
+If the secret did not exist yet, create it first (`create-secret`) or use `./scripts/rotate-weather-api-key.sh`.
 
-### Option 3: AWS Console
-1. Go to Lambda → `agrinexus-weather-dev`
-2. Configuration → Environment variables
-3. Edit → Add `WEATHER_API_KEY` = your key
-4. Set `MOCK_WEATHER` = `false`
-5. Save
+### Option 2: AWS Console
+1. **Secrets Manager** → secret `agrinexus/weather/api-key` → **Edit** → paste the OpenWeatherMap key.
+2. Lambda `agrinexus-weather-dev` → **Configuration** → ensure `WEATHER_API_KEY_SECRET` points at that secret and `MOCK_WEATHER` is `false` for real weather.
+
+### Option 3: Deterministic demos only
+Set `MOCK_WEATHER=true` on the Weather Lambda to skip live OpenWeatherMap (handler uses mock conditions).
 
 ## Testing
 
@@ -57,13 +56,13 @@ aws lambda invoke \
   response.json && cat response.json
 ```
 
-- With **`MOCK_WEATHER=false`** and a valid **`WEATHER_API_KEY`**, expect **`"mock_mode": false`** at the top level.
+- With **`MOCK_WEATHER=false`** and a valid secret (readable via `WEATHER_API_KEY_SECRET`), expect **`"mock_mode": false`** at the top level.
 - In **`details`**, each entry should include **`"mock": false`** when the API succeeded (wind/rain from OpenWeatherMap).
 - If the key is missing or the HTTP call fails, the handler logs the reason and falls back to mock data (`"mock": true` in per-location objects).
 
 ### End-to-end: “Ramesh” from Latur, Maharashtra
 
-1. **Deploy** with a real **`WeatherApiKey`** and **`MOCK_WEATHER=false`** on the weather Lambda.
+1. **Deploy** the stack (secret `agrinexus/weather/api-key` populated) and **`MOCK_WEATHER=false`** on the weather Lambda.
 2. **Onboard** a test user (your phone) in WhatsApp: choose language → pick **Latur** (or Jalna / Nagpur) from district **buttons**, or type `Latur` / `लातूर`. Complete crop + nudge consent so **`GSI1PK` = `LOCATION#Latur`** exists.
 3. **Invoke** the poller (command above). The Lambda queries GSI1 for each configured district including **Latur**; if at least one user exists for Latur, that district is checked against OpenWeatherMap at **lat 18.4088, lon 76.5604**.
 4. **CloudWatch** logs for `agrinexus-weather-dev`: look for `Checking weather for … locations`, **`Triggered nudge workflow for Latur`** when conditions are favorable (wind &lt; 10 km/h, no rain in the payload), or no trigger when weather is unfavorable (expected in real conditions).
