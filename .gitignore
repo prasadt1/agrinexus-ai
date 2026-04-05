@@ -87,6 +87,25 @@ design.md
 SETUP-CHECKLIST.md
 DEPLOYMENT-SUCCESS.md
 
+# Private / competition / finalist / internal status (keep local; do not push)
+AWS-CREDITS-AND-COSTS.md
+BEFORE-AFTER-COMPARISON.md
+COMPETITION-FINALIST-BRIEFING.md
+CURSOR-IMPLEMENTATION-SUMMARY.md
+DEPLOYMENT-STATUS.md
+FINALIST-IMPROVEMENTS.md
+IMPLEMENTATION-VERIFICATION.md
+NEXT-STEPS-QUICK-REFERENCE.md
+RAG-OPTIONS-FOR-COMPETITION.md
+READY-FOR-TESTING.md
+TEST-REPORT.md
+agrinexus-course.html
+docs/DEMO-RECORDING.md
+docs/FINALIST-ARTICLE.md
+docs/FINALIST*.md
+docs/WHATSAPP-PRODUCTION-NUMBER-CUTOVER.md
+docs/KIRO-DEPLOY-AND-TEST.md
+
 # Docs images (competition/blog assets - keep local)
 docs/*.png
 docs/*.jpg
