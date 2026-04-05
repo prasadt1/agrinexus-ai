@@ -69,9 +69,12 @@ def test_has_pending_nudge_detects_sent_and_reminded(monkeypatch):
     assert sender.has_pending_nudge("+919876543210", "spray") is True
 
 
-def test_template_language_code_selection(monkeypatch):
+def test_nudge_sends_context_aware_message_and_template_fallback(monkeypatch):
+    """Personalized buttons first; template only if buttons fail (USE_NUDGE_TEMPLATE)."""
     os.environ["NUDGE_TEMPLATE_NAME"] = "weather_nudge_spray"
     os.environ["USE_NUDGE_TEMPLATE"] = "true"
+    os.environ.setdefault("REMINDER_LAMBDA_ARN", "arn:aws:lambda:us-east-1:123:function:reminder")
+    os.environ.setdefault("SCHEDULER_ROLE_ARN", "arn:aws:iam::123:role/scheduler")
     sender.NUDGE_TEMPLATE_NAME = "weather_nudge_spray"
     sender.USE_NUDGE_TEMPLATE = True
 
@@ -81,25 +84,47 @@ def test_template_language_code_selection(monkeypatch):
             {"phone_number": "+911", "dialect": "mr"}
         ]
     }
+    fake_table.get_item_response = {
+        "Item": {
+            "crop": "Wheat",
+            "location": "Latur",
+            "dialect": "mr",
+        }
+    }
     monkeypatch.setattr(sender, "table", fake_table)
     monkeypatch.setattr(sender, "has_pending_nudge", lambda *args, **kwargs: False)
 
-    captured = {}
+    captured_buttons = {}
+    captured_template = {}
 
-    def fake_template(phone_number, template_name, language_code):
-        captured["phone_number"] = phone_number
-        captured["template_name"] = template_name
-        captured["language_code"] = language_code
+    def fake_buttons(phone_number, message, buttons):
+        captured_buttons["message"] = message
+        captured_buttons["phone"] = phone_number
         return True
 
+    def fake_template(phone_number, template_name, language_code):
+        captured_template["template_name"] = template_name
+        captured_template["language_code"] = language_code
+        return True
+
+    monkeypatch.setattr(sender, "send_whatsapp_buttons", fake_buttons)
     monkeypatch.setattr(sender, "send_whatsapp_template", fake_template)
     monkeypatch.setattr(sender, "send_whatsapp_message", lambda *args, **kwargs: None)
     monkeypatch.setattr(sender, "create_reminder_schedule", lambda *args, **kwargs: None)
+    monkeypatch.setattr(sender, "create_expiry_schedule", lambda *args, **kwargs: None)
 
     sender.lambda_handler({"location": "Latur", "weather": {"wind_speed": 8.5}, "activity": "spray"}, None)
 
-    assert captured["template_name"] == "weather_nudge_spray"
-    assert captured["language_code"] == "mr"
+    assert "लातूर" in captured_buttons["message"] or "Latur" in captured_buttons["message"]
+    assert "गहू" in captured_buttons["message"] or "फवारणी" in captured_buttons["message"]
+    assert not captured_template  # buttons succeeded — no generic template
+
+    # Fallback path: buttons fail → template
+    captured_template.clear()
+    monkeypatch.setattr(sender, "send_whatsapp_buttons", lambda *a, **k: False)
+    sender.lambda_handler({"location": "Latur", "weather": {"wind_speed": 8.5}, "activity": "spray"}, None)
+    assert captured_template.get("template_name") == "weather_nudge_spray"
+    assert captured_template.get("language_code") == "mr"
 
 
 def test_reminder_sender_updates_status(monkeypatch):

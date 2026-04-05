@@ -4,11 +4,18 @@ Sends behavioral nudges and schedules reminders
 """
 import json
 import os
+import sys
 import boto3
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, Any
 from common.whatsapp import send_whatsapp_message, send_whatsapp_template, send_whatsapp_buttons
+
+# Lambda uses Handler sender.lambda_handler (flat zip); tests use src.nudge.sender
+_nudge_dir = os.path.dirname(os.path.abspath(__file__))
+if _nudge_dir not in sys.path:
+    sys.path.insert(0, _nudge_dir)
+from nudge_copy import build_nudge_message
 
 dynamodb = boto3.resource('dynamodb')
 scheduler = boto3.client('scheduler')
@@ -25,21 +32,6 @@ NUDGE_BUTTONS = {
     'mr': [{"id": "done", "title": "झाला"}, {"id": "not_yet", "title": "नाही झाला"}],
     'te': [{"id": "done", "title": "అయ్యింది"}, {"id": "not_yet", "title": "ఇంకా లేదు"}],
     'en': [{"id": "done", "title": "Done"}, {"id": "not_yet", "title": "Not Yet"}],
-}
-
-# Crop name and spray type per crop per dialect: (crop_name, spray_type)
-CROP_INFO = {
-    'Cotton':  {'hi': ('कपास', 'कीटनाशक'),    'mr': ('कापूस', 'कीटकनाशक'),    'te': ('పత్తి', 'పురుగుమందు'),       'en': ('cotton', 'pesticide')},
-    'Wheat':   {'hi': ('गेहूं', 'फफूंदनाशक'),  'mr': ('गहू', 'बुरशीनाशक'),      'te': ('గోధుమ', 'శిలీంధ్రనాశని'),    'en': ('wheat', 'fungicide')},
-    'Soybean': {'hi': ('सोयाबीन', 'कीटनाशक'), 'mr': ('सोयाबीन', 'कीटकनाशक'),  'te': ('సోయాబీన్', 'పురుగుమందు'),   'en': ('soybean', 'pesticide')},
-    'Maize':   {'hi': ('मक्का', 'कीटनाशक'),   'mr': ('मका', 'कीटकनाशक'),       'te': ('మొక్కజొన్న', 'పురుగుమందు'), 'en': ('maize', 'pesticide')},
-}
-
-NUDGE_TEMPLATES = {
-    'hi': 'आज {crop} में {spray_type} स्प्रे करने के लिए अच्छा मौसम है। हवा {wind_speed} km/h है और बारिश नहीं होगी। क्या आपने स्प्रे कर दिया?',
-    'mr': 'आज {crop} साठी {spray_type} फवारणीसाठी चांगले हवामान आहे। वारा {wind_speed} km/h आहे आणि पाऊस नाही। तुम्ही फवारणी केली का?',
-    'te': 'ఈరోజు {crop}లో {spray_type} స్ప్రే చేయడానికి మంచి వాతావరణం. గాలి {wind_speed} km/h మరియు వర్షం ఉండదు. మీరు స్ప్రే చేశారా?',
-    'en': 'Good weather today for {spray_type} spray on your {crop}. Wind is {wind_speed} km/h and no rain expected. Have you sprayed?',
 }
 
 
@@ -182,17 +174,13 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             nudges_skipped += 1
             continue
         
-        # Fetch crop from farmer profile
+        # Fetch crop + district from farmer profile
         profile = table.get_item(Key={'PK': f'USER#{phone_number}', 'SK': 'PROFILE'}).get('Item') or {}
         crop = profile.get('crop', 'Cotton')
+        district_key = profile.get('location') or location
 
-        # Get localized crop name and spray type
-        crop_data = CROP_INFO.get(crop, CROP_INFO['Cotton'])
-        crop_name, spray_type = crop_data.get(dialect, crop_data['hi'])
-
-        # Generate crop-specific nudge message
-        template = NUDGE_TEMPLATES.get(dialect, NUDGE_TEMPLATES['hi'])
-        message = template.format(wind_speed=wind_speed, crop=crop_name, spray_type=spray_type)
+        # Context-aware message (district, crop, spray type, wind, extension-style hint)
+        message = build_nudge_message(dialect, district_key, crop, wind_speed)
 
         # Create nudge record in DynamoDB
         timestamp = datetime.utcnow().isoformat()
@@ -208,15 +196,19 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'status': 'SENT',
                 'activity': activity,
                 'crop': crop,
+                'district': district_key,
                 'weather': weather,
                 'message': message,
                 'ttl': ttl
             }
         )
         
-        # Send WhatsApp message (template if configured)
+        # Personalized interactive message first (shows crop/district/hints).
+        # WhatsApp template is generic — use only as fallback if buttons fail.
         sent = False
-        if USE_NUDGE_TEMPLATE and NUDGE_TEMPLATE_NAME:
+        buttons = NUDGE_BUTTONS.get(dialect, NUDGE_BUTTONS['hi'])
+        sent = send_whatsapp_buttons(phone_number, message, buttons)
+        if not sent and USE_NUDGE_TEMPLATE and NUDGE_TEMPLATE_NAME:
             language_code = {
                 'hi': 'hi',
                 'mr': 'mr',
@@ -224,9 +216,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'en': 'en'
             }.get(dialect, 'hi')
             sent = send_whatsapp_template(phone_number, NUDGE_TEMPLATE_NAME, language_code)
-        if not sent:
-            buttons = NUDGE_BUTTONS.get(dialect, NUDGE_BUTTONS['hi'])
-            sent = send_whatsapp_buttons(phone_number, message, buttons)
         if not sent:
             send_whatsapp_message(phone_number, message)
 

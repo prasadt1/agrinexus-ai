@@ -4,46 +4,26 @@ Sends T+24h and T+48h reminders if task not completed
 """
 import json
 import os
+import sys
 import boto3
 from typing import Dict, Any
 from common.whatsapp import send_whatsapp_message, send_whatsapp_buttons
+
+_nudge_dir = os.path.dirname(os.path.abspath(__file__))
+if _nudge_dir not in sys.path:
+    sys.path.insert(0, _nudge_dir)
+from nudge_copy import build_reminder_message
 
 dynamodb = boto3.resource('dynamodb')
 
 TABLE_NAME = os.environ['TABLE_NAME']
 table = dynamodb.Table(TABLE_NAME)
 
-CROP_INFO = {
-    'Cotton':  {'hi': ('कपास', 'कीटनाशक'),    'mr': ('कापूस', 'कीटकनाशक'),    'te': ('పత్తి', 'పురుగుమందు'),       'en': ('cotton', 'pesticide')},
-    'Wheat':   {'hi': ('गेहूं', 'फफूंदनाशक'),  'mr': ('गहू', 'बुरशीनाशक'),      'te': ('గోధుమ', 'శిలీంధ్రనాశని'),    'en': ('wheat', 'fungicide')},
-    'Soybean': {'hi': ('सोयाबीन', 'कीटनाशक'), 'mr': ('सोयाबीन', 'कीटकनाशक'),  'te': ('సోయాబీన్', 'పురుగుమందు'),   'en': ('soybean', 'pesticide')},
-    'Maize':   {'hi': ('मक्का', 'कीटनाशक'),   'mr': ('मका', 'कीटकनाशक'),       'te': ('మొక్కజొన్న', 'పురుగుమందు'), 'en': ('maize', 'pesticide')},
-}
-
 REMINDER_BUTTONS = {
     'hi': [{"id": "done", "title": "हो गया"}, {"id": "not_yet", "title": "अभी नहीं"}],
     'mr': [{"id": "done", "title": "झाला"}, {"id": "not_yet", "title": "नाही झाला"}],
     'te': [{"id": "done", "title": "అయ్యింది"}, {"id": "not_yet", "title": "ఇంకా లేదు"}],
     'en': [{"id": "done", "title": "Done"}, {"id": "not_yet", "title": "Not Yet"}],
-}
-
-REMINDER_TEMPLATES = {
-    'hi': {
-        'T+24h': 'याद दिलाना: कल हमने {crop} में {spray_type} स्प्रे के लिए कहा था। क्या आपने कर लिया?',
-        'T+48h': 'अंतिम याद दिलाना: {crop} में {spray_type} स्प्रे अभी बाकी है। कृपया जल्द करें।'
-    },
-    'mr': {
-        'T+24h': 'आठवण: काल आम्ही {crop} साठी {spray_type} फवारणी करण्यास सांगितले होते। तुम्ही केले का?',
-        'T+48h': 'शेवटची आठवण: {crop} साठी {spray_type} फवारणी अजून बाकी आहे. कृपया लवकर करा.'
-    },
-    'te': {
-        'T+24h': 'గుర్తు: నిన్న {crop}లో {spray_type} స్ప్రే చేయమని చెప్పాము. మీరు చేశారా?',
-        'T+48h': 'చివరి గుర్తు: {crop}లో {spray_type} స్ప్రే ఇంకా మిగిలి ఉంది. దయచేసి త్వరగా చేయండి.'
-    },
-    'en': {
-        'T+24h': 'Reminder: Yesterday we suggested {spray_type} spray for your {crop}. Have you done it?',
-        'T+48h': 'Final reminder: {spray_type} spray for your {crop} is still pending. Please do it soon.'
-    }
 }
 
 
@@ -85,7 +65,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             print(f"Auto-expired nudge {nudge_id} (no response after T+48h)")
         return {'statusCode': 200, 'message': 'Nudge expired'}
     
-    # Get user profile to determine dialect
+    # Get user profile to determine dialect + district
     try:
         profile_response = table.get_item(
             Key={
@@ -93,18 +73,19 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'SK': 'PROFILE'
             }
         )
-        dialect = profile_response.get('Item', {}).get('dialect', 'hi')
-    except:
-        dialect = 'hi'  # Default to Hindi if profile not found
+        profile = profile_response.get('Item') or {}
+        dialect = profile.get('dialect', 'hi')
+        district_key = profile.get('location') or ''
+    except Exception:
+        dialect = 'hi'
+        district_key = ''
     
     crop = nudge.get('crop', 'Cotton')
-    crop_data = CROP_INFO.get(crop, CROP_INFO['Cotton'])
-    crop_name, spray_type = crop_data.get(dialect, crop_data['hi'])
+    district_key = nudge.get('district') or district_key
 
     # Only send reminder if not completed
     if status != 'DONE':
-        template = REMINDER_TEMPLATES.get(dialect, REMINDER_TEMPLATES['hi'])
-        message = template.get(reminder_type, template['T+24h']).format(crop=crop_name, spray_type=spray_type)
+        message = build_reminder_message(dialect, reminder_type, district_key, crop)
         
         # Send WhatsApp message with DONE/NOT YET buttons
         buttons = REMINDER_BUTTONS.get(dialect, REMINDER_BUTTONS['hi'])
