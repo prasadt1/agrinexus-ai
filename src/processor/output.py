@@ -12,6 +12,38 @@ s3 = boto3.client('s3', region_name='us-east-1')
 # Set by SAM at deploy; for local runs set TEMP_AUDIO_BUCKET (no default to avoid leaking account IDs)
 TEMP_BUCKET = os.environ.get('TEMP_AUDIO_BUCKET', '')
 
+# Polly TTS length cap (~45–90s typical for hi-IN; tune via env for shorter voice notes)
+VOICE_TTS_MAX_CHARS = int(os.environ.get('VOICE_TTS_MAX_CHARS', '700'))
+
+
+def truncate_for_voice(text: str, max_chars: Optional[int] = None) -> str:
+    """
+    Shorten text for TTS while preferring sentence boundaries.
+    Full reply text should still be sent separately in chat when truncated.
+    """
+    if max_chars is None:
+        max_chars = VOICE_TTS_MAX_CHARS
+    text = (text or '').strip()
+    if len(text) <= max_chars:
+        return text
+    cut = text[:max_chars]
+    for sep in ('।\n', '.\n', '?\n', '!\n', '। ', '. ', '? ', '! ', '।', '\n'):
+        idx = cut.rfind(sep)
+        if idx >= max_chars // 2:
+            return cut[: idx + len(sep)].strip()
+    return cut.rstrip() + '…'
+
+
+def voice_truncation_prefix(dialect: str) -> str:
+    """Spoken intro when TTS is shorter than the full text reply."""
+    prefixes = {
+        'hi': 'पूरा जवाब ऊपर टेक्स्ट में है। संक्षेप में: ',
+        'mr': 'पूर्ण उत्तर वर टेक्स्टमध्ये आहे. संक्षेपात: ',
+        'te': 'పూర్తి సమాధానం పైన టెక్స్ట్‌లో ఉంది. సంక్షిప్తంగా: ',
+        'en': 'The full answer is in the text message above. In brief: ',
+    }
+    return prefixes.get(dialect, prefixes['en'])
+
 
 def get_polly_voice(dialect: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """
@@ -54,8 +86,12 @@ def text_to_speech(text: str, dialect: str, phone_number: str) -> Optional[str]:
             print(f"Voice output not supported for dialect: {dialect}")
             return None
         
+        # Polly limit is 3000 chars for standard API
+        if len(text) > 2900:
+            text = text[:2900] + '…'
+
         print(f"Converting text to speech: dialect={dialect}, voice={voice_id}, lang={language_code}, engine={engine}")
-        print(f"Text preview: {text[:100]}...")
+        print(f"Text preview: {text[:100]}... ({len(text)} chars)")
         
         # Synthesize speech with appropriate engine
         response = polly.synthesize_speech(

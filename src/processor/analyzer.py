@@ -18,6 +18,9 @@ TEMP_BUCKET = os.environ.get('TEMP_AUDIO_BUCKET')
 if not TEMP_BUCKET:
     raise RuntimeError('TEMP_AUDIO_BUCKET is required but not set')
 
+# WhatsApp images are typically small; cap to avoid abuse / Lambda memory spikes
+IMAGE_MAX_BYTES = int(os.environ.get('IMAGE_MAX_BYTES', str(5 * 1024 * 1024)))
+
 
 def download_whatsapp_image(media_id: str) -> bytes:
     """Download image from WhatsApp"""
@@ -41,7 +44,12 @@ def download_whatsapp_image(media_id: str) -> bytes:
         return response.read()
 
 
-def analyze_crop_image(image_bytes: bytes, dialect: str, crop: str = 'cotton') -> Dict[str, Any]:
+def analyze_crop_image(
+    image_bytes: bytes,
+    dialect: str,
+    crop: str = 'cotton',
+    caption: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     Analyze crop image for pests, diseases, or nutrient deficiencies
     
@@ -49,6 +57,7 @@ def analyze_crop_image(image_bytes: bytes, dialect: str, crop: str = 'cotton') -
         image_bytes: Image data
         dialect: User's dialect (hi, mr, te, en)
         crop: Crop type (default: cotton)
+        caption: Optional WhatsApp image caption (farmer's question)
     
     Returns:
         {
@@ -79,24 +88,31 @@ def analyze_crop_image(image_bytes: bytes, dialect: str, crop: str = 'cotton') -
     }
     language = language_map.get(dialect, 'English')
     
-    # Build prompt
-    prompt = f"""You are an agricultural extension agent helping Indian farmers identify crop problems.
+    caption_block = ""
+    if caption and str(caption).strip():
+        caption_block = (
+            "\nThe farmer added this caption with the photo (treat as their question):\n"
+            f"{repr(str(caption).strip())}\n"
+        )
 
-Analyze this {crop} plant image and provide:
+    # Build prompt — ground in visible evidence; avoid invented Hindi terms
+    prompt = f"""You are a careful agricultural assistant for Indian farmers. You only see this image — do not invent facts.
 
-1. **Diagnosis**: What pest, disease, or nutrient deficiency do you see?
-2. **Severity**: Is it low, medium, or high severity?
-3. **Recommendations**: What should the farmer do immediately? Include:
-   - Specific pesticides/fungicides (with dosage)
-   - Cultural practices (pruning, irrigation, etc.)
-   - Timing (when to apply treatment)
-   - Prevention tips
+{caption_block}
+Crop context from the farmer's profile: **{crop}** (the photo may show leaves, stem, or field — identify what you actually see).
 
-IMPORTANT: Respond in {language}. Use simple, practical language that farmers can understand.
+RULES (must follow):
+1. **Visible evidence only**: Describe ONLY symptoms you can see (e.g. insect shape/color, clustering, chewing, holes, yellowing, mold). If you do NOT see holes, tears, or spots, do NOT claim them. If the leaf looks mostly intact, say so.
+2. **Hindi terminology**: If responding in Hindi, use **standard** terms farmers and extension use — e.g. small sap-sucking insects in dense groups on cereals are often **माहू** (aphids). Do NOT invent compound words or nonsense phrases. If unsure of the Hindi name, write a short plain description, then the English name in parentheses (e.g. "माहू (aphids)").
+3. **Uncertainty**: If identification is not certain, say clearly and set confidence to low or medium — do not fake certainty.
+4. **Treatment advice**: Give short, practical steps: scouting, cultural/IPM (water, avoid overcrowding, natural enemies), and tell the farmer to **confirm with local agriculture department / authorized dealer** for approved products in their state. Avoid long lists of chemical names and dosages unless you are highly confident they match the visible problem; never invent product rates.
+5. **Format** (use these section headings in {language}):
+   - Diagnosis (2–5 short sentences)
+   - Severity (one line: low / medium / high + why)
+   - Recommendations (numbered, at most 4 points, each brief)
+   - Confidence (one line: low / medium / high)
 
-If you cannot identify a specific problem, say so clearly and suggest general crop health practices.
-
-Format your response clearly with sections for Diagnosis, Severity, Recommendations, and Confidence level.
+Keep the entire answer concise (roughly under 350 words). Respond in {language}.
 """
     
     # Call Claude 3 Sonnet Vision
@@ -107,7 +123,7 @@ Format your response clearly with sections for Diagnosis, Severity, Recommendati
             modelId='anthropic.claude-3-sonnet-20240229-v1:0',
             body=json.dumps({
                 "anthropic_version": "bedrock-2023-05-31",
-                "max_tokens": 2000,
+                "max_tokens": 900,
                 "messages": [
                     {
                         "role": "user",
@@ -197,6 +213,7 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         image_id = message['image']['id']
         dialect = user_profile.get('dialect', 'hi')
         crop = user_profile.get('crop', 'cotton')
+        caption = message.get('image', {}).get('caption')
         
         print(f"Processing image message: image_id={image_id}, dialect={dialect}, crop={crop}")
         
@@ -204,6 +221,14 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         print("Downloading image from WhatsApp...")
         image_bytes = download_whatsapp_image(image_id)
         print(f"Downloaded {len(image_bytes)} bytes")
+        if len(image_bytes) > IMAGE_MAX_BYTES:
+            too_big = {
+                'hi': f'यह फ़ोटो बहुत बड़ी है ({len(image_bytes)//1024} KB)। कृपया छोटी या कम रिज़ॉल्यूशन वाली फोटो भेजें।',
+                'mr': 'ही फोटो खूप मोठी आहे. कृपया लहान किंवा कमी रिझोल्यूशन फोटो पाठवा.',
+                'te': 'ఈ ఫోటో చాలా పెద్దది. దయచేసి చిన్న లేదా తక్కువ రిజల్యూషన్ ఫోటో పంపండి.',
+                'en': 'This photo file is too large. Please send a smaller or lower-resolution image.',
+            }
+            return too_big.get(dialect, too_big['en'])
         
         # Optional: Save to S3 for record-keeping
         import time
@@ -220,7 +245,7 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         print(f"Saved to S3: s3://{TEMP_BUCKET}/{s3_key}")
         
         # Analyze image
-        result = analyze_crop_image(image_bytes, dialect, crop)
+        result = analyze_crop_image(image_bytes, dialect, crop, caption=caption)
         
         return result['recommendations']
         

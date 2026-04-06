@@ -211,6 +211,9 @@ Resources:
           TEMP_AUDIO_BUCKET: !Ref TempAudioBucket
           MODEL_ARN: arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0
           APPEND_DISTRICT_HELPLINE: "true"
+          # Shorter Polly audio; full reply always sent as text first (see output.truncate_for_voice)
+          VOICE_TTS_MAX_CHARS: "700"
+          IMAGE_MAX_BYTES: "5242880"
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TableName
@@ -262,6 +265,7 @@ Resources:
           QUEUE_URL: !Ref MessageQueue
           ACCESS_TOKEN_SECRET: agrinexus/whatsapp/access-token
           PHONE_NUMBER_ID_SECRET: agrinexus/whatsapp/phone-number-id
+          VOICE_INPUT_MAX_BYTES: "5242880"
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref TableName

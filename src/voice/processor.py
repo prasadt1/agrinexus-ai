@@ -17,6 +17,8 @@ sqs = boto3.client('sqs')
 TEMP_BUCKET = os.environ['TEMP_AUDIO_BUCKET']
 QUEUE_URL = os.environ['QUEUE_URL']
 TABLE_NAME = os.environ['TABLE_NAME']
+# WhatsApp voice notes are typically small; cap to avoid runaway Transcribe cost
+VOICE_INPUT_MAX_BYTES = int(os.environ.get('VOICE_INPUT_MAX_BYTES', str(5 * 1024 * 1024)))
 
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(TABLE_NAME)
@@ -111,6 +113,8 @@ def process_voice_note(message: Dict[str, Any], user_profile: Dict[str, Any]) ->
         audio_url = get_whatsapp_media_url(audio_id)
         audio_bytes = download_media(audio_url)
         print(f"Downloaded {len(audio_bytes)} bytes")
+        if len(audio_bytes) > VOICE_INPUT_MAX_BYTES:
+            return {'success': False, 'error': 'voice_too_large'}
         
         # 2. Upload to S3
         s3_key = f"voice/{phone}/{timestamp}.ogg"
@@ -236,6 +240,12 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'mr': 'माफ करा, आवाज खूप लांब आहे. कृपया लहान संदेश पाठवा किंवा टाइप करा.',
                     'te': 'క్షమించండి, వాయిస్ చాలా పొడవుగా ఉంది. దయచేసి చిన్న సందేశం పంపండి లేదా టైప్ చేయండి.',
                     'en': 'Sorry, the voice note is too long. Please send a shorter message or type.'
+                },
+                'voice_too_large': {
+                    'hi': 'माफ़ करें, आवाज़ फ़ाइल बहुत बड़ी है। कृपया छोटा वॉइस नोट भेजें या टाइप करें।',
+                    'mr': 'माफ करा, आवाज फाइल खूप मोठी आहे. कृपया लहान व्हॉइस नोट पाठवा किंवा टाइप करा.',
+                    'te': 'క్షమించండి, వాయిస్ ఫైల్ చాలా పెద్దది. దయచేసి చిన్న వాయిస్ నోట్ పంపండి లేదా టైప్ చేయండి.',
+                    'en': 'Sorry, this voice file is too large. Please send a shorter voice note or type your message.'
                 }
             }
             

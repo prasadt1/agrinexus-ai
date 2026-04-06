@@ -10,7 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 
 # Import voice output module
-from output import text_to_speech, should_send_voice_response
+from output import text_to_speech, truncate_for_voice, voice_truncation_prefix
 
 # Import vision module
 from analyzer import process_image_message
@@ -767,17 +767,20 @@ Just type your question or send a photo!'''
             
             # Check if user wants voice response (Hindi, Marathi, English supported)
             send_voice = (dialect in ['hi', 'mr', 'en'] and 
-                         (message.get('_source') == 'voice' or profile.get('voicePreference', False)))
+                         (message.get('_source') in ('voice', 'voice_test') or profile.get('voicePreference', False)))
             
             if send_voice:
-                # Generate voice output
-                audio_url = text_to_speech(reply_text, dialect, from_number)
+                # Full answer as text first (WhatsApp audio path ignores body text)
+                send_whatsapp_message(from_number, reply_text)
+                tts_text = truncate_for_voice(reply_text)
+                if len(tts_text) < len(reply_text.strip()):
+                    tts_text = voice_truncation_prefix(dialect) + tts_text
+                audio_url = text_to_speech(tts_text, dialect, from_number)
                 if audio_url:
-                    # Send voice message
-                    send_whatsapp_message(from_number, reply_text, audio_url=audio_url)
+                    send_whatsapp_message(from_number, '', audio_url=audio_url)
                 else:
-                    # Fallback to text if voice generation fails
-                    send_whatsapp_message(from_number, reply_text)
+                    # Already sent full text above
+                    pass
             else:
                 # Send text response
                 send_whatsapp_message(from_number, reply_text)
