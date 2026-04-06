@@ -87,6 +87,18 @@ design.md
 SETUP-CHECKLIST.md
 DEPLOYMENT-SUCCESS.md
 
+# ---------------------------------------------------------------------------
+# Personal / local-only — not for the public repo (your drafts, demos, notes)
+# Use: drop files here or name with *.local.* / *-private.*
+# ---------------------------------------------------------------------------
+response.json
+**/local/
+*.local.md
+*.local.yaml
+*.local.toml
+*-private.md
+docs/DEMO-NARRATION-SCRIPT.md
+
 # Private / competition / finalist / internal status (keep local; do not push)
 AWS-CREDITS-AND-COSTS.md
 BEFORE-AFTER-COMPARISON.md

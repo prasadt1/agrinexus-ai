@@ -767,9 +767,13 @@ jobs:
 
 ### 8.2 Scaling Projections (10,000 farmers - Post-MVP)
 
-**Estimated Monthly Cost**: approximately $450 with S3 Vectors (approximately $13 vectors + approximately $437 variable)
+**Estimated Monthly Cost**: approximately **$450** with S3 Vectors (approximately **$13** vectors + approximately **$437** variable), assuming **10×** the §8.1 usage (messages, images, voice, nudges) — **linear projection**, **not** measured billing at 10K users.
 
-**Cost per Farmer per Year**: approximately $0.54 (10K farmers) vs approximately $0.64 (1K farmers) - minimal economies of scale with pay-per-query model
+**Cost per Farmer per Year**: approximately **$0.54** (10K farmers) vs approximately **$0.64** (1K farmers). The **$0.54** value is **($450 × 12) ÷ 10,000** — it is **derived arithmetic** from the projected monthly total, **not** an independent benchmark. **Minimal economies of scale** with a pay-per-query model: variable services dominate, so per-farmer cost falls only modestly as headcount rises.
+
+**Clarification (modeled vs actual)**:
+- **§8.1 (~$53/mo @ 1K)** and **§8.2 (~$450/mo @ 10K)** are **spreadsheet / pricing-calculator estimates** using the stated assumptions. **Current** production traffic may be far lower — **use AWS Cost Explorer** for real spend.
+- The **10K** figure is **not validated** until the system runs at that load; treat as **directional** for roadmaps and pitch decks.
 
 **Bottlenecks**:
 - DynamoDB read/write capacity

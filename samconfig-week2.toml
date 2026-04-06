@@ -16,6 +16,7 @@ parameter_overrides = [
     "TableName=agrinexus-data",
     "TableStreamArn=arn:aws:dynamodb:us-east-1:043624892076:table/agrinexus-data/stream/2026-02-16T07:55:35.380",
     "KnowledgeBaseId=ARZ4XQEBCU",
+    # Guardrail disabled: Bedrock Guardrails add per-request cost at scale; re-enable with GuardrailId=\"YOUR_ID\" when budget allows.
     "GuardrailId=\"\"",
     "GuardrailVersion=1"
 ]
