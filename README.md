@@ -1,4 +1,4 @@
-![AgriNexus AI - Bridging the Last Mile: From trapped research to accessible WhatsApp-based agricultural advice for smallholder farmers](https://github.com/user-attachments/assets/6987a1de-2f7c-4d1e-8d96-d6c9c7619f94)
+![AgriNexus AI - Bridging the Last Mile: From trapped research to accessible WhatsApp-based agricultural advice for smallholder farmers](https://github.com/user-attachments/assets/8aa328e4-327b-4d73-aaed-338800a656a1)
 
 # AgriNexus AI – WhatsApp Agricultural Advisory
 
