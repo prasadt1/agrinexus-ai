@@ -1,6 +1,12 @@
 # Local demo config (contains WEBHOOK_URL, APP_SECRET, PHONE_NUMBER)
 scripts/demo.env
 
+# Personal / machine-specific scripts (keep out of the shared repo)
+# Option A: put them under scripts/local/ (entire tree ignored via **/local/ below)
+# Option B: suffix with .local.sh (flat or nested under scripts/)
+scripts/*.local.sh
+scripts/**/*.local.sh
+
 # SAM build artifacts (do not commit)
 .aws-sam/
 
@@ -90,6 +96,7 @@ DEPLOYMENT-SUCCESS.md
 # ---------------------------------------------------------------------------
 # Personal / local-only — not for the public repo (your drafts, demos, notes)
 # Use: drop files here or name with *.local.* / *-private.*
+# scripts/local/ — personal automation (demo shortcuts, WhatsApp profile helpers, etc.)
 # ---------------------------------------------------------------------------
 response.json
 **/local/
