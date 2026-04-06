@@ -9,13 +9,13 @@
 
 AgriNexus AI is a behavioral intervention engine and behavioral AI extension agent designed to close the "last mile" gap in agricultural extension for smallholder farmers. Unlike reactive information systems, AgriNexus utilizes a proactive, weather-timed behavioral nudge engine with closed-loop accountability to ensure agronomic advice translates into field action. The system prioritizes trust through dialect-native voice interactions (Hindi, Marathi, Telugu) and evidence-backed citations from validated FAO sources.
 
-The architecture is a serverless system with pay-as-you-go Bedrock. Estimated cost: ~$53/month for 1,000 farmers, with S3 vectors (~$1.30) and Bedrock (~$39 variable) as the primary cost drivers. The system leverages Amazon Bedrock (Claude 3 Sonnet) for dialect-aware conversations, S3 for vector storage (migrated from OpenSearch Serverless on April 4, 2026 for 75% cost reduction), EventBridge Scheduler for behavioral nudges, Claude 3 Vision for pest diagnosis, and Amazon Transcribe + Polly for voice accessibility.
+The architecture is a serverless system with pay-as-you-go Bedrock. Estimated cost: approximately $53/month for 1,000 farmers, with S3 vectors ($1.30) and Bedrock ($39 variable) as the primary cost drivers. The system leverages Amazon Bedrock (Claude 3 Sonnet) for dialect-aware conversations, S3 for vector storage (migrated from OpenSearch Serverless on April 4, 2026 for 75% cost reduction), EventBridge Scheduler for behavioral nudges, Claude 3 Vision for pest diagnosis, and Amazon Transcribe + Polly for voice accessibility.
 
 ## 2. Architecture Principles
 
 - **Serverless First**: Use Lambda, DynamoDB, and managed services to minimize operational overhead and costs
 - **Event-Driven**: Leverage EventBridge Scheduler and Step Functions for asynchronous workflows
-- **Cost-Conscious**: Serverless architecture with pay-as-you-go Bedrock (~$53/month for 1,000 farmers; ~$0.64/farmer/year)
+- **Cost-Conscious**: Serverless architecture with pay-as-you-go Bedrock (approximately $53/month for 1,000 farmers; $0.64/farmer/year)
 - **Scalable**: Design for 1,000 farmers in MVP with ability to scale to 10,000 post-MVP
 - **Secure by Default**: Implement encryption, least-privilege IAM, and input validation throughout
 - **Behavioral Closed Loop**: Track nudge → action → confirmation cycle with Nudge Completion Rate as primary metric
@@ -137,12 +137,12 @@ s3://agrinexus-knowledge-base/
 
 **Bedrock Configuration**:
 - Model: Claude 3 Sonnet (cost-effective, multilingual)
-- Knowledge Base: S3 for document storage + S3 vectors for embeddings (~$1.30/month, pay-per-query)
+- Knowledge Base: S3 for document storage + S3 vectors for embeddings (approximately $1.30/month, pay-per-query)
 - Guardrails: Block banned pesticides (Paraquat, Endosulfan), escalate medical/veterinary queries to KVK, include label disclaimers
 - Agent Instructions: "You are an agricultural extension agent. Provide practical, actionable advice grounded in FAO data. Handle code-switching (e.g., Hinglish - mixed Hindi/English) naturally. Respond in the farmer's preferred language (Hindi, Marathi, or Telugu). Include simplified source citations."
 - Language Support: Hindi (primary), Marathi, Telugu, and code-switched variants (Hinglish)
 
-**Historical Note**: Originally used OpenSearch Serverless (~$174/month fixed cost). Migrated to S3 vectors on April 4, 2026 for 75% cost reduction (~$214/month → ~$53/month).
+**Historical Note**: Originally used OpenSearch Serverless (approximately $174/month fixed cost). Migrated to S3 vectors on April 4, 2026 for 75% cost reduction (approximately $214/month → approximately $53/month).
 
 **AWS Services**:
 - Amazon Bedrock (Agent + Knowledge Base with S3 vectors)
@@ -745,20 +745,20 @@ jobs:
 | Lambda | 500,000 invocations | 1M free | $0 |
 | Lambda | 200,000 GB-sec | 400,000 free | $0 |
 | API Gateway | 300,000 requests | 1M free | $0 |
-| DynamoDB | On-demand | 25M RCU/WCU free | ~$0.90 |
+| DynamoDB | On-demand | 25M RCU/WCU free | approximately $0.90 |
 | S3 Storage | 5 GB | 5 GB free | $0 |
-| S3 Requests | 50,000 PUT | 2,000 free | ~$0.24 |
-| S3 Vectors | 300K queries | Pay-per-query | ~$1.30 |
-| Bedrock (Claude 3 Sonnet RAG) | 3M input + 1.5M output tokens | Pay-as-you-go | ~$32 |
-| Bedrock (Claude 3 Vision) | 100 images | Pay-as-you-go | ~$5 |
-| Transcribe | 500 voice minutes | $0.024/min | ~$12 |
-| Polly | 200 min output | $4/1M chars | ~$2 |
-| Step Functions | 10,000 transitions | 4,000 free | ~$0.15 |
-| EventBridge Scheduler | 8,000 schedules | Free | ~$0.01 |
+| S3 Requests | 50,000 PUT | 2,000 free | approximately $0.24 |
+| S3 Vectors | 300K queries | Pay-per-query | approximately $1.30 |
+| Bedrock (Claude 3 Sonnet RAG) | 3M input + 1.5M output tokens | Pay-as-you-go | approximately $32 |
+| Bedrock (Claude 3 Vision) | 100 images | Pay-as-you-go | approximately $5 |
+| Transcribe | 500 voice minutes | $0.024/min | approximately $12 |
+| Polly | 200 min output | $4/1M chars | approximately $2 |
+| Step Functions | 10,000 transitions | 4,000 free | approximately $0.15 |
+| EventBridge Scheduler | 8,000 schedules | Free | approximately $0.01 |
 | Lambda, API Gateway, SQS, S3 | | Free tier | $0 |
-| **Total (1K farmers)** | | | **~$53/month** |
+| **Total (1K farmers)** | | | **approximately $53/month** |
 
-**Historical Note**: Originally used OpenSearch Serverless (~$174/month fixed cost). Migrated to S3 vectors on April 4, 2026 for 75% cost reduction (~$214/month → ~$53/month). S3 vectors are pay-per-query with 100-800ms latency, acceptable for chatbot use cases.
+**Historical Note**: Originally used OpenSearch Serverless (approximately $174/month fixed cost). Migrated to S3 vectors on April 4, 2026 for 75% cost reduction (approximately $214/month → approximately $53/month). S3 vectors are pay-per-query with 100-800ms latency, acceptable for chatbot use cases.
 
 **Other Cost Optimization Strategies**:
 - Implement response caching for common queries (reduce Bedrock calls)
@@ -767,9 +767,9 @@ jobs:
 
 ### 8.2 Scaling Projections (10,000 farmers - Post-MVP)
 
-**Estimated Monthly Cost**: ~$450 with S3 Vectors (~$13 vectors + ~$437 variable)
+**Estimated Monthly Cost**: approximately $450 with S3 Vectors (approximately $13 vectors + approximately $437 variable)
 
-**Cost per Farmer per Year**: ~$0.54 (10K farmers) vs ~$0.64 (1K farmers) - minimal economies of scale with pay-per-query model
+**Cost per Farmer per Year**: approximately $0.54 (10K farmers) vs approximately $0.64 (1K farmers) - minimal economies of scale with pay-per-query model
 
 **Bottlenecks**:
 - DynamoDB read/write capacity
@@ -844,7 +844,7 @@ jobs:
 - [ ] Performance testing (p95 latency with 10 concurrent users)
 - [ ] End-to-End Demo Video (Latur Farmer scenario)
 - [ ] Article publication on AWS Builder Center (#aideas-2025, #EMEA tags)
-- [ ] Cost audit: verify actual spend vs. $53/month estimate (S3 vectors ~$1.30 + Bedrock ~$39 + other ~$13)
+- [ ] Cost audit: verify actual spend vs. $53/month estimate (S3 vectors approximately $1.30 + Bedrock approximately $39 + other approximately $13)
 
 **Acceptance**:
 - Dashboard shows Completion Rate metric, DLQ depth, latency
