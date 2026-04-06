@@ -175,8 +175,7 @@ Bot: बढ़िया! आपने स्प्रे कर दिया। 
 │   └── diagrams.md                 # Mermaid: flows, webhook, nudge
 ├── docs/
 │   ├── E2E-TEST-GUIDE.md           # End-to-end test guide
-│   ├── CODE-WALKTHROUGH.md         # Component walkthrough
-│   └── VOICE-LATENCY-PHASE2-PLAN.md  # Voice latency / streaming roadmap
+│   └── CODE-WALKTHROUGH.md         # Component walkthrough
 ├── scripts/
 │   ├── deploy-week2.sh            # Deployment script
 │   ├── e2e-test.sh                 # E2E automated test
@@ -323,7 +322,7 @@ The **$0.54** figure is **not** a separate measurement—it is **($450 × 12) ÷
 
 ## Known Limitations
 
-1. **Voice round-trip latency**: Typically **~30–40s** end-to-end (batch **Transcribe** ~15–30s + **Bedrock RAG** ~5–15s + **Polly** + WhatsApp media). The **voice-received** text line is sent from the **webhook** as soon as possible after dedup (often **~1–3s**; **cold start** on first request can add more). **Phase 2:** streaming STT / pipeline changes — see [docs/VOICE-LATENCY-PHASE2-PLAN.md](docs/VOICE-LATENCY-PHASE2-PLAN.md).
+1. **Voice round-trip latency**: Typically **~30–40s** end-to-end (batch **Transcribe** ~15–30s + **Bedrock RAG** ~5–15s + **Polly** + WhatsApp media). The **voice-received** text line is sent from the **webhook** as soon as possible after dedup (often **~1–3s**; **cold start** on first request can add more).
 2. **Telugu Voice Output**: No native Telugu voice in Polly. Text-only responses for Telugu users.
 3. **WhatsApp Test Numbers**: Don't support media (voice/images). Requires real WhatsApp Business number for end-to-end testing.
 4. **Weather Data**: Real OpenWeatherMap API integrated. Set MOCK_WEATHER=true for demo reliability.
@@ -434,7 +433,6 @@ This project was developed using **Kiro AI**, which enabled requirements-driven 
 - [architecture/diagrams.md](architecture/diagrams.md) — Mermaid flow diagrams
 - [docs/E2E-TEST-GUIDE.md](docs/E2E-TEST-GUIDE.md) — end-to-end test walkthrough
 - [docs/CODE-WALKTHROUGH.md](docs/CODE-WALKTHROUGH.md) — component-by-component guide
-- [docs/VOICE-LATENCY-PHASE2-PLAN.md](docs/VOICE-LATENCY-PHASE2-PLAN.md) — voice latency / Phase 2 options
 - [requirements.md](requirements.md) — EARS requirements specification
 - [ISSUES-LOG.md](ISSUES-LOG.md) — troubleshooting history (resolved issues)
 
