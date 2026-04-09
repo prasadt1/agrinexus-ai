@@ -266,6 +266,7 @@ Resources:
           ACCESS_TOKEN_SECRET: agrinexus/whatsapp/access-token
           PHONE_NUMBER_ID_SECRET: agrinexus/whatsapp/phone-number-id
           VOICE_INPUT_MAX_BYTES: "5242880"
+          TRANSCRIBE_MAX_POLL_SEC: "78"
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref TableName

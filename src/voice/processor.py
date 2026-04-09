@@ -19,6 +19,8 @@ QUEUE_URL = os.environ['QUEUE_URL']
 TABLE_NAME = os.environ['TABLE_NAME']
 # WhatsApp voice notes are typically small; cap to avoid runaway Transcribe cost
 VOICE_INPUT_MAX_BYTES = int(os.environ.get('VOICE_INPUT_MAX_BYTES', str(5 * 1024 * 1024)))
+# Max time to poll Transcribe (Lambda timeout is 90s; leave margin for download + queue)
+TRANSCRIBE_MAX_POLL_SEC = float(os.environ.get('TRANSCRIBE_MAX_POLL_SEC', '78'))
 
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(TABLE_NAME)
@@ -136,8 +138,9 @@ def process_voice_note(message: Dict[str, Any], user_profile: Dict[str, Any]) ->
             }
         )
 
-        # 4. Poll for result: immediate first check, then adaptive intervals (1s then 2s)
-        max_polls = 30
+        # 4. Poll until COMPLETED/FAILED or TRANSCRIBE_MAX_POLL_SEC (Transcribe can take 60s+ when busy)
+        poll_start = time.monotonic()
+        attempt = 0
         result = transcribe.get_transcription_job(TranscriptionJobName=job_name)
         status = result['TranscriptionJob']['TranscriptionJobStatus']
         print(f"Transcription status: {status} (elapsed: 0s, first poll)")
@@ -149,12 +152,19 @@ def process_voice_note(message: Dict[str, Any], user_profile: Dict[str, Any]) ->
             s3.delete_object(Bucket=TEMP_BUCKET, Key=s3_key)
             return {'success': False, 'error': 'transcription_failed'}
 
-        for attempt in range(1, max_polls):
+        while True:
+            elapsed = int(time.monotonic() - poll_start)
+            if elapsed >= TRANSCRIBE_MAX_POLL_SEC:
+                break
             wait_time = 1 if attempt < 10 else 2
-            time.sleep(wait_time)
+            remaining = TRANSCRIBE_MAX_POLL_SEC - elapsed
+            if remaining <= 0:
+                break
+            time.sleep(min(wait_time, remaining))
+            attempt += 1
             result = transcribe.get_transcription_job(TranscriptionJobName=job_name)
             status = result['TranscriptionJob']['TranscriptionJobStatus']
-            elapsed = attempt if attempt <= 10 else 10 + (attempt - 10) * 2
+            elapsed = int(time.monotonic() - poll_start)
             print(f"Transcription status: {status} (elapsed: {elapsed}s)")
 
             if status == 'COMPLETED':
@@ -164,15 +174,22 @@ def process_voice_note(message: Dict[str, Any], user_profile: Dict[str, Any]) ->
                 s3.delete_object(Bucket=TEMP_BUCKET, Key=s3_key)
                 return {'success': False, 'error': 'transcription_failed'}
 
-        # Timeout
-        print("Transcription timeout")
-        s3.delete_object(Bucket=TEMP_BUCKET, Key=s3_key)
-        transcribe.delete_transcription_job(TranscriptionJobName=job_name)
+        # Timeout — Transcribe still IN_PROGRESS; cleanup without failing on delete
+        print("Transcription timeout (poll budget exhausted)")
+        try:
+            s3.delete_object(Bucket=TEMP_BUCKET, Key=s3_key)
+        except Exception as ex:
+            print(f"S3 delete after timeout: {ex}")
+        try:
+            transcribe.delete_transcription_job(TranscriptionJobName=job_name)
+        except Exception as ex:
+            print(f"DeleteTranscriptionJob after timeout (ignored): {ex}")
         return {'success': False, 'error': 'timeout'}
     
     except Exception as e:
         print(f"Error processing voice note: {e}")
-        return {'success': False, 'error': str(e)}
+        # Avoid returning raw exception strings (breaks error_messages lookup in lambda_handler)
+        return {'success': False, 'error': 'transcription_failed'}
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -236,10 +253,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'en': 'Sorry, there was a problem understanding your voice. Please type your message.'
                 },
                 'timeout': {
-                    'hi': 'माफ़ करें, आवाज़ बहुत लंबी है। कृपया छोटा संदेश भेजें या टाइप करें।',
-                    'mr': 'माफ करा, आवाज खूप लांब आहे. कृपया लहान संदेश पाठवा किंवा टाइप करा.',
-                    'te': 'క్షమించండి, వాయిస్ చాలా పొడవుగా ఉంది. దయచేసి చిన్న సందేశం పంపండి లేదా టైప్ చేయండి.',
-                    'en': 'Sorry, the voice note is too long. Please send a shorter message or type.'
+                    'hi': 'माफ़ करें, आवाज़ को समझने में समय ज़्यादा लगा। कृपया छोटा वॉइस नोट भेजें या टाइप करें।',
+                    'mr': 'माफ करा, आवाज ओळखण्यास वेळ जास्त लागला. कृपया लहान व्हॉइस नोट पाठवा किंवा टाइप करा.',
+                    'te': 'క్షమించండి, వాయిస్ ప్రాసెస్ చేయడానికి సమయం ఎక్కువ పట్టింది. దయచేసి చిన్న నోట్ పంపండి లేదా టైప్ చేయండి.',
+                    'en': 'Sorry, voice processing took too long. Please send a shorter voice note or type your question.'
                 },
                 'voice_too_large': {
                     'hi': 'माफ़ करें, आवाज़ फ़ाइल बहुत बड़ी है। कृपया छोटा वॉइस नोट भेजें या टाइप करें।',
@@ -250,7 +267,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             }
             
             error_type = result.get('error', 'transcription_failed')
-            error_msg = error_messages.get(error_type, error_messages['transcription_failed'])
+            if error_type not in error_messages:
+                error_type = 'transcription_failed'
+            error_msg = error_messages[error_type]
             send_whatsapp_message(from_number, error_msg.get(dialect, error_msg['hi']))
     
     return {'statusCode': 200}
