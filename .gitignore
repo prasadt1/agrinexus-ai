@@ -7,6 +7,16 @@ scripts/demo.env
 scripts/*.local.sh
 scripts/**/*.local.sh
 
+# Local demo/test automation only — not for pushing (use scripts/local/ or copies here)
+scripts/clear-nudges.sh
+scripts/create-bedrock-guardrail.sh
+scripts/demo-nudge-flow.sh
+scripts/demo-nudge-loop.sh
+scripts/demo-nudge-multilang.sh
+scripts/demo-nudge.sh
+scripts/demo-scenario.sh
+scripts/reset-onboard-and-demo.sh
+
 # SAM build artifacts (do not commit)
 .aws-sam/
 
