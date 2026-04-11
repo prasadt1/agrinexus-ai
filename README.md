@@ -446,7 +446,27 @@ This project was developed using **Kiro AI**, which enabled requirements-driven 
 
 ## License
 
-MIT License - See LICENSE file for details
+Copyright (C) 2026 [Prasad Tilloo](https://prasadtilloo.com). All rights reserved.
+
+This source code is made publicly available for **portfolio, evaluation, and competition review purposes only**.
+
+**Permitted uses:**
+- Viewing and reviewing the source code
+- Running the software locally for personal, non-commercial evaluation
+- Forking for the purpose of submitting issues or pull requests
+
+**Not permitted** without explicit written permission:
+- Commercial use of any kind
+- Redistribution of the source code or compiled binaries
+- Building derivative products or services based on this codebase
+- White-labelling or rebranding this software
+- Deploying this software to serve end users in any commercial context
+
+The agricultural knowledge corpus, RAG pipeline configuration, prompt templates, and nudge logic are proprietary components of AgriNexus AI.
+
+**For licensing and partnership enquiries** → prasad@prasadtilloo.com
+
+See the [LICENSE](LICENSE) file for full details.
 
 ## Security
 

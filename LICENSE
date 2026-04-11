@@ -1,0 +1,30 @@
+Copyright (C) 2026 Prasad Tilloo. All rights reserved.
+
+AGRINEXUS AI — SOURCE AVAILABLE LICENSE
+
+This source code is made publicly available for portfolio, evaluation,
+and competition review purposes only.
+
+Permitted uses:
+- Viewing and reviewing the source code
+- Running the software locally for personal, non-commercial evaluation
+- Forking for the purpose of submitting issues or pull requests
+
+Not permitted without explicit written permission from the copyright holder:
+- Commercial use of any kind
+- Redistribution of the source code or compiled binaries
+- Building derivative products or services based on this codebase
+- White-labelling or rebranding this software
+- Deploying this software to serve end users in any commercial context
+
+The agricultural knowledge corpus, RAG pipeline configuration, prompt
+templates, and nudge logic are proprietary components of AgriNexus AI.
+
+For licensing, partnership, or commercial enquiries:
+Prasad Tilloo
+prasad@prasadtilloo.com
+https://prasadtilloo.com
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM USE OF THIS SOFTWARE.
