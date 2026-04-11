@@ -80,16 +80,21 @@ def detect_keyword(text: str, keywords: List[str]) -> bool:
 
 
 def get_active_nudges(phone_number: str) -> List[Dict[str, Any]]:
-    """Get active nudges for user"""
+    """Get active nudges for user, newest first (by NUDGE# sort key).
+
+    Default DynamoDB sort order is ascending, so the first item was the *oldest*
+    nudge — wrong for lastReminder (T+48h) checks when multiple rows exist.
+    """
     response = table.query(
         KeyConditionExpression='PK = :pk AND begins_with(SK, :sk)',
         ExpressionAttributeValues={
             ':pk': f'USER#{phone_number}',
             ':sk': 'NUDGE#'
-        }
+        },
+        ScanIndexForward=False,
     )
-    
-    # Filter for SENT or REMINDED status (but not EXPIRED)
+
+    # Filter for SENT or REMINDED status (but not EXPIRED); order = newest first
     return [
         item for item in response.get('Items', [])
         if item.get('status') in ['SENT', 'REMINDED']
@@ -210,9 +215,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             # Check if this is after the final (T+48h) reminder
             is_final_reminder = False
             if active_nudges:
+                # [0] = newest active nudge (ScanIndexForward=False + filter preserves order)
                 latest_nudge = active_nudges[0]
                 last_reminder = latest_nudge.get('lastReminder')
-                print(f"Last reminder sent: {last_reminder}")
+                print(f"Using nudge SK={latest_nudge.get('SK')} lastReminder={last_reminder}")
                 
                 # If last reminder was T+48h, this is the final response
                 if last_reminder == 'T+48h':

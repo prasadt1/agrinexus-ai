@@ -10,10 +10,12 @@ These are part of the repository and useful for all developers:
 - `deploy-with-weather.sh` - Deploy with weather API configuration
 - `e2e-test.sh` - End-to-end automated testing
 - `reset-profile.sh` - Reset a user profile for re-onboarding
+- `clear-nudges.sh` - Delete only **NUDGE#** rows for a phone (keeps profile); use before a fresh `demo-nudge-loop.sh`
 - `demo-reset.sh` - Clean all data before demo recording
 - `upload-fao-pdfs.sh` - Upload knowledge base documents to S3
 - `create-bedrock-guardrail.sh` - Create Bedrock guardrail
 - `create-cloudwatch-dashboard.sh` - Create monitoring dashboard
+- `demo-nudge-loop.sh` - **One command** demo: first nudge (default district **Latur**) → **T+24h** → **T+48h**; pause **NUDGE_LOOP_INTERVAL_SEC** (default **15s** — time for tap, bot reply, VO). Set `PHONE_NUMBER` in `demo.env`. Flags: `--district`, `--interval`, `--reminders-only` (skip first nudge).
 
 ## Personal Scripts (Keep Local)
 

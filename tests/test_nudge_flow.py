@@ -188,3 +188,46 @@ def test_detector_marks_done_and_deletes_schedule(monkeypatch):
 
     assert fake_table.updated, "Expected update_item to be called"
     assert delete_calls, "Expected scheduled reminders to be deleted"
+
+
+def test_detector_not_yet_uses_newest_nudge_for_t48_final_message(monkeypatch):
+    """After T+48h, NOT YET must use the nudge row with lastReminder=T+48h (newest first)."""
+    fake_table = FakeTable()
+    # Simulates ScanIndexForward=False: newest SK first. Older row still REMINDED/T+24h from a prior test.
+    fake_table.items = [
+        {"SK": "NUDGE#2026-04-07T12:00:00#spray", "status": "REMINDED", "lastReminder": "T+48h"},
+        {"SK": "NUDGE#2026-01-01T00:00:00#spray", "status": "REMINDED", "lastReminder": "T+24h"},
+    ]
+    fake_table.get_item_response = {"Item": {"dialect": "hi"}}
+    monkeypatch.setattr(detector, "table", fake_table)
+
+    sent = []
+
+    def capture_send(phone, msg):
+        sent.append(msg)
+
+    monkeypatch.setattr(detector, "send_whatsapp_message", capture_send)
+
+    event = {
+        "Records": [
+            {
+                "eventName": "INSERT",
+                "dynamodb": {
+                    "NewImage": {
+                        "PK": {"S": "USER#4917647009148"},
+                        "SK": {"S": "MSG#2026-04-07T12:05:00"},
+                        "message": {
+                            "M": {
+                                "text": {"M": {"body": {"S": "अभी नहीं"}}}
+                            }
+                        },
+                    }
+                },
+            }
+        ]
+    }
+
+    detector.lambda_handler(event, None)
+
+    assert len(sent) == 1
+    assert "अगली बार मौसम" in sent[0] or "next time" in sent[0].lower()
