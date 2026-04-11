@@ -154,3 +154,6 @@ docs/*.html
 *.jpeg
 !README.md
 data/fao-pdfs/**/*.pdf
+
+# Proprietary IP backups (keep local only)
+src/proprietary/
