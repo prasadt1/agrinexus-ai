@@ -14,6 +14,8 @@ Diagrams and high-level design for AgriNexus AI.
 | Text query | WhatsApp → Webhook → SQS → Processor → Bedrock RAG → WhatsApp |
 | Voice      | WhatsApp → Webhook → **voice ACK text** → Voice Queue → Voice Processor (Transcribe) → message queue → Processor → RAG → Polly → WhatsApp |
 | Image      | WhatsApp → Webhook → SQS → Processor → Claude Vision → WhatsApp |
-| Nudge      | Weather Poller → Step Functions → Nudge Sender → WhatsApp; reminders via EventBridge Scheduler |
+| Nudge      | Weather Poller → Step Functions → Nudge Sender → WhatsApp; reminders via EventBridge Scheduler (reminders **off** when `PROFILE.demo_tier == public`) |
 
 **Onboarding districts** (code): **Latur**, **Jalna**, **Nagpur** (`src/processor/handler.py`).
+
+**Profiles:** **`demo_tier: public`** (default) = single nudge for public demos; change in Dynamo for full reminder loop.

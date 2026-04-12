@@ -13,8 +13,6 @@ s3 = boto3.client('s3', region_name='us-east-1')
 secrets = boto3.client('secretsmanager', region_name='us-east-1')
 
 TEMP_BUCKET = os.environ.get('TEMP_AUDIO_BUCKET')
-if not TEMP_BUCKET:
-    raise RuntimeError('TEMP_AUDIO_BUCKET is required but not set')
 
 
 def download_whatsapp_image(media_id: str) -> bytes:
@@ -210,7 +208,9 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         timestamp = int(time.time())
         phone = user_profile.get('phone_number', 'unknown')
         s3_key = f"images/{phone}/{timestamp}.jpg"
-        
+
+        if not TEMP_BUCKET:
+            raise RuntimeError('TEMP_AUDIO_BUCKET is required for the WhatsApp image pipeline')
         s3.put_object(
             Bucket=TEMP_BUCKET,
             Key=s3_key,

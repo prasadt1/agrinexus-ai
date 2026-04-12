@@ -60,6 +60,8 @@ flowchart TB
 
 **Flow summary:** (1) Farmer → WhatsApp. (2) WhatsApp → API Gateway → Webhook Lambda. (3) Webhook → SQS (message or voice queue) → Message Processor or Voice Processor. For **audio**, webhook sends a short **voice-received** text (after dedup, before queue) using Secrets Manager + Graph API. **Transcribe** runs only in **Voice Processor**; Message Processor uses Bedrock RAG, Polly, Vision. (4) Processors and nudge/reminder Lambdas send replies **directly to WhatsApp Cloud API** (HTTP). Nudges: EventBridge → Weather Poller → Step Functions → Nudge Sender → WhatsApp; reminders via EventBridge Scheduler → Reminder Sender → WhatsApp.
 
+**Demo vs full nudge loop:** New **`PROFILE`** items default to **`demo_tier: public`** — users get **one** nudge per favorable weather run, **without** T+24h/T+48h reminders. Override in DynamoDB for full scheduling.
+
 ---
 
 ## High-level system

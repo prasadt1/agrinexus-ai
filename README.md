@@ -10,11 +10,12 @@
 
 ## Architecture
 
-- **Onboarding**: Language → district (**Latur**, **Jalna**, **Nagpur**) → crop → nudge consent (`src/processor/handler.py`)
+- **Onboarding**: Language → district (**Latur**, **Jalna**, **Nagpur**) → crop → nudge consent (`src/processor/handler.py`). New profiles include **`demo_tier: public`** (public demo: one weather nudge, no T+24h/T+48h follow-ups). Set **`demo_tier`** to another value in DynamoDB (e.g. `full`) for pilot partners who need the full reminder loop.
 - **Serverless**: Lambda, DynamoDB, EventBridge Scheduler, Step Functions
-- **AI**: Amazon Bedrock (Claude 3 Sonnet + RAG), Transcribe, Polly, Claude Vision
+- **AI**: Amazon Bedrock (Claude 3 Sonnet + RAG via Knowledge Base `retrieve_and_generate`), Transcribe, Polly, Claude Vision
 - **Messaging**: WhatsApp Business API
-- **Storage**: DynamoDB single-table design, S3 for knowledge base vectors + temp audio
+- **Storage**: DynamoDB single-table design, S3 for knowledge base vectors + temp audio / voice
+- **Abuse / cost**: Webhook enforces **per-user rate limits** (default 10 messages/hour; `RATE_LIMIT_*` in `template-week2.yaml`) using **`MSG#*`** sort keys only; signature verification on POST. See [Security](#security).
 - **Cost**: ~$53/month for 1,000 farmers (all pay-per-use). See [Cost breakdown](#cost-breakdown)
 
 **Diagrams:** See [architecture/diagrams.md](architecture/diagrams.md) for Mermaid diagrams (high-level, webhook, text/voice/image flows, nudge flow). Full design: [architecture.md](architecture.md).
@@ -35,7 +36,7 @@
 ### 3. Behavioral Nudges
 - **Weather-Based**: Spray reminders when conditions are optimal
 - **Closed-Loop**: Tracks completion with "हो गया" (done) responses
-- **Smart Reminders**: T+24h and T+48h follow-ups if not completed
+- **Smart Reminders**: T+24h and T+48h follow-ups if not completed (**skipped** when profile **`demo_tier`** is **`public`**)
 - **Auto-Expiry**: T+72h auto-expiry if no response (EXPIRED status)
 - **Duplicate Prevention**: Max 1 nudge per activity per day
 
@@ -69,14 +70,16 @@ aws configure
 ### Deployment
 
 ```bash
-# 1. Deploy infrastructure
+# 1. Deploy infrastructure (recommended: samconfig-week2.toml)
 sam build --template template-week2.yaml
-sam deploy --template-file .aws-sam/build/template.yaml \
-  --stack-name agrinexus-week2 \
-  --parameter-overrides "KnowledgeBaseId=YOUR_KB_ID GuardrailId='' Environment=dev TableName=agrinexus-data GuardrailVersion=1" \
-  --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-  --resolve-s3
-# Or use: sam deploy --config-env default (after setting KnowledgeBaseId in samconfig-week2.toml)
+sam deploy --config-file samconfig-week2.toml
+
+# Manual alternative (match parameters in samconfig-week2.toml, including TableStreamArn):
+# sam deploy --template-file .aws-sam/build/template.yaml \
+#   --stack-name agrinexus-week2 \
+#   --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+#   --resolve-s3 \
+#   --parameter-overrides "Environment=dev TableName=agrinexus-data TableStreamArn=arn:aws:dynamodb:REGION:ACCOUNT:table/TABLE/stream/... KnowledgeBaseId=YOUR_KB_ID GuardrailId='' GuardrailVersion=1"
 
 # 2. Configure WhatsApp secrets
 aws secretsmanager create-secret \
@@ -132,7 +135,7 @@ aws bedrock-agent start-ingestion-job \
 - **Signatures (POST)**: Incoming message payloads are verified with `X-Hub-Signature-256` (HMAC-SHA256) using `agrinexus/whatsapp/app-secret`. Reject if invalid.
 - **Sending messages**: The **webhook** Lambda (via Common layer), **processor**, and **nudge** Lambdas use `agrinexus/whatsapp/access-token` and `agrinexus/whatsapp/phone-number-id` to call the WhatsApp Cloud API. For **inbound audio**, the webhook sends a short “received / preparing reply” text **immediately after deduplication** (before SQS → Voice Processor) so feedback is not delayed by queue or Transcribe. Text/interactive/template sends work as before.
 - **Production number cutover** (new eSIM / WABA / templates): update the Meta Developer app, **phone number ID**, approved **message templates**, and **webhook** URL; refresh **`agrinexus/whatsapp/*`** secrets in **Secrets Manager** (never commit tokens).
-- **Deploy / test**: use **Deployment** and **Testing** sections above (`sam build` / `sam deploy --config-file samconfig-week2.toml`, then webhook tests or `./scripts/e2e-test.sh` with `scripts/demo.env`).
+- **Deploy / test**: **`sam build`** / **`sam deploy --config-file samconfig-week2.toml`**, then manual WhatsApp checks or [docs/E2E-TEST-GUIDE.md](docs/E2E-TEST-GUIDE.md) with **`scripts/demo.env`**.
 - **Message types**: Inbound text, image, and audio are supported. Outbound: text, optional interactive buttons (e.g. language/location during onboarding), and template messages for nudges (see [architecture/diagrams.md](architecture/diagrams.md)).
 
 ## Usage
@@ -177,12 +180,12 @@ Bot: बढ़िया! आपने स्प्रे कर दिया। 
 │   ├── E2E-TEST-GUIDE.md           # End-to-end test guide
 │   └── CODE-WALKTHROUGH.md         # Component walkthrough
 ├── scripts/
-│   ├── deploy-week2.sh            # Deployment script
-│   ├── e2e-test.sh                 # E2E automated test
-│   ├── reset-profile.sh            # Reset user for re-onboarding
-│   ├── demo-reset.sh               # Pre-demo cleanup (DynamoDB + SQS)
-│   ├── demo.env.example            # Example env (copy to demo.env)
-│   └── upload-fao-pdfs.sh          # Upload knowledge base docs
+│   ├── README.md                   # Which scripts are shared vs local
+│   ├── clear-nudges.sh             # Clear NUDGE# rows for a user
+│   ├── reset-onboard-and-demo.sh   # Reset profile + optional webhook demo flow
+│   ├── demo-nudge-loop.sh          # Scripted nudge / reminder demo (uses demo.env)
+│   ├── create-bedrock-guardrail.sh
+│   └── … (other demo helpers; see scripts/README.md)
 ├── src/
 │   ├── webhook/                    # WhatsApp webhook handler
 │   ├── processor/                  # Message processor with RAG + voice + vision
@@ -211,8 +214,11 @@ Bot: बढ़िया! आपने स्प्रे कर दिया। 
 
 ### Text RAG
 ```bash
+# Integration tests call Bedrock; set a real KB ID or tests skip:
+export KNOWLEDGE_BASE_ID=YOUR_KB_ID
 pytest tests/test_golden_questions.py -v
 ```
+Without **`KNOWLEDGE_BASE_ID`**, parametrized golden tests **skip** (see `tests/test_golden_questions.py`).
 
 ### Voice Input
 ```bash
@@ -236,26 +242,16 @@ python tests/test_voice_end_to_end.py
 
 See [docs/E2E-TEST-GUIDE.md](docs/E2E-TEST-GUIDE.md) for testing onboarding, Q&A, voice, vision, and nudges.
 
-**One-time setup:** Copy `scripts/demo.env.example` to `scripts/demo.env` and set `WEBHOOK_URL`, `APP_SECRET`, and `PHONE_NUMBER`. All test scripts auto-load it:
+**Webhook scripts:** create **`scripts/demo.env`** (not committed) with at least **`WEBHOOK_URL`**, **`APP_SECRET`** (if signatures are on), and **`PHONE_NUMBER`**. Scripts such as **`reset-onboard-and-demo.sh`** and **`demo-nudge-loop.sh`** source it when present.
 
-```bash
-cp scripts/demo.env.example scripts/demo.env
-# Edit scripts/demo.env, then:
-./scripts/e2e-test.sh --phone +919876543210
-```
+### Reset profile / re-onboarding
 
-### Reset Profile (Re-Onboarding)
-
-```bash
-./scripts/reset-profile.sh +919876543210
-```
-
-Then send a new language keyword (`हिंदी` / `मराठी` / `తెలుగు` / `English`) in WhatsApp to restart onboarding.
+Use **`./scripts/reset-onboard-and-demo.sh --phone <E.164>`** (see script usage; requires **`WEBHOOK_URL`**), or delete the user’s **`PROFILE`** item in DynamoDB. Then send a new language choice in WhatsApp to restart onboarding.
 
 ## Architecture Details
 
 ### Lambda Functions
-1. **WebhookHandler**: Validates signature, deduplicates, stores messages for the response detector, routes **text/image** to the message queue and **audio** to the voice queue; for **audio**, sends localized **voice-received ACK** via WhatsApp (before enqueue) using the Common layer + secrets
+1. **WebhookHandler**: Validates signature, **per-user rate limit** (DynamoDB `MSG#` count in window), deduplicates, stores messages for the response detector, routes **text/image** to the message queue and **audio** to the voice queue; for **audio**, sends localized **voice-received ACK** via WhatsApp (before enqueue) using the Common layer + secrets
 2. **MessageProcessor**: Handles text/image messages, RAG queries, Polly voice output; **does not** send a duplicate “preparing answer” ack for transcribed voice (`_source: voice`)
 3. **VoiceProcessor**: Downloads media, **Transcribe** batch job, queues transcribed text to the message queue
 4. **NudgeSender**: Sends behavioral nudges, schedules reminders
@@ -368,13 +364,9 @@ aws lambda invoke --function-name agrinexus-weather-dev --payload '{}' /tmp/resp
 
 ## Monitoring
 
-Create the CloudWatch dashboard (dev example):
+Use the [CloudWatch console](https://console.aws.amazon.com/cloudwatch/) for Lambda log groups (e.g. `/aws/lambda/agrinexus-webhook-dev`) and optional dashboards. Add your own dashboard JSON or helper scripts locally if needed.
 
-```bash
-./scripts/create-cloudwatch-dashboard.sh dev us-east-1
-```
-
-**Billing (Cost Explorer):** run `./scripts/aws-cost-report.sh` for a **by-service** Unblended cost summary (requires [Cost Explorer](https://console.aws.amazon.com/cost-management/home#/cost-explorer) enabled once in the account). Use `--days 7`, `--json`, or `--granularity MONTHLY` as needed.
+**Billing:** enable [Cost Explorer](https://console.aws.amazon.com/cost-management/home#/cost-explorer) once per account, then filter by service (Bedrock, Transcribe, etc.).
 
 **Custom Metrics**:
 - `AgriNexus/NudgesSent`
@@ -470,9 +462,10 @@ See the [LICENSE](LICENSE) file for full details.
 
 ## Security
 
-- **Do not commit** API keys, tokens, app secrets, or real phone numbers. `scripts/demo.env` and `.aws-sam/` are gitignored.
-- Set **KnowledgeBaseId** in `samconfig-week2.toml` or via `--parameter-overrides` when deploying.
-- Set **TEMP_AUDIO_BUCKET** and **KNOWLEDGE_BASE_ID** (and optionally **VOICE_QUEUE_URL**) for integration tests.
+- **Do not commit** API keys, tokens, app secrets, or real phone numbers. `scripts/demo.env` and `.aws-sam/` should stay gitignored.
+- **Webhook:** Meta **`X-Hub-Signature-256`** verification; **per-user message rate limit** before enqueueing work (see `template-week2.yaml` **`RATE_LIMIT_*`**).
+- Set **KnowledgeBaseId** (and related stack params) in **`samconfig-week2.toml`** or **`--parameter-overrides`** when deploying. Processor Lambdas receive **`KNOWLEDGE_BASE_ID`** from the template.
+- For **vision / voice** integration tests, set **`TEMP_AUDIO_BUCKET`** (and any other required env vars) as documented in the test files.
 
 ## Support
 

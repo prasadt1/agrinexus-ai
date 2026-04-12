@@ -16,7 +16,7 @@ s3 = boto3.client('s3', region_name='us-east-1')
 TEST_PHONE = '+919876543210'
 
 
-def test_voice_output(text, dialect, description):
+def run_voice_output(text, dialect, description):
     """Test voice output generation"""
     print(f"\n{'='*70}")
     print(f"TEST: {description}")
@@ -100,7 +100,7 @@ if __name__ == '__main__':
     results = []
     for i, test_case in enumerate(test_cases, 1):
         print(f"\n\nTest {i}/{len(test_cases)}")
-        success = test_voice_output(
+        success = run_voice_output(
             text=test_case['text'],
             dialect=test_case['dialect'],
             description=test_case['description']

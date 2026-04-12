@@ -347,11 +347,7 @@ After successful deployment:
 
 ## CloudWatch Dashboard (Optional)
 
-Create the prebuilt dashboard for ops visibility:
-
-```bash
-./scripts/create-cloudwatch-dashboard.sh dev us-east-1
-```
+Use **`dashboards/cloudwatch-dashboard.json`** from the CloudWatch console (**Dashboards → Create → JSON source**) or via `aws cloudwatch put-dashboard`, adjusting widget ARNs for your account/region.
 
 ## Real Weather API (Optional)
 

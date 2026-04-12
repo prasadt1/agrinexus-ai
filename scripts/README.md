@@ -4,18 +4,16 @@ This directory contains both **shared scripts** (tracked in git) and **personal/
 
 ## Shared Scripts (Tracked in Git)
 
-These are part of the repository and useful for all developers:
+Scripts actually present in this repo (others may live under `scripts/local/` on your machine):
 
-- `deploy-week2.sh` - Deploy the SAM stack
-- `deploy-with-weather.sh` - Deploy with weather API configuration
-- `e2e-test.sh` - End-to-end automated testing
-- `reset-profile.sh` - Reset a user profile for re-onboarding
-- `clear-nudges.sh` - Delete only **NUDGE#** rows for a phone (keeps profile); use before a fresh `demo-nudge-loop.sh`
-- `demo-reset.sh` - Clean all data before demo recording
-- `upload-fao-pdfs.sh` - Upload knowledge base documents to S3
-- `create-bedrock-guardrail.sh` - Create Bedrock guardrail
-- `create-cloudwatch-dashboard.sh` - Create monitoring dashboard
-- `demo-nudge-loop.sh` - **One command** demo: first nudge (default district **Latur**) → **T+24h** → **T+48h**; pause **NUDGE_LOOP_INTERVAL_SEC** (default **15s** — time for tap, bot reply, VO). Set `PHONE_NUMBER` in `demo.env`. Flags: `--district`, `--interval`, `--reminders-only` (skip first nudge).
+- `clear-nudges.sh` — Delete **NUDGE#** rows for a phone (keeps profile); useful before `demo-nudge-loop.sh`
+- `reset-onboard-and-demo.sh` — Reset profile / drive onboarding + optional weather + webhook messages (needs `WEBHOOK_URL`, etc.)
+- `demo-nudge-loop.sh` — **One command** demo: first nudge (default **Latur**) → **T+24h** → **T+48h**; uses `demo.env` for `PHONE_NUMBER`. Flags: `--district`, `--interval`, `--reminders-only`
+- `demo-nudge-flow.sh`, `demo-nudge-multilang.sh`, `demo-nudge.sh`, `demo-scenario.sh` — Additional demo flows
+- `create-bedrock-guardrail.sh` — Create a Bedrock guardrail resource
+- `cleanup-internal-scripts.sh`, `remove-internal-docs.sh` — Maintainer cleanup helpers
+
+**Deploy:** use the SAM CLI from the repo root (see **README.md**): `sam build --template template-week2.yaml` then `sam deploy --config-file samconfig-week2.toml`.
 
 ## Personal Scripts (Keep Local)
 
@@ -60,8 +58,7 @@ These types of scripts should be kept local:
 
 ## Configuration Files
 
-- `demo.env` - **NEVER COMMIT** - Contains webhook URL, app secret, phone number
-- `demo.env.example` - Template for demo.env (tracked in git)
+- `demo.env` — **Do not commit** — Local file with `WEBHOOK_URL`, `APP_SECRET`, `PHONE_NUMBER`, etc. Create it yourself; scripts `source` it when present.
 
 ## After Moving a Script
 
@@ -84,7 +81,7 @@ git commit -m "chore: Move personal script to local"
 2. **Keep phone numbers private** - Use environment variables or local scripts
 3. **Document shared scripts** - Add comments explaining what they do
 4. **Test before committing** - Run shared scripts to ensure they work for others
-5. **Use meaningful names** - `deploy-week2.sh` is better than `d.sh`
+5. **Use meaningful names** — e.g. `reset-onboard-and-demo.sh` rather than `d.sh`
 
 ## Need Help?
 

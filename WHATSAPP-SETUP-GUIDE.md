@@ -169,7 +169,7 @@ Once webhook is configured and tested:
 2. **Test Image Analysis**: Send a photo of a crop pest/disease
 3. **Test Multi-Language**: Complete onboarding in different languages
 4. **Monitor Metrics**: Check CloudWatch for NudgesSent and NudgesCompleted metrics
-5. **Create Dashboard**: Run `./scripts/create-cloudwatch-dashboard.sh dev us-east-1`
+5. **Create Dashboard**: Import **`dashboards/cloudwatch-dashboard.json`** in the CloudWatch console (JSON source) or use `aws cloudwatch put-dashboard`
 
 ## Production Checklist
 

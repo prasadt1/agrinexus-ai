@@ -2,8 +2,8 @@
 
 **Project**: AgriNexus AI - Behavioral AI Extension Agent  
 **Competition**: AWS 10,000 AIdeas Competition (Social Impact Track)  
-**Version**: 1.0  
-**Date**: February 13, 2026
+**Version**: 1.1  
+**Date**: February 13, 2026 (doc refreshed April 2026 for deploy, DynamoDB shape, webhook limits)
 
 ## 1. Executive Summary
 
@@ -68,10 +68,12 @@ The architecture is a serverless system with pay-as-you-go Bedrock. Estimated co
 │                    │                                        │
 │                    ▼                                        │
 │         ┌──────────────────────┐                           │
-│         │  Lambda (Send Nudge) │                           │
-│         │  + Polly (Voice)     │                           │
-│         │  + SNS (Alerts)      │                           │
+│         │  Nudge Sender Lambda │                           │
+│         │  → WhatsApp (buttons/│                           │
+│         │    text / template)  │                           │
 │         └──────────────────────┘                           │
+│         (Polly: Message Processor for voice replies;       │
+│          SNS topic in stack for optional ops alerts)        │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -85,6 +87,7 @@ The architecture is a serverless system with pay-as-you-go Bedrock. Estimated co
 **Responsibilities**:
 - Receive incoming WhatsApp messages via webhook
 - Validate webhook signatures (Meta `X-Hub-Signature-256` + app secret)
+- **Per-user rate limiting** before enqueueing work: count recent **`MSG#*`** items in DynamoDB within a configurable window (default 10 messages/hour; see SAM template `RATE_LIMIT_*` env vars)
 - Extract message content (text, images, audio)
 - Route to appropriate processing Lambda
 - Send responses back to WhatsApp
@@ -107,13 +110,13 @@ The architecture is a serverless system with pay-as-you-go Bedrock. Estimated co
 - Lambda: 1M requests + 400,000 GB-seconds/month free
 - Use Lambda proxy integration to minimize API Gateway costs
 
-### 4.2 Conversation Engine (Bedrock Agent)
+### 4.2 Conversation Engine (Bedrock Knowledge Base + Claude)
 
-**Components**: Amazon Bedrock Agent + Knowledge Base + S3
+**Components**: Amazon Bedrock Agent **Runtime** (`retrieve_and_generate`) + Knowledge Base + S3
 
 **Responsibilities**:
 - Process messages using Claude 3 Sonnet
-- Retrieve relevant agronomic knowledge using RAG
+- Retrieve relevant agronomic knowledge using RAG (`bedrock-agent-runtime` retrieve and generate)
 - Generate contextually appropriate responses in Hindi, Marathi, or Telugu
 - Apply guardrails for agricultural safety
 - Maintain conversation context natively
@@ -196,54 +199,41 @@ s3://agrinexus-temp-images/
 ```
 PK: USER#+919876543210
 SK: PROFILE
-Attributes:
-- entityType: "UserProfile"
-- userId: "+919876543210"
-- location: {district: "Latur District", state: "Maharashtra", country: "India"}
-- crops: ["cotton", "soybean"]
-- language: "hi" (Hindi)
-- dialect: "Marathi"
-- voicePreference: true
-- consent: true
-- registeredAt: Unix timestamp
-- lastActive: Unix timestamp
-- profileComplete: true
+Attributes (representative; see create_user_profile / onboarding in code):
+- phone_number: E.164
+- dialect: "hi" | "mr" | "te" | "en"
+- location: district key (e.g. "Latur")
+- location_coords: optional [lat, lon]
+- crop: e.g. "Cotton"
+- consent: bool (nudge consent)
+- onboarding_state / onboarding_complete: onboarding FSM
+- demo_tier: "public" (default for new users: one nudge, no T+24h/T+48h) or override for full reminder loop
+- created_at: ISO timestamp
+- GSI1PK / GSI1SK: LOCATION#… / CROP#… for farmer queries
+- voicePreference: optional
 ```
 
 #### Conversation Messages
 ```
 PK: USER#+919876543210
-SK: MSG#1707955200#abc123
+SK: MSG#{UTC ISO8601 timestamp}   # e.g. MSG#2026-04-11T12:00:00.123456
 Attributes:
-- entityType: "Message"
-- messageId: "abc123"
-- wamid: "wamid.HBgNOTE3..."
-- timestamp: 1707955200
-- direction: "inbound" | "outbound"
-- content: "Mere cotton mein pests hain"
-- messageType: "text" | "image" | "audio"
-- language: "hi"
-- sessionId: "session-xyz789"
-- source_citation: "FAO Cotton Guide, Section 3"
-- bedrockResponse: {model: "claude-3-sonnet", tokens: 450}
-- TTL: 1715731200 (90 days)
+- wamid: WhatsApp message id
+- message: raw message payload (map)
+- response: assistant text (if stored)
+- source_citation: citation string
+- ttl: epoch seconds (~90 days)
 ```
 
 #### Nudges (User View)
 ```
 PK: USER#+919876543210
-SK: NUDGE#1707955200#spray-pesticide
+SK: NUDGE#{timestamp}#{activity}   # e.g. NUDGE#2026-04-11T10:00:00.123456#spray
 Attributes:
-- entityType: "Nudge"
-- nudgeId: "2026-02-14-spray-pesticide-latur"
-- activity: "spray_pesticide"
-- sentAt: 1707955200
-- scheduledReminderAt: 1708041600 (T+24h)
 - status: "SENT" | "REMINDED" | "DONE" | "EXPIRED"
-- responseAt: Unix timestamp (optional)
-- responseText: "Ho gaya" (optional)
-- weatherCondition: {temperature: 28, rainfall: 0, windSpeed: 6}
-- TTL: 1723507200 (180 days)
+- activity, crop, district, weather (map), message (text sent)
+- GSI2PK: "NUDGE", GSI2SK: timestamp (for queries)
+- ttl: epoch seconds (~180 days)
 ```
 
 **Status Flow**:
@@ -254,18 +244,11 @@ Attributes:
 
 **Global Secondary Indexes**:
 
-#### GSI-1: SessionIndex
-- Partition Key: `sessionId` (String)
-- Sort Key: `timestamp` (Number)
-- Projection: ALL
-- Purpose: Retrieve all messages in a conversation session (Note: May not be needed if Bedrock Agent manages sessions internally)
+#### GSI-1 (farmer / location queries)
+- See template and code: `GSI1PK` / `GSI1SK` on profiles (e.g. `LOCATION#…`, `CROP#…`).
 
-#### GSI-2: StatusIndex (Sparse)
-- Partition Key: `status` (String)
-- Sort Key: `scheduledReminderAt` (Number)
-- Projection: ALL
-- Purpose: Query pending reminders for EventBridge Scheduler
-- Sparse Index: Only items with `status` attribute are indexed
+#### GSI-2 (nudge listings)
+- `GSI2PK` / `GSI2SK` on nudge records for operational queries (see SAM template and `src/nudge/`).
 
 **DynamoDB Streams**: Enable for real-time response detection (DONE/NOT YET keywords)
 
@@ -275,6 +258,8 @@ Attributes:
 - Sparse indexes: Only index necessary attributes
 
 ### 4.5 Behavioral Nudge Engine (EventBridge Scheduler Pattern)
+
+**Public demo behavior**: If the farmer’s **`PROFILE`** has **`demo_tier == "public"`** (default on new onboarding), the **Nudge Sender** sends **one** contextual nudge and **does not** create T+24h / T+48h / T+72h EventBridge schedules. Set **`demo_tier`** to another value in DynamoDB for partners who need the full closed loop.
 
 **State Machine**: NudgeFlow (short-lived, completes in seconds)
 

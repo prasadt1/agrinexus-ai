@@ -232,13 +232,21 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         emit_metric('NudgesSent', 1)
         
-        # Schedule reminders at T+24h and T+48h
-        create_reminder_schedule(phone_number, nudge_id, 24, dialect)
-        create_reminder_schedule(phone_number, nudge_id, 48, dialect)
+        # Check if user is demo tier (skip follow-up reminders for demo users)
+        is_demo_user = profile.get('demo_tier') == 'public'
         
-        # Schedule auto-expiry at T+72h (24h after final reminder)
-        # This closes the nudge if farmer never responds
-        create_expiry_schedule(phone_number, nudge_id, 72)
+        if is_demo_user:
+            print(f"Demo user {phone_number} - sending one nudge only, no T+24h/T+48h follow-ups")
+            # Demo users get one nudge to see the flow, but no follow-up reminders
+        else:
+            # Production users get full closed-loop follow-ups
+            # Schedule reminders at T+24h and T+48h
+            create_reminder_schedule(phone_number, nudge_id, 24, dialect)
+            create_reminder_schedule(phone_number, nudge_id, 48, dialect)
+            
+            # Schedule auto-expiry at T+72h (24h after final reminder)
+            # This closes the nudge if farmer never responds
+            create_expiry_schedule(phone_number, nudge_id, 72)
         
         nudges_sent += 1
     

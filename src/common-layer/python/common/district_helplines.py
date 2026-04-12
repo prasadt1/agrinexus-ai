@@ -19,17 +19,38 @@ Copyright (C) 2026 Prasad Tilloo. All rights reserved.
 
 import os
 
-APPEND_HELPLINE = os.environ.get('APPEND_DISTRICT_HELPLINE', 'false').lower() == 'true'
-
 # Generic helpline data (production includes comprehensive district-specific data)
 HELPLINES = {
     'Latur': {
-        'hi': '\n\n📞 कृषि सहायता:\n• किसान कॉल सेंटर: 1800-180-1551',
-        'mr': '\n\n📞 शेती मदत:\n• किसान कॉल सेंटर: 1800-180-1551',
-        'te': '\n\n📞 వ్యవసాయ సహాయం:\n• కిసాన్ కాల్ సెంటర్: 1800-180-1551',
-        'en': '\n\n📞 Agricultural Support:\n• Kisan Call Centre: 1800-180-1551'
-    }
+        'hi': '\n\n📞 कृषि सहायता (लातूर):\n• किसान कॉल सेंटर: 1800-180-1551',
+        'mr': '\n\n📞 शेती मदत (लातूर):\n• किसान कॉल सेंटर: 1800-180-1551',
+        'te': '\n\n📞 వ్యవసాయ సహాయం (లాతూర్):\n• కిసాన్ కాల్ సెంటర్: 1800-180-1551',
+        'en': '\n\n📞 Agricultural Support (Latur):\n• Kisan Call Centre: 1800-180-1551',
+    },
+    'Nagpur': {
+        'hi': '\n\n📞 कृषि सहायता (नागपुर):\n• किसान कॉल सेंटर: 1800-180-1551',
+        'mr': '\n\n📞 शेती मदत (नागपूर):\n• किसान कॉल सेंटर: 1800-180-1551',
+        'te': '\n\n📞 వ్యవసాయ సహాయం (నాగ్‌పూర్):\n• కిసాన్ కాల్ సెంటర్: 1800-180-1551',
+        'en': '\n\n📞 Agricultural Support (Nagpur):\n• Kisan Call Centre: 1800-180-1551',
+    },
+    'Jalna': {
+        'hi': '\n\n📞 कृषि सहायता (जालना):\n• किसान कॉल सेंटर: 1800-180-1551',
+        'mr': '\n\n📞 शेती मदत (जालना):\n• किसान कॉल सेंटर: 1800-180-1551',
+        'te': '\n\n📞 వ్యవసాయ సహాయం (జల్నా):\n• కిసాన్ కాల్ సెంటర్: 1800-180-1551',
+        'en': '\n\n📞 Agricultural Support (Jalna):\n• Kisan Call Centre: 1800-180-1551',
+    },
 }
+
+
+def wants_where_to_buy_hint(query: str) -> bool:
+    """True when the farmer is asking where to obtain inputs (dealers, purchase location)."""
+    ql = query.lower()
+    english = ('buy', 'purchase', 'where', 'dealer')
+    if any(kw in ql for kw in english):
+        return True
+    devanagari = ('खरीद', 'कहाँ', 'कहां', 'विक्रेता')
+    return any(kw in query for kw in devanagari)
+
 
 def maybe_append_helpline_footer(text: str, query: str, dialect: str, district: str) -> str:
     """
@@ -43,16 +64,17 @@ def maybe_append_helpline_footer(text: str, query: str, dialect: str, district: 
     
     This stub returns generic Kisan Call Centre only.
     """
-    if not APPEND_HELPLINE:
+    if os.environ.get('APPEND_DISTRICT_HELPLINE', 'false').lower() != 'true':
         return text
-    
-    # Generic implementation - production has sophisticated keyword matching
-    keywords = ['buy', 'purchase', 'where', 'dealer', 'खरीद', 'कहाँ', 'विक्रेता']
-    if any(kw in query.lower() for kw in keywords):
-        helpline = HELPLINES.get(district, HELPLINES['Latur'])
-        return text + helpline.get(dialect, helpline['en'])
-    
-    return text
+
+    if not wants_where_to_buy_hint(query):
+        return text
+
+    helpline = HELPLINES.get(district)
+    if not helpline:
+        return text
+
+    return text + helpline.get(dialect, helpline['en'])
 
 # Note: Full implementation available under commercial license
 # Contact: prasad@prasadtilloo.com

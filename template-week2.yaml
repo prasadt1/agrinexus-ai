@@ -45,6 +45,8 @@ Globals:
         KNOWLEDGE_BASE_ID: !Ref KnowledgeBaseId
         GUARDRAIL_ID: !Ref GuardrailId
         GUARDRAIL_VERSION: !Ref GuardrailVersion
+        RATE_LIMIT_MESSAGES: "10"  # Max messages per user per hour
+        RATE_LIMIT_WINDOW_SECONDS: "3600"  # 1 hour window
 
 Resources:
   # ============================================================================
@@ -54,7 +56,7 @@ Resources:
     Type: AWS::Serverless::LayerVersion
     Properties:
       LayerName: !Sub agrinexus-common-${Environment}
-      Description: Common utilities for WhatsApp integration (caching, PII redaction)
+      Description: Common utilities for WhatsApp integration (caching, PII redaction, district helplines)
       ContentUri: src/common-layer/
       CompatibleRuntimes:
         - python3.11
@@ -559,6 +561,28 @@ Resources:
       StartingPosition: LATEST
       BatchSize: 100
       MaximumBatchingWindowInSeconds: 10
+
+  # ============================================================================
+  # Cost Monitoring: Budget Alert
+  # ============================================================================
+  CostAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub agrinexus-high-cost-${Environment}
+      AlarmDescription: Alert when daily estimated charges exceed threshold
+      MetricName: EstimatedCharges
+      Namespace: AWS/Billing
+      Statistic: Maximum
+      Period: 86400  # 24 hours
+      EvaluationPeriods: 1
+      Threshold: 20  # Alert if daily cost >= $20
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: Currency
+          Value: USD
+      AlarmActions:
+        - !Ref AlertTopic
+      TreatMissingData: notBreaching
 
 Outputs:
   WebhookUrl:

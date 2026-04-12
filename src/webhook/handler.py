@@ -49,6 +49,47 @@ SKIP_RAG_KEYWORDS = [
     'ఇంకా లేదు', 'తర్వాత', 'చేయలేదు'
 ]
 
+# Rate limiting: max messages per user per hour
+RATE_LIMIT_MESSAGES = int(os.environ.get('RATE_LIMIT_MESSAGES', '10'))
+RATE_LIMIT_WINDOW_SECONDS = int(os.environ.get('RATE_LIMIT_WINDOW_SECONDS', '3600'))
+
+
+def check_rate_limit(phone_number: str) -> bool:
+    """Count only MSG# items in the time window (excludes NUDGE#, PROFILE, etc.)."""
+    try:
+        now_ts = int(datetime.utcnow().timestamp())
+        window_start = now_ts - RATE_LIMIT_WINDOW_SECONDS
+        start_iso = datetime.utcfromtimestamp(window_start).isoformat()
+        end_iso = datetime.utcnow().isoformat()
+
+        message_count = 0
+        query_kwargs: Dict[str, Any] = {
+            'KeyConditionExpression': 'PK = :pk AND SK BETWEEN :lo AND :hi',
+            'ExpressionAttributeValues': {
+                ':pk': f'USER#{phone_number}',
+                ':lo': f'MSG#{start_iso}',
+                ':hi': f'MSG#{end_iso}',
+            },
+            'Select': 'COUNT',
+        }
+        while True:
+            response = table.query(**query_kwargs)
+            message_count += response.get('Count', 0)
+            if message_count >= RATE_LIMIT_MESSAGES:
+                logger.warning(
+                    f"Rate limit exceeded for {phone_number}: {message_count} messages in window"
+                )
+                return False
+            lek = response.get('LastEvaluatedKey')
+            if not lek:
+                break
+            query_kwargs['ExclusiveStartKey'] = lek
+
+        return True
+    except Exception as e:
+        logger.error(f"Error checking rate limit: {e}")
+        return True  # Allow on error (fail open)
+
 
 def should_skip_rag(text: str) -> bool:
     """Check if message contains DONE/NOT YET keywords that should skip RAG"""
@@ -222,6 +263,22 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             message_type = message.get('type')
             
             logger.info(f"Message - wamid: {wamid}, from: {redact_phone(from_number)}, type: {message_type}")
+            
+            # Rate limit check
+            if not check_rate_limit(from_number):
+                logger.warning(f"Rate limit exceeded for {redact_phone(from_number)}, dropping message {wamid}")
+                rate_limit_msg = {
+                    'hi': 'आपने बहुत सारे संदेश भेजे हैं। कृपया 1 घंटे बाद पुनः प्रयास करें।',
+                    'mr': 'तुम्ही खूप संदेश पाठवले आहेत. कृपया 1 तासानंतर पुन्हा प्रयत्न करा.',
+                    'te': 'మీరు చాలా సందేశాలు పంపారు. దయచేసి 1 గంట తర్వాత మళ్లీ ప్రయత్నించండి.',
+                    'en': 'You have sent too many messages. Please try again in 1 hour.'
+                }
+                dialect = get_user_dialect(from_number)
+                send_whatsapp_message(
+                    from_number,
+                    rate_limit_msg.get(dialect, rate_limit_msg['hi']),
+                )
+                continue
             
             # Idempotency check: Conditional write to avoid race
             try:

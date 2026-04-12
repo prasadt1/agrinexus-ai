@@ -17,6 +17,22 @@ This public version provides generic examples only.
 For licensing enquiries: prasad@prasadtilloo.com
 Copyright (C) 2026 Prasad Tilloo. All rights reserved.
 """
+from typing import Optional
+
+
+def build_nudge_message(
+    dialect: str,
+    district: str,
+    crop: str,
+    wind_speed: float,
+    context_hint_override: Optional[str] = None,
+) -> str:
+    """Public entry point used by sender (optional Bedrock liner appended)."""
+    text = get_nudge_message(dialect, district, crop, wind_speed)
+    if context_hint_override and str(context_hint_override).strip():
+        return f"{text.rstrip()}\n\n{str(context_hint_override).strip()}"
+    return text
+
 
 def get_nudge_message(dialect: str, district: str, crop: str, wind_speed: float) -> str:
     """
@@ -31,13 +47,20 @@ def get_nudge_message(dialect: str, district: str, crop: str, wind_speed: float)
     This stub returns a generic message.
     """
     generic_messages = {
-        'hi': f'मौसम अनुकूल है। हवा {wind_speed} km/h है। कृपया स्प्रे करें।',
-        'mr': f'हवामान अनुकूल आहे. वारा {wind_speed} km/h आहे. कृपया फवारणी करा.',
-        'te': f'వాతావరణం అనుకూలంగా ఉంది. గాలి {wind_speed} km/h. దయచేసి స్ప్రే చేయండి.',
-        'en': f'Weather is favorable. Wind: {wind_speed} km/h. Please spray.'
+        'hi': f'{district}: मौसम अनुकूल है। हवा {wind_speed} km/h है। कृपया स्प्रे करें।',
+        'mr': f'{district}: हवामान अनुकूल आहे. वारा {wind_speed} km/h आहे. कृपया फवारणी करा.',
+        'te': f'{district}: వాతావరణం అనుకూలంగా ఉంది. గాలి {wind_speed} km/h. దయచేసి స్ప్రే చేయండి.',
+        'en': f'{district}: Weather is favorable. Wind: {wind_speed} km/h. Please spray.',
     }
     
     return generic_messages.get(dialect, generic_messages['en'])
+
+def build_reminder_message(
+    dialect: str, reminder_type: str, district: str, crop: str
+) -> str:
+    """Entry point used by reminder lambda."""
+    return get_reminder_message(dialect, reminder_type, district, crop)
+
 
 def get_reminder_message(dialect: str, reminder_type: str, district: str, crop: str) -> str:
     """

@@ -11,7 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.vision.analyzer import analyze_crop_image
 
 
-def test_vision_analysis(image_path, dialect, crop, description):
+def run_vision_analysis(image_path, dialect, crop, description):
     """Test vision analysis with a sample image"""
     print(f"\n{'='*70}")
     print(f"TEST: {description}")
@@ -93,6 +93,6 @@ if __name__ == '__main__':
     
     # Run test
     description = f"{dialect.upper()} - {crop.title()} pest/disease identification"
-    success = test_vision_analysis(image_path, dialect, crop, description)
+    success = run_vision_analysis(image_path, dialect, crop, description)
     
     sys.exit(0 if success else 1)

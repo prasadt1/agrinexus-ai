@@ -22,6 +22,15 @@ import boto3
 
 ENABLED = os.environ.get('NUDGE_BEDROCK_LINER', 'false').lower() == 'true'
 
+def invoke_nudge_focus_line(
+    dialect: str, crop: str, district: str, wind_speed: float
+) -> str:
+    """Entry point used by sender; maps flat args to weather dict."""
+    return generate_context_hint(
+        dialect, district, crop, {"wind_speed": wind_speed}
+    )
+
+
 def generate_context_hint(dialect: str, district: str, crop: str, weather: dict) -> str:
     """
     Generate AI-powered context hint for nudges.

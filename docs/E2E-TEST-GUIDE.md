@@ -27,17 +27,9 @@ All compute is serverless (Lambda, DynamoDB, SQS, Step Functions, EventBridge). 
    - `APP_SECRET` – WhatsApp app secret (for `X-Hub-Signature-256`). If verification is disabled in dev, you can omit it.
    - A **test phone number** in E.164 (e.g. `919876543210`). For voice and image tests, use a number that can send media (real WhatsApp Business numbers; test numbers often don’t support media).
 
-3. **Recommended (no typing URL each time):** Copy the example env file and edit with your values:
-   ```bash
-   cp scripts/demo.env.example scripts/demo.env
-   # Edit scripts/demo.env: set WEBHOOK_URL, APP_SECRET, PHONE_NUMBER
-   ```
-   All automated test scripts (`e2e-test.sh`, `reset-onboard-and-demo.sh`, `reset-profile.sh`, `demo-nudge-flow.sh`, etc.) **auto-load** `scripts/demo.env` when present. You can then run tests without passing env vars every time, e.g.:
-   ```bash
-   ./scripts/e2e-test.sh --phone +919876543210
-   # or, if PHONE_NUMBER is set in demo.env:
-   ./scripts/e2e-test.sh
-   ```
+3. **Recommended (no typing URL each time):** Create **`scripts/demo.env`** (gitignored) with at least **`WEBHOOK_URL`**, **`APP_SECRET`** (if webhook signature verification is on), and **`PHONE_NUMBER`**.
+   Scripts such as **`reset-onboard-and-demo.sh`**, **`demo-nudge-loop.sh`**, and **`demo-nudge-flow.sh`** **source** `scripts/demo.env` when the file exists.
+   There is no single “e2e-test.sh” in the repo; follow the curl / WhatsApp steps in the sections below, or use the demo scripts with your phone.
    `demo.env` is gitignored so secrets are not committed.
 
 4. **AWS CLI** configured (for Lambda invoke, DynamoDB reset, and integration tests).

@@ -134,7 +134,9 @@ def create_user_profile(phone_number: str, dialect: str, location: str, crop: st
             'onboarding_complete': True,
             'created_at': datetime.utcnow().isoformat(),
             'GSI1PK': f'LOCATION#{location}',
-            'GSI1SK': f'CROP#{crop}'
+            'GSI1SK': f'CROP#{crop}',
+            # Public demo: one weather nudge only (no T+24h/T+48h). Set demo_tier to 'full' in Dynamo for pilot partners.
+            'demo_tier': 'public',
         }
     )
 
@@ -178,7 +180,8 @@ def handle_onboarding(phone_number: str, message_text: str, profile: Optional[Di
                     'phone_number': phone_number,
                     'dialect': dialect,
                     'onboarding_state': 'location',
-                    'onboarding_complete': False
+                    'onboarding_complete': False,
+                    'demo_tier': 'public',
                 }
             )
             location_prompt = {
@@ -205,7 +208,8 @@ def handle_onboarding(phone_number: str, message_text: str, profile: Optional[Di
                 'SK': 'PROFILE',
                 'phone_number': phone_number,
                 'onboarding_state': 'language',
-                'onboarding_complete': False
+                'onboarding_complete': False,
+                'demo_tier': 'public',
             }
         )
         multilingual_welcome = """Welcome to AgriNexus AI! 🌾
@@ -502,7 +506,15 @@ def query_bedrock(query: str, dialect: str = 'hi', session_id: Optional[str] = N
         'promptTemplate': {
             'textPromptTemplate': f'''You are an agricultural extension agent helping smallholder farmers in India with FARMING questions ONLY.
 {language_instruction}
-Include source citations.
+
+RESPONSE STYLE (very important):
+- Sound like a calm, practical TV or radio farm advisory (DD Kisan / extension bulletin style): direct and trustworthy, not a research paper.
+- Lead with the ACTION the farmer should take first — not long background.
+- Main answer: at most 2-3 short sentences. For simple when / how much / what questions, give the direct answer in one or two sentences first.
+- Add at most one short sentence for "why" or "what to watch" only if it changes what they should do.
+- Use everyday words; if a technical term is needed, explain it in a few words.
+- Avoid long paragraphs, dense lists, and copying long passages from the context.
+- End with exactly ONE final line for traceability: Look at the search_results metadata and extract the actual document name or source title. Write a single compact line starting with "Source:" (or "स्रोत:" in Hindi, "स्त्रोत:" in Marathi, "మూలం:" in Telugu) followed by the actual document name from the metadata (e.g., "Source: FAO Cotton IPM Guide" or "स्रोत: ICAR कीट प्रबंधन सलाह"). Do NOT just write "Source: 1" or "स्रोत: 1".
 
 IMPORTANT RESTRICTIONS:
 - ONLY answer questions about agriculture, farming, crops, pests, diseases, fertilizers, weather, and farm management
@@ -514,7 +526,7 @@ Question: $query$
 
 Context: $search_results$
 
-Provide actionable farming advice with source references.'''
+Answer using the style rules above. Ground every claim in the context; if the context is insufficient, say so briefly and suggest contacting the local KVK or a qualified adviser.'''
         }
     }
     

@@ -359,6 +359,9 @@ def validate_general_advice(response: Dict) -> Dict:
 @pytest.mark.parametrize("question_data", GOLDEN_QUESTIONS)
 def test_golden_question(question_data):
     """Test each golden question with flexible validation"""
+    if not str(KNOWLEDGE_BASE_ID or "").strip():
+        pytest.skip("KNOWLEDGE_BASE_ID not set; skipping Bedrock KB integration tests")
+
     print(f"\n{'='*80}")
     print(f"Testing: {question_data['id']} ({question_data['language']})")
     print(f"Question: {question_data['question']}")
