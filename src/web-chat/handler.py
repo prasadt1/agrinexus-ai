@@ -43,7 +43,7 @@ def get_client_ip(event: Dict[str, Any]) -> str:
 def check_rate_limit(ip_address: str) -> Dict[str, Any]:
     """
     Check if IP has exceeded rate limit.
-    Returns: {'allowed': bool, 'remaining': int, 'reset_at': int}
+    Returns: {'allowed': bool, 'remaining': int, 'reset_at': int, 'current_count': int}
     """
     now = int(datetime.utcnow().timestamp())
     ttl = now + RATE_LIMIT_WINDOW
@@ -52,7 +52,37 @@ def check_rate_limit(ip_address: str) -> Dict[str, Any]:
     ip_hash = hashlib.sha256(ip_address.encode()).hexdigest()[:16]
     
     try:
-        # Try to increment counter atomically
+        # First, check current count without incrementing
+        try:
+            current_response = table.get_item(
+                Key={
+                    'PK': f'RATE_LIMIT#{ip_hash}',
+                    'SK': 'WEB_DEMO'
+                }
+            )
+            
+            if 'Item' in current_response:
+                current_count = int(current_response['Item'].get('count', 0))
+                current_ttl = int(current_response['Item'].get('ttl', 0))
+                
+                # Check if TTL expired (reset counter)
+                if current_ttl < now:
+                    current_count = 0
+            else:
+                current_count = 0
+        except Exception:
+            current_count = 0
+        
+        # Check if already at limit BEFORE incrementing
+        if current_count >= RATE_LIMIT:
+            return {
+                'allowed': False,
+                'remaining': 0,
+                'reset_at': ttl,
+                'current_count': current_count
+            }
+        
+        # Increment counter
         response = table.update_item(
             Key={
                 'PK': f'RATE_LIMIT#{ip_hash}',
@@ -75,9 +105,11 @@ def check_rate_limit(ip_address: str) -> Dict[str, Any]:
         remaining = max(0, RATE_LIMIT - count)
         
         return {
-            'allowed': count <= RATE_LIMIT,
+            'allowed': True,
             'remaining': remaining,
-            'reset_at': ttl
+            'reset_at': ttl,
+            'current_count': count
+        }
         }
     
     except Exception as e:
