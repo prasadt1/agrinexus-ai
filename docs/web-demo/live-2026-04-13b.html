@@ -321,7 +321,7 @@
 
         async function sendMessage() {
             const message = messageInput.value.trim();
-            if (!message || isProcessing) return;
+            if (!message || isProcessing || remainingQueries <= 0) return;
 
             isProcessing = true;
             sendButton.disabled = true;
@@ -362,9 +362,14 @@
                 showError('Sorry, something went wrong. Please try again.');
             } finally {
                 isProcessing = false;
-                sendButton.disabled = false;
-                messageInput.disabled = false;
-                messageInput.focus();
+                if (remainingQueries > 0) {
+                    sendButton.disabled = false;
+                    messageInput.disabled = false;
+                    messageInput.focus();
+                } else {
+                    sendButton.disabled = true;
+                    messageInput.disabled = true;
+                }
             }
         }
 
