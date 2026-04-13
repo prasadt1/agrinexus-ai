@@ -224,7 +224,7 @@ Resources:
       MemorySize: 512
       Environment:
         Variables:
-          WEB_RATE_LIMIT: "10"  # 10 queries per hour per IP
+          WEB_RATE_LIMIT: "5"  # 5 queries per hour per IP
           WEB_RATE_LIMIT_WINDOW: "3600"  # 1 hour
           MODEL_ARN: arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0
       Policies:

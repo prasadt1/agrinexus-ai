@@ -370,7 +370,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'body': json.dumps({
                     'reply': analysis,
                     'citations': ['Vision Analysis'],
-                    'remaining': rate_limit_status['remaining'] - 1,
+                    'remaining': rate_limit_status['remaining'],
                     'reset_at': rate_limit_status['reset_at']
                 })
             }
@@ -398,7 +398,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'body': json.dumps({
                 'reply': result['text'],
                 'citations': list(set(citations)),  # Deduplicate
-                'remaining': rate_limit_status['remaining'] - 1,
+                'remaining': rate_limit_status['remaining'],
                 'reset_at': rate_limit_status['reset_at']
             })
         }
