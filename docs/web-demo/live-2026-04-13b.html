@@ -277,9 +277,24 @@
                 const raw = localStorage.getItem(STORAGE_KEY);
                 const state = raw ? JSON.parse(raw) : {};
                 const lockedUntil = Number(state.lockedUntil || 0);
+                const lastRemaining = Number(state.remainingQueries);
+                const lastResetAt = Number(state.resetAtSeconds || 0);
+
+                if (Number.isFinite(lastRemaining) && lastRemaining >= 0) {
+                    remainingQueries = Math.max(0, Math.floor(lastRemaining));
+                    updateRateLimit(remainingQueries);
+                }
+
                 if (Number.isFinite(lockedUntil) && lockedUntil > Date.now()) {
                     remainingQueries = 0;
                     updateRateLimit(0);
+                }
+
+                // If we have resetAt in the past, clear any stale lockout/remaining.
+                if (Number.isFinite(lastResetAt) && lastResetAt > 0 && (lastResetAt * 1000) <= Date.now()) {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify({ clientId }));
+                    remainingQueries = 5;
+                    updateRateLimit(5);
                 }
             } catch {
                 // ignore
@@ -355,7 +370,23 @@
             try {
                 const raw = localStorage.getItem(STORAGE_KEY);
                 const state = raw ? JSON.parse(raw) : {};
-                localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, lockedUntil, clientId }));
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, lockedUntil, resetAtSeconds, remainingQueries: 0, clientId }));
+            } catch {
+                // ignore
+            }
+        }
+
+        function persistRateLimitState(remaining, resetAtSeconds) {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                const state = raw ? JSON.parse(raw) : {};
+                const next = {
+                    ...state,
+                    clientId,
+                    remainingQueries: Math.max(0, Math.floor(Number.isFinite(remaining) ? remaining : remainingQueries)),
+                    resetAtSeconds: Number.isFinite(resetAtSeconds) ? resetAtSeconds : (state.resetAtSeconds || 0),
+                };
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
             } catch {
                 // ignore
             }
@@ -405,6 +436,7 @@
                 const citation = data.citations && data.citations.length > 0 ? data.citations.join(', ') : null;
                 addMessage(data.reply, true, citation);
                 if (data.remaining !== undefined) updateRateLimit(data.remaining);
+                if (data.reset_at) persistRateLimitState(Number(data.remaining), Number(data.reset_at));
                 if (data.reset_at && Number(data.remaining) <= 0) persistLockout(Number(data.reset_at));
 
             } catch (error) {

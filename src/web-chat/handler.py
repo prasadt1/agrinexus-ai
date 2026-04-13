@@ -40,6 +40,56 @@ def get_client_ip(event: Dict[str, Any]) -> str:
     identity = request_context.get('identity', {})
     return identity.get('sourceIp', 'unknown')
 
+def _peek_rate_limit(identifier: str) -> Dict[str, Any]:
+    """
+    Read-only rate limit check (no increments).
+    Returns same shape as check_rate_limit(): allowed/remaining/reset_at/current_count.
+    """
+    now = int(datetime.utcnow().timestamp())
+    ident_hash = hashlib.sha256(identifier.encode()).hexdigest()[:16]
+
+    key = {
+        'PK': f'RATE_LIMIT#{ident_hash}',
+        'SK': 'WEB_DEMO'
+    }
+
+    try:
+        item = table.get_item(Key=key).get('Item') or {}
+        ttl = int(item.get('ttl', 0) or 0)
+        count = int(item.get('count', 0) or 0)
+
+        # Missing/expired -> fresh window, but don't create it here.
+        if ttl < now:
+            return {
+                'allowed': True,
+                'remaining': RATE_LIMIT,
+                'reset_at': now + RATE_LIMIT_WINDOW,
+                'current_count': 0
+            }
+
+        if count >= RATE_LIMIT:
+            return {
+                'allowed': False,
+                'remaining': 0,
+                'reset_at': ttl,
+                'current_count': count
+            }
+
+        return {
+            'allowed': True,
+            'remaining': max(0, RATE_LIMIT - count),
+            'reset_at': ttl,
+            'current_count': count
+        }
+    except Exception as e:
+        print(f"Rate limit peek error: {e}")
+        return {
+            'allowed': False,
+            'remaining': 0,
+            'reset_at': now + RATE_LIMIT_WINDOW,
+            'current_count': RATE_LIMIT
+        }
+
 
 def check_rate_limit(identifier: str) -> Dict[str, Any]:
     """
@@ -419,22 +469,36 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         client_ip = get_client_ip(event)
         client_id = str(body.get('client_id', '')).strip()
 
-        ip_status = check_rate_limit(f"IP#{client_ip}")
-        rate_limit_status = ip_status
-
+        # Pre-check (no increments) so we don't partially increment one bucket if the other is already over limit.
+        identifiers = [f"IP#{client_ip}"]
         if client_id:
             # Keep it bounded; we only support a short anonymous identifier
             if 16 <= len(client_id) <= 80:
-                cid_status = check_rate_limit(f"CID#{client_id}")
-                # Deny if either denies; remaining is the tighter bound
-                rate_limit_status = {
-                    'allowed': bool(ip_status.get('allowed')) and bool(cid_status.get('allowed')),
-                    'remaining': min(int(ip_status.get('remaining', 0)), int(cid_status.get('remaining', 0))),
-                    'reset_at': max(int(ip_status.get('reset_at', 0)), int(cid_status.get('reset_at', 0))),
-                    'current_count': max(int(ip_status.get('current_count', 0)), int(cid_status.get('current_count', 0))),
-                }
+                identifiers.append(f"CID#{client_id}")
             else:
                 print("Ignoring invalid client_id length for rate limiting.")
+
+        peeked = [_peek_rate_limit(i) for i in identifiers]
+        if any(not p.get('allowed') for p in peeked):
+            reset_at = max(int(p.get('reset_at', 0)) for p in peeked)
+            return {
+                'statusCode': 429,
+                'headers': headers,
+                'body': json.dumps({
+                    'error': 'Rate limit exceeded. Please try again later.',
+                    'remaining': 0,
+                    'reset_at': reset_at
+                })
+            }
+
+        # Increment all identifiers now that we know all are allowed.
+        statuses = [check_rate_limit(i) for i in identifiers]
+        rate_limit_status = {
+            'allowed': all(bool(s.get('allowed')) for s in statuses),
+            'remaining': min(int(s.get('remaining', 0)) for s in statuses),
+            'reset_at': max(int(s.get('reset_at', 0)) for s in statuses),
+            'current_count': max(int(s.get('current_count', 0)) for s in statuses),
+        }
         
         if not rate_limit_status['allowed']:
             return {
