@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <link rel="icon" type="image/png" href="./assets/logo.png">
+    <title>AgriNexus AI - Web Demo (Live)</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        /* Cotton-field themed background (inline SVG, no external assets). */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+            background:
+                linear-gradient(180deg, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.35) 100%),
+                url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1200 800%22%3E%3Cdefs%3E%3CradialGradient id=%22sky%22 cx=%2250%25%22 cy=%2225%25%22 r=%2275%25%22%3E%3Cstop offset=%220%25%22 stop-color=%22%23eaf7ff%22/%3E%3Cstop offset=%22100%25%22 stop-color=%22%23bfe6f3%22/%3E%3C/radialGradient%3E%3ClinearGradient id=%22haze%22 x1=%220%25%22 y1=%220%25%22 x2=%220%25%22 y2=%22100%25%22%3E%3Cstop offset=%220%25%22 stop-color=%22%23ffffff%22 stop-opacity=%220.55%22/%3E%3Cstop offset=%2235%25%22 stop-color=%22%23ffffff%22 stop-opacity=%220.15%22/%3E%3Cstop offset=%22100%25%22 stop-color=%22%23000000%22 stop-opacity=%220%22/%3E%3C/linearGradient%3E%3ClinearGradient id=%22field%22 x1=%220%25%22 y1=%220%25%22 x2=%220%25%22 y2=%22100%25%22%3E%3Cstop offset=%220%25%22 stop-color=%22%232d8b4e%22/%3E%3Cstop offset=%22100%25%22 stop-color=%22%2312462a%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%221200%22 height=%22360%22 fill=%22url(%23sky)%22/%3E%3Crect y=%22320%22 width=%221200%22 height=%22480%22 fill=%22url(%23field)%22/%3E%3Crect y=%22260%22 width=%221200%22 height=%22180%22 fill=%22url(%23haze)%22/%3E%3C!-- cotton rows --%3E%3Cg opacity=%220.18%22 stroke=%22%23ffffff%22 stroke-width=%223%22%3E%3Cpath d=%22M0 380 C260 410 420 520 600 800%22 fill=%22none%22/%3E%3Cpath d=%22M160 370 C360 420 520 540 700 800%22 fill=%22none%22/%3E%3Cpath d=%22M320 365 C470 430 630 560 800 800%22 fill=%22none%22/%3E%3Cpath d=%22M480 365 C600 440 760 580 900 800%22 fill=%22none%22/%3E%3Cpath d=%22M640 370 C740 450 890 600 1000 800%22 fill=%22none%22/%3E%3Cpath d=%22M800 380 C880 470 1010 620 1100 800%22 fill=%22none%22/%3E%3C/g%3E%3C!-- cotton bolls dots --%3E%3Cg opacity=%220.22%22%3E%3Cg fill=%22%23fff%22%3E%3Ccircle cx=%22120%22 cy=%22580%22 r=%226%22/%3E%3Ccircle cx=%22190%22 cy=%22630%22 r=%225%22/%3E%3Ccircle cx=%22280%22 cy=%22540%22 r=%226%22/%3E%3Ccircle cx=%22370%22 cy=%22610%22 r=%225%22/%3E%3Ccircle cx=%22460%22 cy=%22550%22 r=%226%22/%3E%3Ccircle cx=%22570%22 cy=%22620%22 r=%225%22/%3E%3Ccircle cx=%22680%22 cy=%22560%22 r=%226%22/%3E%3Ccircle cx=%22790%22 cy=%22630%22 r=%225%22/%3E%3Ccircle cx=%22910%22 cy=%22570%22 r=%226%22/%3E%3Ccircle cx=%221030%22 cy=%22620%22 r=%225%22/%3E%3C/circle%3E%3C/g%3E%3Cg fill=%22%23f5a623%22 opacity=%220.6%22%3E%3Ccircle cx=%22210%22 cy=%22660%22 r=%222%22/%3E%3Ccircle cx=%22400%22 cy=%22650%22 r=%222%22/%3E%3Ccircle cx=%22610%22 cy=%22670%22 r=%222%22/%3E%3Ccircle cx=%22830%22 cy=%22660%22 r=%222%22/%3E%3Ccircle cx=%221020%22 cy=%22680%22 r=%222%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');
+            background-size: cover;
+            background-attachment: fixed;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at 20% 40%, rgba(245, 166, 35, 0.12) 0%, transparent 55%),
+                radial-gradient(circle at 80% 75%, rgba(0, 168, 204, 0.10) 0%, transparent 55%);
+            pointer-events: none;
+        }
+
+        .container {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+            max-width: 600px;
+            width: 100%;
+            height: 90vh;
+            max-height: 700px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2D8B4E 0%, #1a5c32 100%);
+            color: white;
+            padding: 24px 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 0;
+            right: 0;
+            height: 10px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.12), transparent);
+        }
+
+        .logo {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 12px;
+            background: white;
+            border-radius: 12px;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo svg { width: 100%; height: 100%; display: block; }
+
+        .header h1 { font-size: 26px; margin-bottom: 6px; font-weight: 700; }
+        .header p { font-size: 14px; opacity: 0.95; font-weight: 400; }
+
+        .language-selector { margin-top: 12px; }
+        .language-selector select {
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            outline: none;
+            backdrop-filter: blur(10px);
+            font-weight: 500;
+        }
+        .language-selector select option { color: #333; background: white; }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background:
+                linear-gradient(to bottom, #f8f9fa 0%, #ffffff 100%),
+                url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 140 140%22%3E%3C!-- subtle cotton boll pattern --%3E%3Cg opacity=%220.14%22%3E%3Cg fill=%22%23f5a623%22%3E%3Ccircle cx=%2222%22 cy=%2220%22 r=%223%22/%3E%3Ccircle cx=%2290%22 cy=%2236%22 r=%223%22/%3E%3Ccircle cx=%2260%22 cy=%2290%22 r=%223%22/%3E%3C/g%3E%3Cg fill=%22%23ffffff%22 stroke=%22%23e9eef2%22 stroke-width=%221%22%3E%3Ccircle cx=%2220%22 cy=%2218%22 r=%227%22/%3E%3Ccircle cx=%2228%22 cy=%2223%22 r=%226%22/%3E%3Ccircle cx=%2215%22 cy=%2226%22 r=%226%22/%3E%3Ccircle cx=%2288%22 cy=%2234%22 r=%227%22/%3E%3Ccircle cx=%2296%22 cy=%2239%22 r=%226%22/%3E%3Ccircle cx=%2283%22 cy=%2242%22 r=%226%22/%3E%3Ccircle cx=%2258%22 cy=%2288%22 r=%227%22/%3E%3Ccircle cx=%2266%22 cy=%2293%22 r=%226%22/%3E%3Ccircle cx=%2253%22 cy=%2296%22 r=%226%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');
+            background-size: cover, 140px 140px;
+        }
+
+        .message { margin-bottom: 16px; display: flex; animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px);} to { opacity: 1; transform: translateY(0);} }
+        .message.bot { justify-content: flex-start; }
+        .message.user { justify-content: flex-end; }
+
+        .message-content {
+            max-width: 80%;
+            padding: 14px 18px;
+            border-radius: 18px;
+            word-wrap: break-word;
+            line-height: 1.5;
+        }
+
+        .message.bot .message-content {
+            background: linear-gradient(135deg, #2D8B4E 0%, #1a5c32 100%);
+            color: white;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 2px 8px rgba(45, 139, 78, 0.3);
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #F5A623 0%, #e89610 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+            box-shadow: 0 2px 8px rgba(245, 166, 35, 0.3);
+        }
+
+        .citation {
+            font-size: 11px;
+            opacity: 0.85;
+            margin-top: 8px;
+            font-style: italic;
+            border-top: 1px solid rgba(255,255,255,0.2);
+            padding-top: 6px;
+        }
+
+        .typing-indicator { display: none; padding: 14px 18px; background: linear-gradient(135deg, #2D8B4E 0%, #1a5c32 100%); border-radius: 18px; width: 60px; }
+        .typing-indicator.active { display: block; }
+        .typing-indicator span { height: 8px; width: 8px; background: white; border-radius: 50%; display: inline-block; margin-right: 3px; animation: bounce 1.4s infinite ease-in-out both; }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0);} 40% { transform: scale(1);} }
+
+        .input-area { padding: 20px; background: white; border-top: 1px solid #e0e0e0; }
+        .input-container { display: flex; gap: 10px; margin-bottom: 10px; }
+        .input-wrapper { flex: 1; position: relative; }
+        .input-container input {
+            width: 100%;
+            padding: 14px 18px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        .input-container input:focus { border-color: #2D8B4E; }
+
+        .input-container button.send-btn {
+            padding: 14px 28px;
+            background: linear-gradient(135deg, #2D8B4E 0%, #1a5c32 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 12px rgba(45, 139, 78, 0.3);
+        }
+        .input-container button.send-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(45, 139, 78, 0.4); }
+        .input-container button.send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .rate-limit-info { font-size: 12px; color: #666; text-align: center; }
+        .error-message { background: #ff4444; color: white; padding: 12px; border-radius: 12px; margin: 10px 20px; text-align: center; font-size: 14px; animation: fadeIn 0.3s ease-in; }
+        .privacy-notice { font-size: 11px; color: #999; text-align: center; padding: 12px 20px; background: #f9f9f9; border-top: 1px solid #e0e0e0; }
+
+        @media (max-width: 600px) {
+            .container { height: 100vh; max-height: 100vh; border-radius: 0; }
+            .header h1 { font-size: 22px; }
+            .message-content { max-width: 85%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <img src="./assets/logo.png" alt="AgriNexus AI logo" width="32" height="32" style="display:block;">
+            </div>
+            <h1>AgriNexus AI</h1>
+            <p>Your farming advisor — ask about crops, pests, fertilizers, and timing</p>
+            <div class="language-selector">
+                <select id="language">
+                    <option value="en">English</option>
+                    <option value="hi">हिंदी (Hindi)</option>
+                    <option value="mr">मराठी (Marathi)</option>
+                    <option value="te">తెలుగు (Telugu)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+            <div class="message bot">
+                <div class="message-content">
+                    Welcome to AgriNexus AI!<br><br>
+                    Ask a farming question (text-only web demo).<br>
+                    <small style="opacity: 0.8; margin-top: 8px; display: block;">You have 5 free questions per hour</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <div class="input-container">
+                <div class="input-wrapper">
+                    <input
+                        type="text"
+                        id="messageInput"
+                        placeholder="Type your farming question..."
+                        maxlength="500"
+                    />
+                </div>
+                <button class="send-btn" id="sendButton">Send</button>
+            </div>
+            <div class="rate-limit-info" id="rateLimitInfo">5 questions remaining this hour</div>
+        </div>
+
+        <div class="privacy-notice">
+            🔒 Privacy-friendly demo. No phone number required.
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_URL = 'https://h4bt24ycdl.execute-api.us-east-1.amazonaws.com/dev/chat';
+
+        const chatMessages = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const languageSelect = document.getElementById('language');
+        const rateLimitInfo = document.getElementById('rateLimitInfo');
+        let isProcessing = false;
+        let remainingQueries = 5;
+
+        function addMessage(text, isBot = false, citation = null) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isBot ? 'bot' : 'user'}`;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+
+            contentDiv.textContent = text;
+
+            if (citation && isBot) {
+                const citationDiv = document.createElement('div');
+                citationDiv.className = 'citation';
+                citationDiv.textContent = `📚 ${citation}`;
+                contentDiv.appendChild(citationDiv);
+            }
+
+            messageDiv.appendChild(contentDiv);
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function showTyping() {
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message bot';
+            typingDiv.id = 'typingIndicator';
+
+            const indicator = document.createElement('div');
+            indicator.className = 'typing-indicator active';
+            indicator.innerHTML = '<span></span><span></span><span></span>';
+
+            typingDiv.appendChild(indicator);
+            chatMessages.appendChild(typingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function hideTyping() {
+            const typingIndicator = document.getElementById('typingIndicator');
+            if (typingIndicator) typingIndicator.remove();
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            chatMessages.appendChild(errorDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            setTimeout(() => errorDiv.remove(), 5000);
+        }
+
+        function updateRateLimit(remaining) {
+            const safeRemaining = Math.max(0, Number.isFinite(remaining) ? remaining : remainingQueries);
+            remainingQueries = safeRemaining;
+            rateLimitInfo.textContent = `${safeRemaining} question${safeRemaining !== 1 ? 's' : ''} remaining this hour`;
+            if (safeRemaining <= 0) {
+                messageInput.disabled = true;
+                sendButton.disabled = true;
+                rateLimitInfo.textContent = 'Rate limit reached. Please try again later.';
+            } else {
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+            }
+        }
+
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message || isProcessing) return;
+
+            isProcessing = true;
+            sendButton.disabled = true;
+            messageInput.disabled = true;
+
+            addMessage(message, false, null);
+            messageInput.value = '';
+
+            showTyping();
+
+            try {
+                const requestBody = { language: languageSelect.value, message };
+
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+
+                hideTyping();
+
+                if (response.status === 429) {
+                    showError('Rate limit exceeded. Please try again later.');
+                    updateRateLimit(0);
+                    return;
+                }
+
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                const data = await response.json();
+                const citation = data.citations && data.citations.length > 0 ? data.citations.join(', ') : null;
+                addMessage(data.reply, true, citation);
+                if (data.remaining !== undefined) updateRateLimit(data.remaining);
+
+            } catch (error) {
+                hideTyping();
+                console.error('Error:', error);
+                showError('Sorry, something went wrong. Please try again.');
+            } finally {
+                isProcessing = false;
+                sendButton.disabled = false;
+                messageInput.disabled = false;
+                messageInput.focus();
+            }
+        }
+
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+        messageInput.focus();
+    </script>
+</body>
+</html>
+
