@@ -20,7 +20,7 @@ TABLE_NAME = os.environ['TABLE_NAME']
 KB_ID = os.environ['KNOWLEDGE_BASE_ID']
 GUARDRAIL_ID = os.environ.get('GUARDRAIL_ID', '')
 GUARDRAIL_VERSION = os.environ.get('GUARDRAIL_VERSION', '1')
-RATE_LIMIT = int(os.environ.get('WEB_RATE_LIMIT', '10'))  # 10 queries per hour
+RATE_LIMIT = int(os.environ.get('WEB_RATE_LIMIT', '5'))  # 5 queries per hour
 RATE_LIMIT_WINDOW = int(os.environ.get('WEB_RATE_LIMIT_WINDOW', '3600'))  # 1 hour
 
 table = dynamodb.Table(TABLE_NAME)
@@ -46,69 +46,70 @@ def check_rate_limit(ip_address: str) -> Dict[str, Any]:
     Returns: {'allowed': bool, 'remaining': int, 'reset_at': int, 'current_count': int}
     """
     now = int(datetime.utcnow().timestamp())
-    ttl = now + RATE_LIMIT_WINDOW
     
     # Hash IP for privacy (don't store raw IPs)
     ip_hash = hashlib.sha256(ip_address.encode()).hexdigest()[:16]
     
     try:
-        # First, check current count without incrementing
-        try:
-            current_response = table.get_item(
-                Key={
-                    'PK': f'RATE_LIMIT#{ip_hash}',
-                    'SK': 'WEB_DEMO'
+        key = {
+            'PK': f'RATE_LIMIT#{ip_hash}',
+            'SK': 'WEB_DEMO'
+        }
+
+        current_response = table.get_item(Key=key)
+        item = current_response.get('Item')
+
+        # New window if missing/expired
+        if not item or int(item.get('ttl', 0)) < now:
+            reset_at = now + RATE_LIMIT_WINDOW
+            table.put_item(
+                Item={
+                    **key,
+                    'count': 1,
+                    'ttl': reset_at
                 }
             )
-            
-            if 'Item' in current_response:
-                current_count = int(current_response['Item'].get('count', 0))
-                current_ttl = int(current_response['Item'].get('ttl', 0))
-                
-                # Check if TTL expired (reset counter)
-                if current_ttl < now:
-                    current_count = 0
-            else:
-                current_count = 0
-        except Exception:
-            current_count = 0
-        
-        # Check if already at limit BEFORE incrementing
+            return {
+                'allowed': True,
+                'remaining': max(0, RATE_LIMIT - 1),
+                'reset_at': reset_at,
+                'current_count': 1
+            }
+
+        current_count = int(item.get('count', 0))
+        reset_at = int(item.get('ttl', now + RATE_LIMIT_WINDOW))
+
         if current_count >= RATE_LIMIT:
             return {
                 'allowed': False,
                 'remaining': 0,
-                'reset_at': ttl,
+                'reset_at': reset_at,
                 'current_count': current_count
             }
-        
-        # Increment counter
+
+        # Atomic increment; keep existing ttl (fixed window)
         response = table.update_item(
-            Key={
-                'PK': f'RATE_LIMIT#{ip_hash}',
-                'SK': 'WEB_DEMO'
-            },
-            UpdateExpression='SET #count = if_not_exists(#count, :zero) + :inc, #ttl = :ttl',
+            Key=key,
+            UpdateExpression='SET #count = #count + :inc',
+            ConditionExpression='#ttl >= :now AND #count < :limit',
             ExpressionAttributeNames={
                 '#count': 'count',
                 '#ttl': 'ttl'
             },
             ExpressionAttributeValues={
-                ':zero': 0,
                 ':inc': 1,
-                ':ttl': ttl
+                ':now': now,
+                ':limit': RATE_LIMIT
             },
             ReturnValues='ALL_NEW'
         )
-        
-        count = int(response['Attributes']['count'])
-        remaining = max(0, RATE_LIMIT - count)
-        
+
+        new_count = int(response['Attributes']['count'])
         return {
             'allowed': True,
-            'remaining': remaining,
-            'reset_at': ttl,
-            'current_count': count
+            'remaining': max(0, RATE_LIMIT - new_count),
+            'reset_at': reset_at,
+            'current_count': new_count
         }
     
     except Exception as e:
@@ -117,7 +118,7 @@ def check_rate_limit(ip_address: str) -> Dict[str, Any]:
         return {
             'allowed': True,
             'remaining': RATE_LIMIT,
-            'reset_at': ttl
+            'reset_at': now + RATE_LIMIT_WINDOW
         }
 
 
@@ -217,18 +218,22 @@ def analyze_image(image_base64: str, dialect: str = 'en') -> str:
     Returns:
         Analysis text
     """
-    # Remove data URI prefix if present
-    if ',' in image_base64:
-        image_base64 = image_base64.split(',')[1]
-    
-    # Detect media type from original data URI or default to jpeg
+    # Detect media type from data URI (if present)
+    raw = image_base64
     media_type = "image/jpeg"
-    if 'data:image/png' in image_base64:
-        media_type = "image/png"
-    elif 'data:image/webp' in image_base64:
-        media_type = "image/webp"
-    elif 'data:image/gif' in image_base64:
-        media_type = "image/gif"
+    if raw.startswith('data:image/'):
+        if raw.startswith('data:image/png'):
+            media_type = "image/png"
+        elif raw.startswith('data:image/webp'):
+            media_type = "image/webp"
+        elif raw.startswith('data:image/gif'):
+            media_type = "image/gif"
+        elif raw.startswith('data:image/jpeg') or raw.startswith('data:image/jpg'):
+            media_type = "image/jpeg"
+
+    # Remove data URI prefix if present
+    if ',' in raw:
+        image_base64 = raw.split(',')[1]
     
     # Language-specific prompts
     prompts = {

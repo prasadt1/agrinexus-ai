@@ -577,13 +577,17 @@
         }
 
         function updateRateLimit(remaining) {
-            remainingQueries = remaining;
-            rateLimitInfo.textContent = `${remaining} question${remaining !== 1 ? 's' : ''} remaining this hour`;
+            const safeRemaining = Math.max(0, Number.isFinite(remaining) ? remaining : remainingQueries);
+            remainingQueries = safeRemaining;
+            rateLimitInfo.textContent = `${safeRemaining} question${safeRemaining !== 1 ? 's' : ''} remaining this hour`;
             
-            if (remaining === 0) {
+            if (safeRemaining <= 0) {
                 messageInput.disabled = true;
                 sendButton.disabled = true;
                 rateLimitInfo.textContent = 'Rate limit reached. Please try again later.';
+            } else {
+                messageInput.disabled = false;
+                sendButton.disabled = false;
             }
         }
 
@@ -648,9 +652,7 @@
                 addMessage(data.reply, true, citation);
 
                 // Update rate limit
-                if (data.remaining !== undefined) {
-                    updateRateLimit(data.remaining);
-                }
+                if (data.remaining !== undefined) updateRateLimit(data.remaining);
 
             } catch (error) {
                 hideTyping();
