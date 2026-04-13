@@ -1,11 +1,12 @@
 """
 Web Chat Handler
-Provides a public API for text-based queries without phone numbers.
+Provides a public API for text-based queries and image analysis without phone numbers.
 Reuses existing Bedrock RAG logic from processor.
 """
 import json
 import os
 import boto3
+import base64
 from typing import Dict, Any
 from datetime import datetime
 from decimal import Decimal
@@ -13,6 +14,7 @@ import hashlib
 
 dynamodb = boto3.resource('dynamodb')
 bedrock_agent = boto3.client('bedrock-agent-runtime')
+bedrock_runtime = boto3.client('bedrock-runtime')
 
 TABLE_NAME = os.environ['TABLE_NAME']
 KB_ID = os.environ['KNOWLEDGE_BASE_ID']
@@ -173,6 +175,92 @@ Answer using the style rules above. Ground every claim in the context; if the co
     }
 
 
+def analyze_image(image_base64: str, dialect: str = 'en') -> str:
+    """
+    Analyze crop image using Claude 3 Sonnet vision
+    
+    Args:
+        image_base64: Base64 encoded image (with or without data URI prefix)
+        dialect: Language for response
+    
+    Returns:
+        Analysis text
+    """
+    # Remove data URI prefix if present
+    if ',' in image_base64:
+        image_base64 = image_base64.split(',')[1]
+    
+    # Decode to get image bytes
+    image_bytes = base64.b64decode(image_base64)
+    
+    # Language-specific prompts
+    prompts = {
+        'hi': '''आप एक कृषि विशेषज्ञ हैं। इस फसल की तस्वीर का विश्लेषण करें और बताएं:
+1. यह कौन सी फसल है?
+2. क्या कोई कीट या रोग दिखाई दे रहा है?
+3. पौधे की स्वास्थ्य स्थिति क्या है?
+4. क्या सुधार की आवश्यकता है?
+
+संक्षिप्त और व्यावहारिक सलाह दें।''',
+        'mr': '''तुम्ही शेती तज्ञ आहात। या पिकाच्या फोटोचे विश्लेषण करा आणि सांगा:
+1. हे कोणते पीक आहे?
+2. काही किडे किंवा रोग दिसत आहेत का?
+3. रोपाची आरोग्य स्थिती काय आहे?
+4. काही सुधारणा आवश्यक आहे का?
+
+संक्षिप्त आणि व्यावहारिक सल्ला द्या।''',
+        'te': '''మీరు వ్యవసాయ నిపుణులు. ఈ పంట ఫోటోను విశ్లేషించి చెప్పండి:
+1. ఇది ఏ పంట?
+2. ఏదైనా పురుగులు లేదా వ్యాధులు కనిపిస్తున్నాయా?
+3. మొక్క ఆరోగ్య స్థితి ఏమిటి?
+4. ఏదైనా మెరుగుదల అవసరమా?
+
+సంక్షిప్త మరియు ఆచరణాత్మక సలహా ఇవ్వండి।''',
+        'en': '''You are an agricultural expert. Analyze this crop image and tell me:
+1. What crop is this?
+2. Are there any pests or diseases visible?
+3. What is the plant's health status?
+4. What improvements are needed?
+
+Provide brief and practical advice.'''
+    }
+    
+    prompt = prompts.get(dialect, prompts['en'])
+    
+    # Call Claude 3 Sonnet with vision
+    request_body = {
+        "anthropic_version": "bedrock-2023-05-31",
+        "max_tokens": 1000,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/jpeg",
+                            "data": image_base64
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": prompt
+                    }
+                ]
+            }
+        ]
+    }
+    
+    response = bedrock_runtime.invoke_model(
+        modelId='anthropic.claude-3-sonnet-20240229-v1:0',
+        body=json.dumps(request_body)
+    )
+    
+    response_body = json.loads(response['body'].read())
+    return response_body['content'][0]['text']
+
+
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Handle web chat API requests
@@ -211,18 +299,19 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         body = json.loads(event.get('body', '{}'))
         message = body.get('message', '').strip()
         language = body.get('language', 'en')
+        image = body.get('image')  # Base64 encoded image
         
         # Validate input
-        if not message:
+        if not message and not image:
             return {
                 'statusCode': 400,
                 'headers': headers,
                 'body': json.dumps({
-                    'error': 'Message is required'
+                    'error': 'Message or image is required'
                 })
             }
         
-        if len(message) > 500:
+        if message and len(message) > 500:
             return {
                 'statusCode': 400,
                 'headers': headers,
@@ -249,7 +338,23 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 })
             }
         
-        # Query Bedrock
+        # Process image if provided
+        if image:
+            print(f"Processing image analysis request")
+            analysis = analyze_image(image, language)
+            
+            return {
+                'statusCode': 200,
+                'headers': headers,
+                'body': json.dumps({
+                    'reply': analysis,
+                    'citations': ['Vision Analysis'],
+                    'remaining': rate_limit_status['remaining'] - 1,
+                    'reset_at': rate_limit_status['reset_at']
+                })
+            }
+        
+        # Query Bedrock for text
         result = query_bedrock(message, language)
         
         # Format citations
