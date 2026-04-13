@@ -110,7 +110,6 @@ def check_rate_limit(ip_address: str) -> Dict[str, Any]:
             'reset_at': ttl,
             'current_count': count
         }
-        }
     
     except Exception as e:
         print(f"Rate limit check error: {e}")
