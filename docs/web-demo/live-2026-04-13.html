@@ -6,6 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath d='M128 234c-9 0-16-7-16-16V118c0-9 7-16 16-16s16 7 16 16v100c0 9-7 16-16 16z' fill='%2300A8CC'/%3E%3Cpath d='M128 26c-40 0-73 27-87 63-15 39-8 83 22 112 15 15 34 24 55 27 5 1 10-3 10-9V62c0-20 0-36 0-36z' fill='none'/%3E%3Cpath d='M128 26c-40 0-73 27-87 63-15 39-8 83 22 112 15 15 34 24 55 27 5 1 10-3 10-9V62c0-20 0-36 0-36z' fill='%232D8B4E'/%3E%3Cpath d='M128 26c40 0 73 27 87 63 15 39 8 83-22 112-15 15-34 24-55 27-5 1-10-3-10-9V62c0-20 0-36 0-36z' fill='%2300A8CC'/%3E%3Cpath d='M70 106c16-32 45-54 58-63M186 106c-16-32-45-54-58-63' stroke='%23ffffff' stroke-opacity='.0'/%3E%3Cpath d='M90 114c10-14 25-25 38-31M90 144c11-10 26-17 38-20M90 174c12-7 25-11 38-12' stroke='%231a5c32' stroke-width='10' stroke-linecap='round' fill='none'/%3E%3Cpath d='M166 98v28M166 128h28M154 116h24M150 148h34M150 170h22' stroke='%2300A8CC' stroke-width='10' stroke-linecap='round' fill='none'/%3E%3Cg fill='%23F5A623'%3E%3Ccircle cx='194' cy='126' r='8'/%3E%3Ccircle cx='184' cy='148' r='8'/%3E%3Ccircle cx='172' cy='170' r='8'/%3E%3Ccircle cx='166' cy='98' r='8'/%3E%3C/g%3E%3Cpath d='M50 156c8 26 28 48 56 60' stroke='%232D8B4E' stroke-width='14' stroke-linecap='round' fill='none'/%3E%3Cpath d='M206 156c-8 26-28 48-56 60' stroke='%2300A8CC' stroke-width='14' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
     <title>AgriNexus AI - Web Demo (Live)</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -82,7 +83,7 @@
             justify-content: center;
         }
 
-        .logo svg { width: 100%; height: 100%; }
+        .logo svg { width: 100%; height: 100%; display: block; }
 
         .header h1 { font-size: 26px; margin-bottom: 6px; font-weight: 700; }
         .header p { font-size: 14px; opacity: 0.95; font-weight: 400; }
@@ -199,34 +200,26 @@
     <div class="container">
         <div class="header">
             <div class="logo">
-                <!-- Leaf + circuit logo -->
-                <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-                    <!-- Left leaf (green) -->
-                    <path d="M30 60 Q30 30, 45 20 Q50 18, 52 22 L52 50 Q52 58, 48 62 L35 75 Q30 78, 28 72 Z"
-                          fill="#2D8B4E" stroke="#2D8B4E" stroke-width="2"/>
-                    <path d="M35 35 L42 45 M38 45 L45 55 M42 55 L48 62"
-                          stroke="#1a5c32" stroke-width="2" fill="none"/>
-
-                    <!-- Right leaf (cyan/tech) -->
-                    <path d="M90 60 Q90 30, 75 20 Q70 18, 68 22 L68 50 Q68 58, 72 62 L85 75 Q90 78, 92 72 Z"
-                          fill="#00A8CC" stroke="#00A8CC" stroke-width="2"/>
-
-                    <!-- Circuit lines -->
-                    <line x1="70" y1="30" x2="85" y2="30" stroke="#00A8CC" stroke-width="2.5"/>
-                    <line x1="70" y1="45" x2="85" y2="45" stroke="#00A8CC" stroke-width="2.5"/>
-                    <line x1="70" y1="60" x2="85" y2="60" stroke="#00A8CC" stroke-width="2.5"/>
-
-                    <!-- Circuit nodes (golden) -->
-                    <circle cx="87" cy="30" r="3" fill="#F5A623"/>
-                    <circle cx="87" cy="45" r="3" fill="#F5A623"/>
-                    <circle cx="87" cy="60" r="3" fill="#F5A623"/>
-                    <circle cx="75" cy="37" r="2.5" fill="#00A8CC"/>
-                    <circle cx="75" cy="52" r="2.5" fill="#00A8CC"/>
-
+                <!-- Brand logo (leaf + circuit leaf) -->
+                <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-label="AgriNexus AI logo">
+                    <!-- Outer leaves (approx brand mark) -->
+                    <path d="M128 26c-40 0-73 27-87 63-15 39-8 83 22 112 15 15 34 24 55 27 5 1 10-3 10-9V62c0-20 0-36 0-36z" fill="#2D8B4E"/>
+                    <path d="M128 26c40 0 73 27 87 63 15 39 8 83-22 112-15 15-34 24-55 27-5 1-10-3-10-9V62c0-20 0-36 0-36z" fill="#00A8CC"/>
+                    <!-- Bottom leaf hints -->
+                    <path d="M50 156c8 26 28 48 56 60" stroke="#2D8B4E" stroke-width="14" stroke-linecap="round" fill="none"/>
+                    <path d="M206 156c-8 26-28 48-56 60" stroke="#00A8CC" stroke-width="14" stroke-linecap="round" fill="none"/>
                     <!-- Stem -->
-                    <line x1="60" y1="75" x2="60" y2="95" stroke="#2D8B4E" stroke-width="3"/>
-                    <path d="M60 75 Q45 70, 35 75" stroke="#2D8B4E" stroke-width="2" fill="none"/>
-                    <path d="M60 75 Q75 70, 85 75" stroke="#00A8CC" stroke-width="2" fill="none"/>
+                    <path d="M128 234c-9 0-16-7-16-16V118c0-9 7-16 16-16s16 7 16 16v100c0 9-7 16-16 16z" fill="#00A8CC"/>
+                    <!-- Left veins -->
+                    <path d="M90 114c10-14 25-25 38-31M90 144c11-10 26-17 38-20M90 174c12-7 25-11 38-12" stroke="#1a5c32" stroke-width="10" stroke-linecap="round" fill="none"/>
+                    <!-- Right circuits -->
+                    <path d="M166 98v28M166 128h28M154 116h24M150 148h34M150 170h22" stroke="#00A8CC" stroke-width="10" stroke-linecap="round" fill="none"/>
+                    <g fill="#F5A623">
+                        <circle cx="166" cy="98" r="8"/>
+                        <circle cx="194" cy="126" r="8"/>
+                        <circle cx="184" cy="148" r="8"/>
+                        <circle cx="172" cy="170" r="8"/>
+                    </g>
                 </svg>
             </div>
             <h1>AgriNexus AI</h1>
