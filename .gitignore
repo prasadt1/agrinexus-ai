@@ -20,6 +20,9 @@ scripts/reset-onboard-and-demo.sh
 # SAM build artifacts (do not commit)
 .aws-sam/
 
+# D2 CLI export scratch (regenerate with scripts/export-d2-diagrams.sh)
+docs/diagrams/d2/out/
+
 # Kiro/agent specs (internal planning; keep local for public repo)
 .kiro/
 

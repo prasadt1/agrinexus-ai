@@ -1,6 +1,6 @@
 # Architecture Diagrams
 
-Mermaid diagrams for AgriNexus AI. Rendered on GitHub.
+Mermaid diagrams for AgriNexus AI. Rendered on GitHub. These stay **accuracy-first** (and may look plain compared to slide decks); for **finalist-style** static or animated figures for AWS Builder, see [`../docs/diagrams/ARTICLE-POLISHED-DIAGRAM.md`](../docs/diagrams/ARTICLE-POLISHED-DIAGRAM.md).
 
 ## System architecture (competition-style, accurate)
 
