@@ -190,39 +190,49 @@ def analyze_image(image_base64: str, dialect: str = 'en') -> str:
     if ',' in image_base64:
         image_base64 = image_base64.split(',')[1]
     
-    # Decode to get image bytes
-    image_bytes = base64.b64decode(image_base64)
+    # Detect media type from original data URI or default to jpeg
+    media_type = "image/jpeg"
+    if 'data:image/png' in image_base64:
+        media_type = "image/png"
+    elif 'data:image/webp' in image_base64:
+        media_type = "image/webp"
+    elif 'data:image/gif' in image_base64:
+        media_type = "image/gif"
     
     # Language-specific prompts
     prompts = {
-        'hi': '''आप एक कृषि विशेषज्ञ हैं। इस फसल की तस्वीर का विश्लेषण करें और बताएं:
+        'hi': '''आप एक कृषि विशेषज्ञ हैं जो भारतीय किसानों की मदद करते हैं। इस तस्वीर को देखें और बताएं:
+
 1. यह कौन सी फसल है?
-2. क्या कोई कीट या रोग दिखाई दे रहा है?
-3. पौधे की स्वास्थ्य स्थिति क्या है?
-4. क्या सुधार की आवश्यकता है?
+2. पौधे की स्वास्थ्य स्थिति कैसी है?
+3. क्या कोई कीट, रोग या पोषण की कमी दिखाई दे रही है?
+4. क्या सुधार की सलाह देंगे?
 
-संक्षिप्त और व्यावहारिक सलाह दें।''',
-        'mr': '''तुम्ही शेती तज्ञ आहात। या पिकाच्या फोटोचे विश्लेषण करा आणि सांगा:
+संक्षिप्त और व्यावहारिक जवाब दें। अगर तस्वीर में फसल नहीं है, तो बताएं कि आप क्या देख रहे हैं।''',
+        'mr': '''तुम्ही भारतीय शेतकऱ्यांना मदत करणारे शेती तज्ञ आहात. हा फोटो पहा आणि सांगा:
+
 1. हे कोणते पीक आहे?
-2. काही किडे किंवा रोग दिसत आहेत का?
-3. रोपाची आरोग्य स्थिती काय आहे?
-4. काही सुधारणा आवश्यक आहे का?
+2. रोपाची आरोग्य स्थिती कशी आहे?
+3. काही किडे, रोग किंवा पोषणाची कमतरता दिसते का?
+4. काय सुधारणा सुचवाल?
 
-संक्षिप्त आणि व्यावहारिक सल्ला द्या।''',
-        'te': '''మీరు వ్యవసాయ నిపుణులు. ఈ పంట ఫోటోను విశ్లేషించి చెప్పండి:
+संक्षिप्त आणि व्यावहारिक उत्तर द्या. फोटोमध्ये पीक नसेल तर काय दिसतंय ते सांगा.''',
+        'te': '''మీరు భారతీయ రైతులకు సహాయం చేసే వ్యవసాయ నిపుణులు. ఈ ఫోటోను చూసి చెప్పండి:
+
 1. ఇది ఏ పంట?
-2. ఏదైనా పురుగులు లేదా వ్యాధులు కనిపిస్తున్నాయా?
-3. మొక్క ఆరోగ్య స్థితి ఏమిటి?
-4. ఏదైనా మెరుగుదల అవసరమా?
+2. మొక్క ఆరోగ్య స్థితి ఎలా ఉంది?
+3. ఏదైనా పురుగులు, వ్యాధులు లేదా పోషకాహార లోపం కనిపిస్తుందా?
+4. ఏ మెరుగుదల సూచిస్తారు?
 
-సంక్షిప్త మరియు ఆచరణాత్మక సలహా ఇవ్వండి।''',
-        'en': '''You are an agricultural expert. Analyze this crop image and tell me:
+సంక్షిప్త మరియు ఆచరణాత్మక సమాధానం ఇవ్వండి. ఫోటోలో పంట లేకపోతే, మీకు ఏమి కనిపిస్తుందో చెప్పండి.''',
+        'en': '''You are an agricultural expert helping Indian farmers. Look at this image and tell me:
+
 1. What crop is this?
-2. Are there any pests or diseases visible?
-3. What is the plant's health status?
-4. What improvements are needed?
+2. What is the plant's health status?
+3. Are there any pests, diseases, or nutrient deficiencies visible?
+4. What improvements would you recommend?
 
-Provide brief and practical advice.'''
+Provide a brief and practical answer. If the image doesn't show a crop, describe what you see.'''
     }
     
     prompt = prompts.get(dialect, prompts['en'])
@@ -239,7 +249,7 @@ Provide brief and practical advice.'''
                         "type": "image",
                         "source": {
                             "type": "base64",
-                            "media_type": "image/jpeg",
+                            "media_type": media_type,
                             "data": image_base64
                         }
                     },
@@ -252,13 +262,24 @@ Provide brief and practical advice.'''
         ]
     }
     
-    response = bedrock_runtime.invoke_model(
-        modelId='anthropic.claude-3-sonnet-20240229-v1:0',
-        body=json.dumps(request_body)
-    )
-    
-    response_body = json.loads(response['body'].read())
-    return response_body['content'][0]['text']
+    try:
+        response = bedrock_runtime.invoke_model(
+            modelId='anthropic.claude-3-sonnet-20240229-v1:0',
+            body=json.dumps(request_body)
+        )
+        
+        response_body = json.loads(response['body'].read())
+        return response_body['content'][0]['text']
+    except Exception as e:
+        print(f"Error analyzing image: {e}")
+        # Return a helpful error message
+        error_messages = {
+            'hi': 'क्षमा करें, तस्वीर का विश्लेषण करने में समस्या हुई। कृपया फिर से प्रयास करें या एक अलग तस्वीर अपलोड करें।',
+            'mr': 'माफ करा, फोटोचे विश्लेषण करताना समस्या आली. कृपया पुन्हा प्रयत्न करा किंवा वेगळा फोटो अपलोड करा.',
+            'te': 'క్షమించండి, ఫోటో విశ్లేషణలో సమస్య వచ్చింది. దయచేసి మళ్లీ ప్రయత్నించండి లేదా వేరే ఫోటో అప్‌లోడ్ చేయండి.',
+            'en': 'Sorry, there was a problem analyzing the image. Please try again or upload a different image.'
+        }
+        return error_messages.get(dialect, error_messages['en'])
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
