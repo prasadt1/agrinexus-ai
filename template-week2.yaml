@@ -157,8 +157,54 @@ Resources:
       MethodSettings:
         - ResourcePath: "/*"
           HttpMethod: "*"
-          ThrottlingRateLimit: 100
-          ThrottlingBurstLimit: 200
+          # Demo-safe throttling: reduces burst/bot risk at the edge
+          ThrottlingRateLimit: 2
+          ThrottlingBurstLimit: 5
+
+  # ============================================================================
+  # WAFv2: Protect public Web Chat API from abuse
+  # ============================================================================
+  WebChatWebAcl:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: !Sub agrinexus-web-chat-waf-${Environment}
+      Scope: REGIONAL
+      DefaultAction:
+        Allow: {}
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: !Sub agrinexusWebChatWaf-${Environment}
+      Rules:
+        - Name: RateLimitChat
+          Priority: 1
+          Action:
+            Block: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: !Sub agrinexusWebChatRateLimit-${Environment}
+          Statement:
+            RateBasedStatement:
+              AggregateKeyType: IP
+              # WAF rate limits are evaluated over a fixed 5-minute window.
+              # This is a backstop; app-layer hourly caps still apply.
+              Limit: 300
+              ScopeDownStatement:
+                ByteMatchStatement:
+                  SearchString: "/chat"
+                  FieldToMatch:
+                    UriPath: {}
+                  TextTransformations:
+                    - Priority: 0
+                      Type: NONE
+                  PositionalConstraint: ENDS_WITH
+
+  WebChatWebAclAssociation:
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties:
+      ResourceArn: !Sub arn:aws:apigateway:${AWS::Region}::/restapis/${WebChatApi}/stages/${Environment}
+      WebACLArn: !GetAtt WebChatWebAcl.Arn
 
   # ============================================================================
   # Lambda: WhatsApp Webhook Handler
