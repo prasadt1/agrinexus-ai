@@ -11,6 +11,7 @@ from typing import Dict, Any
 from datetime import datetime
 from decimal import Decimal
 import hashlib
+from botocore.exceptions import ClientError
 
 dynamodb = boto3.resource('dynamodb')
 bedrock_agent = boto3.client('bedrock-agent-runtime')
@@ -88,21 +89,54 @@ def check_rate_limit(ip_address: str) -> Dict[str, Any]:
             }
 
         # Atomic increment; keep existing ttl (fixed window)
-        response = table.update_item(
-            Key=key,
-            UpdateExpression='SET #count = #count + :inc',
-            ConditionExpression='#ttl >= :now AND #count < :limit',
-            ExpressionAttributeNames={
-                '#count': 'count',
-                '#ttl': 'ttl'
-            },
-            ExpressionAttributeValues={
-                ':inc': 1,
-                ':now': now,
-                ':limit': RATE_LIMIT
-            },
-            ReturnValues='ALL_NEW'
-        )
+        try:
+            response = table.update_item(
+                Key=key,
+                UpdateExpression='SET #count = #count + :inc',
+                ConditionExpression='#ttl >= :now AND #count < :limit',
+                ExpressionAttributeNames={
+                    '#count': 'count',
+                    '#ttl': 'ttl'
+                },
+                ExpressionAttributeValues={
+                    ':inc': 1,
+                    ':now': now,
+                    ':limit': RATE_LIMIT
+                },
+                ReturnValues='ALL_NEW'
+            )
+        except ClientError as e:
+            # Most common here: ConditionalCheckFailedException (hit limit or window expired)
+            code = e.response.get('Error', {}).get('Code', '')
+            if code == 'ConditionalCheckFailedException':
+                latest = table.get_item(Key=key).get('Item') or {}
+                latest_ttl = int(latest.get('ttl', 0) or 0)
+                latest_count = int(latest.get('count', 0) or 0)
+
+                # If window expired between read and update, start a new window.
+                if latest_ttl < now:
+                    reset_at = now + RATE_LIMIT_WINDOW
+                    table.put_item(
+                        Item={
+                            **key,
+                            'count': 1,
+                            'ttl': reset_at
+                        }
+                    )
+                    return {
+                        'allowed': True,
+                        'remaining': max(0, RATE_LIMIT - 1),
+                        'reset_at': reset_at,
+                        'current_count': 1
+                    }
+
+                return {
+                    'allowed': False,
+                    'remaining': 0,
+                    'reset_at': latest_ttl or reset_at,
+                    'current_count': latest_count
+                }
+            raise
 
         new_count = int(response['Attributes']['count'])
         return {
@@ -114,11 +148,12 @@ def check_rate_limit(ip_address: str) -> Dict[str, Any]:
     
     except Exception as e:
         print(f"Rate limit check error: {e}")
-        # Fail open (allow request) if rate limiting fails
+        # Fail closed (deny request) if rate limiting fails
         return {
-            'allowed': True,
-            'remaining': RATE_LIMIT,
-            'reset_at': now + RATE_LIMIT_WINDOW
+            'allowed': False,
+            'remaining': 0,
+            'reset_at': now + RATE_LIMIT_WINDOW,
+            'current_count': RATE_LIMIT
         }
 
 
