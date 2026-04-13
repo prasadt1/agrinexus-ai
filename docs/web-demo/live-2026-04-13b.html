@@ -255,6 +255,36 @@
         const rateLimitInfo = document.getElementById('rateLimitInfo');
         let isProcessing = false;
         let remainingQueries = 5;
+        const STORAGE_KEY = 'agrinexus_web_demo_v1';
+
+        function getOrCreateClientId() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                const state = raw ? JSON.parse(raw) : {};
+                if (state && typeof state.clientId === 'string' && state.clientId.length >= 16) return state.clientId;
+                const clientId = (crypto && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, clientId }));
+                return clientId;
+            } catch {
+                return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+            }
+        }
+
+        const clientId = getOrCreateClientId();
+
+        function loadRateLimitState() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                const state = raw ? JSON.parse(raw) : {};
+                const lockedUntil = Number(state.lockedUntil || 0);
+                if (Number.isFinite(lockedUntil) && lockedUntil > Date.now()) {
+                    remainingQueries = 0;
+                    updateRateLimit(0);
+                }
+            } catch {
+                // ignore
+            }
+        }
 
         function addMessage(text, isBot = false, citation = null) {
             const messageDiv = document.createElement('div');
@@ -319,6 +349,18 @@
             }
         }
 
+        function persistLockout(resetAtSeconds) {
+            if (!Number.isFinite(resetAtSeconds)) return;
+            const lockedUntil = Math.max(Date.now(), resetAtSeconds * 1000);
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                const state = raw ? JSON.parse(raw) : {};
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, lockedUntil, clientId }));
+            } catch {
+                // ignore
+            }
+        }
+
         async function sendMessage() {
             const message = messageInput.value.trim();
             if (!message || isProcessing || remainingQueries <= 0) return;
@@ -333,7 +375,7 @@
             showTyping();
 
             try {
-                const requestBody = { language: languageSelect.value, message };
+                const requestBody = { language: languageSelect.value, message, client_id: clientId };
 
                 const response = await fetch(API_URL, {
                     method: 'POST',
@@ -344,8 +386,16 @@
                 hideTyping();
 
                 if (response.status === 429) {
+                    let resetAt = null;
+                    try {
+                        const data = await response.json();
+                        if (data && data.reset_at) resetAt = Number(data.reset_at);
+                    } catch {
+                        // ignore
+                    }
                     showError('Rate limit exceeded. Please try again later.');
                     updateRateLimit(0);
+                    if (resetAt) persistLockout(resetAt);
                     return;
                 }
 
@@ -355,6 +405,7 @@
                 const citation = data.citations && data.citations.length > 0 ? data.citations.join(', ') : null;
                 addMessage(data.reply, true, citation);
                 if (data.remaining !== undefined) updateRateLimit(data.remaining);
+                if (data.reset_at && Number(data.remaining) <= 0) persistLockout(Number(data.reset_at));
 
             } catch (error) {
                 hideTyping();
@@ -375,6 +426,7 @@
 
         sendButton.addEventListener('click', sendMessage);
         messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+        loadRateLimitState();
         messageInput.focus();
     </script>
 </body>

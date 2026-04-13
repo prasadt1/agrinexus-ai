@@ -41,15 +41,15 @@ def get_client_ip(event: Dict[str, Any]) -> str:
     return identity.get('sourceIp', 'unknown')
 
 
-def check_rate_limit(ip_address: str) -> Dict[str, Any]:
+def check_rate_limit(identifier: str) -> Dict[str, Any]:
     """
     Check if IP has exceeded rate limit.
     Returns: {'allowed': bool, 'remaining': int, 'reset_at': int, 'current_count': int}
     """
     now = int(datetime.utcnow().timestamp())
     
-    # Hash IP for privacy (don't store raw IPs)
-    ip_hash = hashlib.sha256(ip_address.encode()).hexdigest()[:16]
+    # Hash identifier for privacy (don't store raw IPs / client IDs)
+    ip_hash = hashlib.sha256(identifier.encode()).hexdigest()[:16]
     
     try:
         key = {
@@ -415,9 +415,26 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if language not in ['en', 'hi', 'mr', 'te']:
             language = 'en'
         
-        # Check rate limit
+        # Check rate limit (enforce strictest of IP + anonymous client_id, if provided)
         client_ip = get_client_ip(event)
-        rate_limit_status = check_rate_limit(client_ip)
+        client_id = str(body.get('client_id', '')).strip()
+
+        ip_status = check_rate_limit(f"IP#{client_ip}")
+        rate_limit_status = ip_status
+
+        if client_id:
+            # Keep it bounded; we only support a short anonymous identifier
+            if 16 <= len(client_id) <= 80:
+                cid_status = check_rate_limit(f"CID#{client_id}")
+                # Deny if either denies; remaining is the tighter bound
+                rate_limit_status = {
+                    'allowed': bool(ip_status.get('allowed')) and bool(cid_status.get('allowed')),
+                    'remaining': min(int(ip_status.get('remaining', 0)), int(cid_status.get('remaining', 0))),
+                    'reset_at': max(int(ip_status.get('reset_at', 0)), int(cid_status.get('reset_at', 0))),
+                    'current_count': max(int(ip_status.get('current_count', 0)), int(cid_status.get('current_count', 0))),
+                }
+            else:
+                print("Ignoring invalid client_id length for rate limiting.")
         
         if not rate_limit_status['allowed']:
             return {
