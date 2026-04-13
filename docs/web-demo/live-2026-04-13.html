@@ -139,13 +139,6 @@
             box-shadow: 0 2px 8px rgba(245, 166, 35, 0.3);
         }
 
-        .message-image {
-            max-width: 100%;
-            border-radius: 12px;
-            margin-top: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        }
-
         .citation {
             font-size: 11px;
             opacity: 0.85;
@@ -167,7 +160,7 @@
         .input-wrapper { flex: 1; position: relative; }
         .input-container input {
             width: 100%;
-            padding: 14px 50px 14px 18px;
+            padding: 14px 18px;
             border: 2px solid #e0e0e0;
             border-radius: 25px;
             font-size: 14px;
@@ -175,21 +168,6 @@
             transition: border-color 0.3s;
         }
         .input-container input:focus { border-color: #2D8B4E; }
-
-        .image-upload-btn {
-            position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            cursor: pointer;
-            padding: 6px;
-            color: #666;
-            transition: color 0.3s;
-        }
-        .image-upload-btn:hover { color: #2D8B4E; }
-        .image-upload-btn svg { width: 24px; height: 24px; }
 
         .input-container button.send-btn {
             padding: 14px 28px;
@@ -205,11 +183,6 @@
         }
         .input-container button.send-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(45, 139, 78, 0.4); }
         .input-container button.send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        .image-preview { display: none; margin-bottom: 10px; position: relative; }
-        .image-preview.active { display: block; }
-        .image-preview img { max-width: 150px; max-height: 150px; border-radius: 12px; border: 2px solid #2D8B4E; }
-        .image-preview button { position: absolute; top: -8px; right: -8px; background: #ff4444; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 16px; line-height: 1; }
 
         .rate-limit-info { font-size: 12px; color: #666; text-align: center; }
         .error-message { background: #ff4444; color: white; padding: 12px; border-radius: 12px; margin: 10px 20px; text-align: center; font-size: 14px; animation: fadeIn 0.3s ease-in; }
@@ -257,7 +230,7 @@
                 </svg>
             </div>
             <h1>AgriNexus AI</h1>
-            <p>Your farming advisor — ask about crops, pests, or upload a photo</p>
+            <p>Your farming advisor — ask about crops, pests, fertilizers, and timing</p>
             <div class="language-selector">
                 <select id="language">
                     <option value="en">English</option>
@@ -272,39 +245,21 @@
             <div class="message bot">
                 <div class="message-content">
                     Welcome to AgriNexus AI!<br><br>
-                    Ask a farming question, or upload a crop photo for analysis.<br>
+                    Ask a farming question (text-only web demo).<br>
                     <small style="opacity: 0.8; margin-top: 8px; display: block;">You have 5 free questions per hour</small>
                 </div>
             </div>
         </div>
 
         <div class="input-area">
-            <div class="image-preview" id="imagePreview">
-                <img id="previewImg" src="" alt="Preview">
-                <button onclick="clearImage()">×</button>
-            </div>
             <div class="input-container">
                 <div class="input-wrapper">
                     <input
                         type="text"
                         id="messageInput"
-                        placeholder="Type your question or upload a photo..."
+                        placeholder="Type your farming question..."
                         maxlength="500"
                     />
-                    <input
-                        type="file"
-                        id="imageInput"
-                        accept="image/*"
-                        style="display: none;"
-                        onchange="handleImageSelect(event)"
-                    />
-                    <button class="image-upload-btn" onclick="document.getElementById('imageInput').click()">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                            <circle cx="8.5" cy="8.5" r="1.5"/>
-                            <polyline points="21 15 16 10 5 21"/>
-                        </svg>
-                    </button>
                 </div>
                 <button class="send-btn" id="sendButton">Send</button>
             </div>
@@ -325,55 +280,17 @@
         const sendButton = document.getElementById('sendButton');
         const languageSelect = document.getElementById('language');
         const rateLimitInfo = document.getElementById('rateLimitInfo');
-        const imagePreview = document.getElementById('imagePreview');
-        const previewImg = document.getElementById('previewImg');
-
         let isProcessing = false;
         let remainingQueries = 5;
-        let selectedImage = null;
 
-        function handleImageSelect(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            if (file.size > 5 * 1024 * 1024) {
-                showError('Image too large. Maximum size is 5MB.');
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                selectedImage = e.target.result;
-                previewImg.src = selectedImage;
-                imagePreview.classList.add('active');
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function clearImage() {
-            selectedImage = null;
-            imagePreview.classList.remove('active');
-            document.getElementById('imageInput').value = '';
-        }
-
-        function addMessage(text, isBot = false, citation = null, imageData = null) {
+        function addMessage(text, isBot = false, citation = null) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isBot ? 'bot' : 'user'}`;
 
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
 
-            if (imageData && !isBot) {
-                const img = document.createElement('img');
-                img.src = imageData;
-                img.className = 'message-image';
-                contentDiv.appendChild(img);
-                if (text) {
-                    const textNode = document.createElement('div');
-                    textNode.textContent = text;
-                    contentDiv.appendChild(textNode);
-                }
-            } else {
-                contentDiv.textContent = text;
-            }
+            contentDiv.textContent = text;
 
             if (citation && isBot) {
                 const citationDiv = document.createElement('div');
@@ -431,29 +348,19 @@
 
         async function sendMessage() {
             const message = messageInput.value.trim();
-            const hasImage = selectedImage !== null;
-            if ((!message && !hasImage) || isProcessing) return;
+            if (!message || isProcessing) return;
 
             isProcessing = true;
             sendButton.disabled = true;
             messageInput.disabled = true;
 
-            addMessage(message || 'Analyzing image...', false, null, selectedImage);
+            addMessage(message, false, null);
             messageInput.value = '';
-
-            const imageToSend = selectedImage;
-            clearImage();
 
             showTyping();
 
             try {
-                const requestBody = { language: languageSelect.value };
-                if (hasImage) {
-                    requestBody.image = imageToSend;
-                    requestBody.message = message || 'What do you see in this image?';
-                } else {
-                    requestBody.message = message;
-                }
+                const requestBody = { language: languageSelect.value, message };
 
                 const response = await fetch(API_URL, {
                     method: 'POST',
