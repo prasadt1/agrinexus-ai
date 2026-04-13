@@ -143,6 +143,24 @@ Resources:
         AllowOrigin: "'*'"
 
   # ============================================================================
+  # API Gateway for Web Chat Demo
+  # ============================================================================
+  WebChatApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub agrinexus-web-chat-${Environment}
+      StageName: !Ref Environment
+      Cors:
+        AllowMethods: "'POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+          ThrottlingRateLimit: 100
+          ThrottlingBurstLimit: 200
+
+  # ============================================================================
   # Lambda: WhatsApp Webhook Handler
   # ============================================================================
   WebhookHandler:
@@ -191,6 +209,49 @@ Resources:
             RestApiId: !Ref WhatsAppApi
             Path: /webhook
             Method: POST
+
+  # ============================================================================
+  # Lambda: Web Chat Handler (Public Demo)
+  # ============================================================================
+  WebChatHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-web-chat-${Environment}
+      CodeUri: src/web-chat/
+      Handler: handler.lambda_handler
+      Description: Public web chat API for text queries (no phone number required)
+      Timeout: 60
+      MemorySize: 512
+      Environment:
+        Variables:
+          WEB_RATE_LIMIT: "10"  # 10 queries per hour per IP
+          WEB_RATE_LIMIT_WINDOW: "3600"  # 1 hour
+          MODEL_ARN: arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TableName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+                - bedrock:RetrieveAndGenerate
+                - bedrock:Retrieve
+                - bedrock-agent:Retrieve
+                - bedrock-agent:RetrieveAndGenerate
+              Resource: '*'
+      Events:
+        WebChatPost:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebChatApi
+            Path: /chat
+            Method: POST
+        WebChatOptions:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebChatApi
+            Path: /chat
+            Method: OPTIONS
 
   # ============================================================================
   # Lambda: Message Processor
@@ -588,6 +649,10 @@ Outputs:
   WebhookUrl:
     Description: WhatsApp webhook URL
     Value: !Sub https://${WhatsAppApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/webhook
+
+  WebChatApiUrl:
+    Description: Web chat API endpoint (for public demo)
+    Value: !Sub https://${WebChatApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/chat
 
   MessageQueueUrl:
     Description: SQS queue URL for message processing
