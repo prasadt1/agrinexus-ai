@@ -12,6 +12,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 
 from common.whatsapp import send_whatsapp_message, VOICE_RECEIVED_ACK
+from common.allowlist import is_approved_user, allowlist_expiry_hint
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -306,6 +307,18 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             voice_queue_url = os.environ.get('VOICE_QUEUE_URL')
             if message_type == 'audio' and voice_queue_url:
+                # Gate expensive voice path for unapproved users (text-only still works)
+                if not is_approved_user(table, from_number):
+                    dialect = get_user_dialect(from_number)
+                    gate_msg = {
+                        'hi': f'अभी वॉइस सुविधा बंद है। कृपया टेक्स्ट में प्रश्न भेजें। {allowlist_expiry_hint(dialect)}',
+                        'mr': f'सध्या व्हॉइस सुविधा बंद आहे. कृपया प्रश्न टेक्स्टमध्ये पाठवा. {allowlist_expiry_hint(dialect)}',
+                        'te': f'ప్రస్తుతం వాయిస్ ఫీచర్ అందుబాటులో లేదు. దయచేసి టెక్స్ట్‌లో ప్రశ్న అడగండి. {allowlist_expiry_hint(dialect)}',
+                        'en': f'Voice is not enabled in the public demo. Please ask in text. {allowlist_expiry_hint(dialect)}',
+                    }
+                    send_whatsapp_message(from_number, gate_msg.get(dialect, gate_msg['en']))
+                    continue
+
                 # Before detector write + SQS + Voice Lambda — minimizes perceived ACK delay
                 send_voice_received_ack(from_number)
 

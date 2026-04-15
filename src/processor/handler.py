@@ -19,6 +19,7 @@ from analyzer import process_image_message
 from common.whatsapp import send_whatsapp_message, send_whatsapp_list
 from common.whatsapp import send_whatsapp_buttons as _send_whatsapp_buttons
 from common.district_helplines import maybe_append_helpline_footer
+from common.allowlist import is_approved_user, allowlist_expiry_hint
 
 
 def send_whatsapp_buttons(phone_number: str, body_text: str, buttons: list):
@@ -520,7 +521,7 @@ RESPONSE STYLE (when you DO have relevant context):
 - Add at most one short sentence for "why" or "what to watch" only if it changes what they should do.
 - Use everyday words; if a technical term is needed, explain it in a few words.
 - Avoid long paragraphs, dense lists, and copying long passages from the context.
-- ONLY if you answered the question using the Context: End with exactly ONE final line for traceability: Look at the search_results metadata and extract the actual document name or source title. Write a single compact line starting with "Source:" (or "स्रोत:" in Hindi, "स्त्रोत:" in Marathi, "మూలం:" in Telugu) followed by the actual document name from the metadata (e.g., "Source: FAO Cotton IPM Guide" or "स्रोत: ICAR कीट प्रबंधन सलाह"). Do NOT just write "Source: 1" or "स्रोत: 1".
+- DO NOT add any source citation or reference line at the end. The system will add it automatically.
 
 CRITICAL: If you said "I don't have information" OR "I can only help with farming questions", DO NOT ADD ANY SOURCE CITATION. NO "स्रोत:", NO "Source:", NOTHING. Just end your response immediately after the refusal message.
 
@@ -658,6 +659,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             continue
         
         dialect = profile.get('dialect', 'hi')
+        approved = is_approved_user(table, from_number)
         
         # Process based on message type
         if message_type == 'text':
@@ -775,8 +777,41 @@ Just type your question or send a photo!'''
             
             # Query Bedrock with session ID for conversation context (this takes ~13 seconds)
             result = query_bedrock(text, dialect, session_id=from_number)
+            
+            # Extract source citation from response or add generic attribution
+            response_text = result["text"]
+            source_keywords = {
+                'hi': 'स्रोत:',
+                'mr': 'स्त्रोत:',
+                'te': 'మూలం:',
+                'en': 'Source:'
+            }
+            source_keyword = source_keywords.get(dialect, 'Source:')
+            
+            # Check if source citation is already in the response (and remove if it's just a number)
+            has_source = source_keyword in response_text
+            if has_source:
+                # Check if it's just "स्त्रोत: 1" or similar placeholder
+                import re
+                placeholder_pattern = f"{re.escape(source_keyword)}\\s*\\d+\\s*$"
+                if re.search(placeholder_pattern, response_text.strip()):
+                    # Remove the placeholder
+                    response_text = re.sub(placeholder_pattern, '', response_text).strip()
+                    has_source = False
+            
+            # Add generic source attribution if not present
+            if not has_source:
+                source_attributions = {
+                    'hi': 'FAO/ICAR कृषि मार्गदर्शिका',
+                    'mr': 'FAO/ICAR शेती मार्गदर्शक',
+                    'te': 'FAO/ICAR వ్యవసాయ మార్గదర్శకం',
+                    'en': 'FAO/ICAR Agricultural Guidelines'
+                }
+                source_text = source_attributions.get(dialect, source_attributions['en'])
+                response_text += f"\n\n{source_keyword} {source_text}"
+            
             reply_text = maybe_append_helpline_footer(
-                result["text"],
+                response_text,
                 text,
                 dialect,
                 profile.get("location") if profile else None,
@@ -786,7 +821,7 @@ Just type your question or send a photo!'''
             save_message(from_number, wamid, message, reply_text, str(result['citations']))
             
             # Check if user wants voice response (Hindi, Marathi, English supported)
-            send_voice = (dialect in ['hi', 'mr', 'en'] and 
+            send_voice = (approved and dialect in ['hi', 'mr', 'en'] and 
                          (message.get('_source') in ('voice', 'voice_test') or profile.get('voicePreference', False)))
             
             if send_voice:
@@ -806,6 +841,16 @@ Just type your question or send a photo!'''
                 send_whatsapp_message(from_number, reply_text)
         
         elif message_type == 'image':
+            if not approved:
+                gate_msg = {
+                    'hi': f'फोटो विश्लेषण सुविधा अभी बंद है। कृपया टेक्स्ट में प्रश्न भेजें। {allowlist_expiry_hint(dialect)}',
+                    'mr': f'फोटो विश्लेषण सुविधा सध्या बंद आहे. कृपया प्रश्न टेक्स्टमध्ये पाठवा. {allowlist_expiry_hint(dialect)}',
+                    'te': f'ఫోటో విశ్లేషణ ఫీచర్ ప్రస్తుతం అందుబాటులో లేదు. దయచేసి టెక్స్ట్‌లో ప్రశ్న అడగండి. {allowlist_expiry_hint(dialect)}',
+                    'en': f'Photo analysis is not enabled in the public demo. Please ask in text. {allowlist_expiry_hint(dialect)}',
+                }
+                send_whatsapp_message(from_number, gate_msg.get(dialect, gate_msg['en']))
+                continue
+
             # Process image with Claude Vision
             print(f"Processing image message from {from_number}")
             
@@ -828,7 +873,16 @@ Just type your question or send a photo!'''
             send_whatsapp_message(from_number, analysis)
         
         elif message_type == 'audio':
-            # Audio messages are handled by VoiceProcessor Lambda
+            # Audio messages are normally handled by VoiceProcessor Lambda (gated in webhook).
+            if not approved:
+                gate_msg = {
+                    'hi': f'अभी वॉइस सुविधा बंद है। कृपया टेक्स्ट में प्रश्न भेजें। {allowlist_expiry_hint(dialect)}',
+                    'mr': f'सध्या व्हॉइस सुविधा बंद आहे. कृपया प्रश्न टेक्स्टमध्ये पाठवा. {allowlist_expiry_hint(dialect)}',
+                    'te': f'ప్రస్తుతం వాయిస్ ఫీచర్ అందుబాటులో లేదు. దయచేసి టెక్స్ట్‌లో ప్రశ్న అడగండి. {allowlist_expiry_hint(dialect)}',
+                    'en': f'Voice is not enabled in the public demo. Please ask in text. {allowlist_expiry_hint(dialect)}',
+                }
+                send_whatsapp_message(from_number, gate_msg.get(dialect, gate_msg['en']))
+                continue
             print(f"Audio message - should be handled by VoiceProcessor")
     
     return {'statusCode': 200}
