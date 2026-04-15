@@ -160,3 +160,72 @@ data/fao-pdfs/**/*.pdf
 
 # Proprietary IP backups (keep local only)
 src/proprietary/
+
+# ============================================================================
+# Added by cleanup script - April 14, 2026
+# ============================================================================
+
+# Internal quick-start guides (personal use only)
+QUICK-START-GUIDE.md
+QUICK-START-WEB-DEMO.md
+
+# Internal cleanup scripts
+scripts/cleanup-internal-scripts.sh
+scripts/remove-internal-docs.sh
+
+# Test audio files (too large for Git, regenerate locally)
+tests/test-audio/*.aiff
+tests/test-audio/*.mp3
+tests/test-audio/*.wav
+
+# Demo videos (too large for Git, host on YouTube/Vimeo)
+docs/demo-video/*.mp4
+docs/demo-video/*.mov
+demo-video/
+
+# Internal deployment documentation (April 2026)
+NOTEBOOKLM-*.md
+ARTICLE-UPDATE-*.md
+READY-TO-SUBMIT-*.md
+SLIDE1-*.md
+DOCUMENTATION-INDEX-*.md
+DEPLOYMENT-APR*.md
+DEPLOYMENT-COMPLETE-*.md
+XRAY-ENABLED-*.md
+HALLUCINATION-FIX-*.md
+NUDGE-TIME-CHANGE-*.md
+WEB-DEMO-FIXES-*.md
+WEB-DEMO-IMPLEMENTATION-*.md
+WEB-DEMO-SECURITY.md
+USER-DATA-RESET-*.md
+REPO-CLEANUP-*.md
+
+# Architecture diagram images (regenerate from source)
+agrinexus-full-architecture.png
+agrinexus-system-architecture.png
+agrinexus_architecture.png
+architecture/generated-diagrams/
+architecture/polished/
+generated-diagrams/
+
+# Diagram generation docs (internal)
+docs/ARCHITECTURE-DIAGRAM-GUIDE.md
+docs/ARCHITECTURE-DIAGRAMS-GUIDE.md
+docs/CREATE-DIAGRAMS-DRAWIO.md
+docs/DIAGRAM-SETUP-STATUS.md
+docs/GENERATE-ARCHITECTURE-DIAGRAMS.md
+docs/INSTALL-KIRO-CLI.md
+docs/TROUBLESHOOT-KIRO-CLI.md
+docs/WEB-DEMO-GUIDE.md
+docs/agrinexus_architecture.py
+docs/architecture-diagram-*.svg
+docs/nudge-loop-simple.svg
+docs/diagrams/*.svg
+docs/web-demo/*.bak
+
+# Test/demo scripts (internal)
+test-diagram.sh
+scripts/cleanup-repo-for-public.sh
+scripts/delete-user-data.sh
+scripts/setup-diagram-generation.sh
+

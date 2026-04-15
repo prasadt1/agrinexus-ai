@@ -39,6 +39,7 @@ Globals:
     Runtime: python3.11
     Timeout: 30
     MemorySize: 512
+    Tracing: Active  # Enable AWS X-Ray distributed tracing
     Environment:
       Variables:
         TABLE_NAME: !Ref TableName

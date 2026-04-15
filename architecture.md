@@ -22,9 +22,9 @@ The architecture is a serverless system with pay-as-you-go Bedrock. Estimated co
 
 ## 3. High-Level Architecture
 
-**Diagrams in Git:** The **source of truth** for structure and flows is **[`architecture/diagrams.md`](architecture/diagrams.md)** (Mermaid, renders on GitHub). Optional text sources: **[`docs/diagrams/d2/`](docs/diagrams/d2/)** (D2). The ASCII sketch below is a compact overview only.
+**Diagrams in Git:** The **source of truth** for structure and flows is **[`architecture/diagrams.md`](architecture/diagrams.md)** (Mermaid, renders on GitHub). The ASCII sketch below is a compact overview only.
 
-**Pretty figures for articles:** For AWS Builder or presentations—official icons, large type, optional short animation—follow **[`docs/diagrams/ARTICLE-POLISHED-DIAGRAM.md`](docs/diagrams/ARTICLE-POLISHED-DIAGRAM.md)** (Keynote/PowerPoint + [AWS Architecture Icons](https://aws.amazon.com/architecture/icons/)); those assets need not match the simplicity of Mermaid in the repo.
+**Pretty figures for articles:** Slide-ready / article diagrams live under **[`docs/diagrams/`](docs/diagrams/)** and **[`architecture/polished/`](architecture/polished/)** (PNG / GIF / MP4). These assets need not match the simplicity of Mermaid in the repo.
 
 ```
 ┌─────────────────┐
