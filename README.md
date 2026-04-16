@@ -20,7 +20,7 @@ Pick the web demo or WhatsApp experience.
 | **Privacy:** No login; minimal retention | **Privacy:** WhatsApp number required |
 | **Limits:** ~5 questions/hour | **Limits:** Rich features are allowlisted |
 
-**WhatsApp access:** Text is open; voice/photo/nudges are available via the demo request template.
+**WhatsApp access:** Text is open; voice/photo/nudges are available via the [demo request template](https://github.com/prasadt1/agrinexus-ai/issues/new?template=demo-request.md ).
 
 **Data retention (public demo):** I keep only the minimum needed to run the demo, and auto-delete demo user data after ~7 days.
 
