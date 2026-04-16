@@ -8,6 +8,24 @@
 
 ---
 
+## Try It Yourself
+
+Pick the web demo or WhatsApp experience.
+
+| 🌐 **Web Demo** | 💬 **WhatsApp Chat** |
+|----------------|---------------------|
+| [Try web demo](https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html) (no phone number) | [Open WhatsApp chat](https://demo.agrinexus-ai.farm/web-demo/chat.html) |
+| **Includes:** Text Q&A (RAG) | **Includes:** Onboarding + text (public); voice/photo/nudges (allowlisted) |
+| **Best for:** Instant judge tryout | **Best for:** Seeing the full channel UX |
+| **Privacy:** No login; minimal retention | **Privacy:** WhatsApp number required |
+| **Limits:** ~5 questions/hour | **Limits:** Rich features are allowlisted |
+
+**WhatsApp access:** Text is open; voice/photo/nudges are available via the demo request template.
+
+**Data retention (public demo):** I keep only the minimum needed to run the demo, and auto-delete demo user data after ~7 days.
+
+---
+
 ## Architecture
 
 - **Onboarding**: Language → district (**Latur**, **Jalna**, **Nagpur**) → crop → nudge consent (`src/processor/handler.py`). New profiles include **`demo_tier: public`** (public demo: one weather nudge, no T+24h/T+48h follow-ups). Set **`demo_tier`** to another value in DynamoDB (e.g. `full`) for pilot partners who need the full reminder loop.
