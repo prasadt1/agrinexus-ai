@@ -5,6 +5,7 @@ Reuses existing Bedrock RAG logic from processor.
 """
 import json
 import os
+import re
 import boto3
 import base64
 from typing import Dict, Any
@@ -25,6 +26,27 @@ RATE_LIMIT = int(os.environ.get('WEB_RATE_LIMIT', '5'))  # 5 queries per hour
 RATE_LIMIT_WINDOW = int(os.environ.get('WEB_RATE_LIMIT_WINDOW', '3600'))  # 1 hour
 
 table = dynamodb.Table(TABLE_NAME)
+
+
+def effective_dialect(message: str, ui_language: str) -> str:
+    """
+    Use UI language when set to a non-English locale. If UI is English but the
+    message is clearly in another script, infer dialect so prompts match the
+    question (retrieval still uses the same query text).
+    """
+    lang = (ui_language or 'en').strip().lower()
+    if lang not in ('en', 'hi', 'mr', 'te'):
+        lang = 'en'
+    if lang != 'en':
+        return lang
+    text = (message or '').strip()
+    if not text:
+        return 'en'
+    if re.search(r'[\u0900-\u097F]', text):
+        return 'hi'
+    if re.search(r'[\u0C00-\u0C7F]', text):
+        return 'te'
+    return 'en'
 
 
 def get_client_ip(event: Dict[str, Any]) -> str:
@@ -520,10 +542,12 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 })
             }
         
+        dialect = effective_dialect(message or '', language)
+
         # Process image if provided
         if image:
             print(f"Processing image analysis request")
-            analysis = analyze_image(image, language)
+            analysis = analyze_image(image, dialect)
             
             return {
                 'statusCode': 200,
@@ -537,7 +561,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             }
         
         # Query Bedrock for text
-        result = query_bedrock(message, language)
+        result = query_bedrock(message, dialect)
         
         # Format citations
         citations = []
