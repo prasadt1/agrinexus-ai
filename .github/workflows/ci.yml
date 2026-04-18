@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  pytest-fast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Fast tests (no live AWS Bedrock)
+        run: |
+          python3 -m pytest tests/test_nudge_flow.py tests/test_district_helplines.py -v
+
+      - name: Install SAM CLI
+        run: pip install aws-sam-cli
+
+      - name: Validate SAM template
+        run: sam validate --template-file template-week2.yaml --lint

@@ -34,6 +34,21 @@ Parameters:
     Default: "1"
     Description: Bedrock Guardrail Version from Week 1 (optional)
 
+  RateLimitBypassPhones:
+    Type: String
+    Default: ""
+    Description: >-
+      Comma-separated WhatsApp numbers (digits only, no +) exempt from webhook MSG rate limit.
+      Use for demo/pilot; leave empty for normal operation.
+
+  RateLimitDisabled:
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: If true, disables per-user WhatsApp message rate limiting (demo only).
+
 Globals:
   Function:
     Runtime: python3.11
@@ -229,6 +244,8 @@ Resources:
           VERIFY_SIGNATURE: "true"
           ACCESS_TOKEN_SECRET: agrinexus/whatsapp/access-token
           PHONE_NUMBER_ID_SECRET: agrinexus/whatsapp/phone-number-id
+          RATE_LIMIT_BYPASS_PHONES: !Ref RateLimitBypassPhones
+          RATE_LIMIT_DISABLED: !Ref RateLimitDisabled
       Policies:
         - SQSSendMessagePolicy:
             QueueName: !GetAtt MessageQueue.QueueName
@@ -691,6 +708,124 @@ Resources:
       AlarmActions:
         - !Ref AlertTopic
       TreatMissingData: notBreaching
+
+  # --------------------------------------------------------------------------
+  # Lambda + SQS alarms (credibility: catch silent failures / stuck queues)
+  # See docs/operations/RUNBOOK-ALERTS.md
+  # --------------------------------------------------------------------------
+  ProcessorErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub agrinexus-processor-errors-${Environment}
+      AlarmDescription: MessageProcessor Lambda error count
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub agrinexus-processor-${Environment}
+      AlarmActions:
+        - !Ref AlertTopic
+
+  WebhookErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub agrinexus-webhook-errors-${Environment}
+      AlarmDescription: WebhookHandler Lambda error count
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub agrinexus-webhook-${Environment}
+      AlarmActions:
+        - !Ref AlertTopic
+
+  WebChatErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub agrinexus-web-chat-errors-${Environment}
+      AlarmDescription: WebChatHandler Lambda error count
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub agrinexus-web-chat-${Environment}
+      AlarmActions:
+        - !Ref AlertTopic
+
+  VoiceProcessorErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub agrinexus-voice-errors-${Environment}
+      AlarmDescription: VoiceProcessor Lambda error count
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub agrinexus-voice-${Environment}
+      AlarmActions:
+        - !Ref AlertTopic
+
+  MessageQueueBacklogAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub agrinexus-messages-queue-age-${Environment}
+      AlarmDescription: Main FIFO queue oldest message age (stuck pipeline)
+      Namespace: AWS/SQS
+      MetricName: ApproximateAgeOfOldestMessage
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 300
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt MessageQueue.QueueName
+      AlarmActions:
+        - !Ref AlertTopic
+
+  MessageDLQDepthAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub agrinexus-messages-dlq-depth-${Environment}
+      AlarmDescription: Messages landed on processor DLQ (after retries)
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt MessageDLQ.QueueName
+      AlarmActions:
+        - !Ref AlertTopic
 
 Outputs:
   WebhookUrl:

@@ -225,6 +225,5 @@ docs/web-demo/*.bak
 # Test/demo scripts (internal)
 test-diagram.sh
 scripts/cleanup-repo-for-public.sh
-scripts/delete-user-data.sh
 scripts/setup-diagram-generation.sh
 

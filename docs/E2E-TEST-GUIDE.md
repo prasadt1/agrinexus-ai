@@ -28,8 +28,8 @@ All compute is serverless (Lambda, DynamoDB, SQS, Step Functions, EventBridge). 
    - A **test phone number** in E.164 (e.g. `919876543210`). For voice and image tests, use a number that can send media (real WhatsApp Business numbers; test numbers often don’t support media).
 
 3. **Recommended (no typing URL each time):** Create **`scripts/demo.env`** (gitignored) with at least **`WEBHOOK_URL`**, **`APP_SECRET`** (if webhook signature verification is on), and **`PHONE_NUMBER`**.
-   Scripts such as **`reset-onboard-and-demo.sh`**, **`demo-nudge-loop.sh`**, and **`demo-nudge-flow.sh`** **source** `scripts/demo.env` when the file exists.
-   There is no single “e2e-test.sh” in the repo; follow the curl / WhatsApp steps in the sections below, or use the demo scripts with your phone.
+   Scripts such as **`reset-onboard-and-demo.sh`**, **`demo-nudge-flow.sh`**, and **`test-complete-flow.sh`** **source** `scripts/demo.env` when the file exists.
+   For a **one-command smoke** (SAM validate + fast pytest + optional KB + optional web `curl`), run **`./scripts/e2e-smoke.sh`** from the repo root (see script header for env vars).
    `demo.env` is gitignored so secrets are not committed.
 
 4. **AWS CLI** configured (for Lambda invoke, DynamoDB reset, and integration tests).
@@ -41,10 +41,12 @@ If you only have **one** test number (e.g. your own: `+919876543210`), each onbo
 **Before each new language onboarding:**
 
 ```bash
-./scripts/reset-profile.sh +919876543210
+./scripts/reset-profile.sh 919876543210
 ```
 
-If you have `PHONE_NUMBER` in `scripts/demo.env`, you can run: `./scripts/reset-profile.sh` (script uses `PHONE_NUMBER` when no argument is given—see below). For `reset-profile.sh`, the phone can also be passed as the first argument.
+Use **digits only** (E.164 without `+`), matching the `from` field WhatsApp sends (e.g. `4917647009148`). If `PHONE_NUMBER` is set in `scripts/demo.env`, you can run `./scripts/reset-profile.sh` with no arguments.
+
+This script calls **`delete-user-data.sh`** with **`DELETE_CONFIRM=yes`** (non-interactive). For an interactive delete, run `./scripts/delete-user-data.sh` and confirm at the prompt.
 
 Then in WhatsApp send the new language keyword (हिंदी / मराठी / తెలుగు / English) and complete the four onboarding steps again. No webhook or `APP_SECRET` needed for the reset—only AWS CLI and `TABLE_NAME` (default `agrinexus-data`).
 
@@ -63,7 +65,7 @@ User must complete onboarding before Q&A/nudges work correctly (language and pro
 | Crop   | e.g. `Cotton` | same | same | same |
 | Nudge consent | `Yes` / `No` | same | same | same |
 
-**Automated:** The script `scripts/e2e-test.sh` sends these four messages for you (see below).
+**Automated (webhook simulation):** Use **`scripts/reset-onboard-and-demo.sh`** (onboarding + optional weather/DONE) or **`scripts/test-complete-flow.sh`** for the long scripted flow—both need `WEBHOOK_URL` and usually `APP_SECRET`.
 
 **Manual:** In WhatsApp, send the four messages in order; you should get a short confirmation.
 
@@ -78,9 +80,9 @@ After onboarding, any text question (in the chosen language) is answered using t
 - Hindi: `कपास में कीट कैसे नियंत्रित करें?`
 - Help in any language: `HELP` or `मदद` / `मदत` / `సహాయం`
 
-**Automated:** `e2e-test.sh` sends **HELP** and one sample question (e.g. cotton pest control).
+**Automated:** `reset-onboard-and-demo.sh` / `test-complete-flow.sh` include a sample farming question after onboarding.
 
-**Manual:** Send any farming-related question; you should get a text reply with citations.
+**Manual:** Send any farming-related question; you should get a text reply with citations (or a proper KB refusal without a fake source line).
 
 ---
 
@@ -159,40 +161,22 @@ python tests/test_voice_end_to_end.py path/to/your_audio.mp3 hi
    `aws lambda invoke --function-name agrinexus-weather-dev --payload '{}' /tmp/response.json`  
 3. Send **DONE** (or `हो गया` / `झाला` / `అయ్యింది`) so the loop closes.
 
-The script `scripts/e2e-test.sh` can do onboarding + one Q&A + trigger weather + send DONE for you.
+The script **`scripts/reset-onboard-and-demo.sh`** can drive onboarding, a text question, optional weather poll, and DONE-style closure (see `usage()` at top of the script for flags).
 
 **Manual:** After triggering the poller, check WhatsApp for the nudge message; reply DONE or NOT YET and confirm the bot’s response.
 
 ---
 
-## Running the E2E Script (Automated Part)
+## Running automated scripts (summary)
 
-One script drives the **automated** E2E flow: onboarding, HELP, one text question, nudge trigger, and DONE.
+| Goal | Script |
+|------|--------|
+| SAM validate + fast pytest + optional KB + optional web `curl` | `./scripts/e2e-smoke.sh` |
+| Reset DynamoDB user only (no WhatsApp HTTP) | `./scripts/reset-profile.sh [phone_digits]` |
+| Long scripted webhook flow (voice/nudge/reminder path) | `./scripts/test-complete-flow.sh` (requires `WEBHOOK_URL`, etc.) |
+| Onboard + demo messages via webhook | `./scripts/reset-onboard-and-demo.sh` |
 
-```bash
-# From repo root. Load demo.env if present.
-WEBHOOK_URL="https://YOUR_API.execute-api.us-east-1.amazonaws.com/dev/webhook" \
-APP_SECRET="YOUR_APP_SECRET" \
-./scripts/e2e-test.sh --phone 919876543210
-```
-
-Optional:
-
-- `--lang hi|mr|te|en` – onboarding language (default: `en`).
-- `--no-reset` – skip DynamoDB profile reset (use existing profile).
-- `--no-nudge` – skip weather poller and DONE (onboarding + Q&A only).
-
-Examples:
-
-```bash
-# Full E2E (reset, onboard, HELP, question, nudge, DONE)
-./scripts/e2e-test.sh --phone 919876543210 --lang en
-
-# Onboarding + Q&A only (no nudge)
-./scripts/e2e-test.sh --phone 919876543210 --no-nudge --no-reset
-```
-
-After the script, do **manual** checks for **voice** (send voice note) and **vision** (send image) in WhatsApp.
+After scripted runs, still do **manual** checks for **voice** (voice note) and **vision** (image) on a **real** WhatsApp Business number if applicable.
 
 ---
 
@@ -219,12 +203,12 @@ See `AGENTS.md` for env vars (e.g. `TABLE_NAME`, `KNOWLEDGE_BASE_ID`) and expect
 
 ## E2E Checklist (All Functionality)
 
-| Area        | Automated (script/tests)        | Manual (WhatsApp)                    |
-|------------|----------------------------------|--------------------------------------|
-| Onboarding | ✅ `e2e-test.sh`                 | Optional: verify in WhatsApp         |
-| Q&A chat   | ✅ `e2e-test.sh` + HELP + 1 Q   | Optional: send more questions        |
-| Voice      | ✅ `test_voice_*.py` (integration) | ✅ Send voice note, check reply    |
-| Vision     | ✅ `test_vision.py` (integration)  | ✅ Send crop image, check reply     |
-| Nudges     | ✅ `e2e-test.sh` (trigger + DONE)  | Optional: trigger poller, reply DONE/NOT YET |
+| Area        | Automated (script/tests)              | Manual (WhatsApp)                    |
+|------------|----------------------------------------|--------------------------------------|
+| Onboarding | `reset-onboard-and-demo.sh` / `test-complete-flow.sh` | Verify templates in app        |
+| Q&A chat   | `e2e-smoke.sh` (optional KB) + scripts above | Send more questions           |
+| Voice      | `test_voice_*.py` (integration)        | Send voice note (real number)        |
+| Vision     | `test_vision.py` (integration)       | Send crop image                       |
+| Nudges     | `reset-onboard-and-demo.sh` / poller | Trigger poller, reply DONE/NOT YET   |
 
-Use this guide for a full end-to-end test of onboarding, nudges, vision, voice, and question/answer chat.
+Use **[E2E-TEST-CHECKLIST.md](../../E2E-TEST-CHECKLIST.md)** before high-visibility demos. Ops alarms: **[RUNBOOK-ALERTS.md](../operations/RUNBOOK-ALERTS.md)**.
