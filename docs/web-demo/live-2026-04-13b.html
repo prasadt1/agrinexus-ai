@@ -45,7 +45,7 @@
             max-width: 600px;
             width: 100%;
             height: 90vh;
-            max-height: 700px;
+            max-height: 800px;
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -107,6 +107,7 @@
             flex: 1;
             overflow-y: auto;
             padding: 20px;
+            min-height: 200px;
             background:
                 linear-gradient(to bottom, #f8f9fa 0%, #ffffff 100%),
                 url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 140 140%22%3E%3C!-- subtle cotton boll pattern --%3E%3Cg opacity=%220.14%22%3E%3Cg fill=%22%23f5a623%22%3E%3Ccircle cx=%2222%22 cy=%2220%22 r=%223%22/%3E%3Ccircle cx=%2290%22 cy=%2236%22 r=%223%22/%3E%3Ccircle cx=%2260%22 cy=%2290%22 r=%223%22/%3E%3C/g%3E%3Cg fill=%22%23ffffff%22 stroke=%22%23e9eef2%22 stroke-width=%221%22%3E%3Ccircle cx=%2220%22 cy=%2218%22 r=%227%22/%3E%3Ccircle cx=%2228%22 cy=%2223%22 r=%226%22/%3E%3Ccircle cx=%2215%22 cy=%2226%22 r=%226%22/%3E%3Ccircle cx=%2288%22 cy=%2234%22 r=%227%22/%3E%3Ccircle cx=%2296%22 cy=%2239%22 r=%226%22/%3E%3Ccircle cx=%2283%22 cy=%2242%22 r=%226%22/%3E%3Ccircle cx=%2258%22 cy=%2288%22 r=%227%22/%3E%3Ccircle cx=%2266%22 cy=%2293%22 r=%226%22/%3E%3Ccircle cx=%2253%22 cy=%2296%22 r=%226%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');
@@ -187,7 +188,28 @@
 
         .rate-limit-info { font-size: 12px; color: #666; text-align: center; }
         .error-message { background: #ff4444; color: white; padding: 12px; border-radius: 12px; margin: 10px 20px; text-align: center; font-size: 14px; animation: fadeIn 0.3s ease-in; }
-        .privacy-notice { font-size: 11px; color: #999; text-align: center; padding: 12px 20px; background: #f9f9f9; border-top: 1px solid #e0e0e0; }
+        .privacy-notice { font-size: 11px; color: #999; text-align: center; padding: 12px 20px; background: #f9f9f9; border-top: 1px solid #e0e0e0; flex-shrink: 0; }
+
+        .sample-question-btn {
+            display: inline-block;
+            padding: 6px 12px;
+            margin: 3px;
+            background: linear-gradient(135deg, #f0f8f4 0%, #e8f5ed 100%);
+            border: 1px solid #2D8B4E;
+            border-radius: 14px;
+            font-size: 11px;
+            color: #1a5c32;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        .sample-question-btn:hover {
+            background: linear-gradient(135deg, #2D8B4E 0%, #1a5c32 100%);
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(45, 139, 78, 0.3);
+        }
+        .sample-questions-container { display: flex; flex-wrap: wrap; gap: 3px; }
 
         @media (max-width: 600px) {
             .container { height: 100vh; max-height: 100vh; border-radius: 0; }
@@ -224,6 +246,11 @@
             </div>
         </div>
 
+        <div id="sampleQuestions" style="padding: 10px 20px; background: #fafafa; border-top: 1px solid #e8e8e8; border-bottom: 1px solid #e8e8e8; flex-shrink: 0; max-height: 120px; overflow-y: auto;">
+            <div style="font-size: 11px; color: #666; margin-bottom: 6px; font-weight: 600;">💡 Try these questions:</div>
+            <div class="sample-questions-container"></div>
+        </div>
+
         <div class="input-area">
             <div class="input-container">
                 <div class="input-wrapper">
@@ -240,13 +267,58 @@
         </div>
 
         <div class="privacy-notice">
-            🔒 Privacy-friendly demo. No phone number required.
+            <div style="margin-bottom: 12px; color: #666;">
+                🔒 Privacy-friendly demo. No phone number required.
+            </div>
+            <div style="margin-bottom: 14px; padding: 12px 14px; background: #e8f5ed; border-radius: 8px; border-left: 4px solid #1a5c32;">
+                <strong style="color: #1a5c32; font-size: 13px;">Want the full experience?</strong><br>
+                <span style="font-size: 12px; color: #2d5a3d; display: block; margin-top: 4px; line-height: 1.4;">
+                    Try the native WhatsApp bot with voice, photo diagnosis, and weather-timed nudges
+                </span>
+                <a href="https://demo.agrinexus-ai.farm/web-demo/chat.html" target="_blank" style="color: #1a5c32; text-decoration: none; font-weight: 700; display: inline-block; margin-top: 8px; font-size: 13px;">
+                    💬 Start WhatsApp Chat →
+                </a>
+            </div>
+            <div style="font-size: 10px; color: #666; margin-bottom: 8px;">
+                Note: This web demo is text-only (RAG queries). Rate limited to 5 questions/hour.
+            </div>
+            <div style="font-size: 10px; color: #666;">
+                Feedback? <a href="https://github.com/prasadt1/agrinexus-ai/issues/new" target="_blank" style="color: #2D8B4E; text-decoration: none;">Submit on GitHub</a>
+            </div>
         </div>
     </div>
 
     <script>
         // Configuration
         const API_URL = 'https://h4bt24ycdl.execute-api.us-east-1.amazonaws.com/dev/chat';
+
+        // Sample questions by language
+        const SAMPLE_QUESTIONS = {
+            en: [
+                "How to control aphids in cotton?",
+                "कपास में सफेद मक्खी का इलाज",
+                "Best fertilizer for tomato plants",
+                "टमाटर के लिए सबसे अच्छा खाद"
+            ],
+            hi: [
+                "कपास में माहू कीट कैसे नियंत्रित करें?",
+                "कपास में सफेद मक्खी का इलाज",
+                "टमाटर के लिए सबसे अच्छा खाद",
+                "गेहूं में पीला रतुआ रोग का उपचार"
+            ],
+            mr: [
+                "कापसात माशी कीटक कसे नियंत्रित करावे?",
+                "कापसात पांढरी माशी उपचार",
+                "टोमॅटोसाठी सर्वोत्तम खत",
+                "गहूमध्ये पिवळा गंज रोग उपचार"
+            ],
+            te: [
+                "పత్తిలో ఆఫిడ్స్ ఎలా నియంత్రించాలి?",
+                "పత్తిలో తెల్ల ఈగ చికిత్స",
+                "టమోటా మొక్కలకు ఉత్తమ ఎరువు",
+                "గోధుమలో పసుపు తుప్పు వ్యాధి చికిత్స"
+            ]
+        };
 
         const chatMessages = document.getElementById('chatMessages');
         const messageInput = document.getElementById('messageInput');
@@ -271,6 +343,23 @@
         }
 
         const clientId = getOrCreateClientId();
+
+        function renderSampleQuestions() {
+            const container = document.querySelector('.sample-questions-container');
+            const lang = languageSelect.value;
+            const questions = SAMPLE_QUESTIONS[lang] || SAMPLE_QUESTIONS.en;
+            
+            container.innerHTML = questions.map(q => 
+                `<button class="sample-question-btn" onclick="useSampleQuestion('${q.replace(/'/g, "\\'")}')">${q}</button>`
+            ).join('');
+        }
+
+        function useSampleQuestion(question) {
+            messageInput.value = question;
+            messageInput.focus();
+            // Optionally auto-send:
+            // sendMessage();
+        }
 
         function loadRateLimitState() {
             try {
@@ -458,7 +547,10 @@
 
         sendButton.addEventListener('click', sendMessage);
         messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+        languageSelect.addEventListener('change', renderSampleQuestions);
+        
         loadRateLimitState();
+        renderSampleQuestions();
         messageInput.focus();
     </script>
 </body>
