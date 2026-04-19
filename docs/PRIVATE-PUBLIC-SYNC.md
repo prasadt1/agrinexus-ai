@@ -89,6 +89,21 @@ Optional: run `./scripts/push-to-public.sh` from this repo for a confirmation ga
 
 ---
 
+## If `git push`, `git repack`, or `git gc` fails (mmap, SIGBUS, early EOF)
+
+On macOS, a Git repo under **iCloud Desktop & Documents** (or another cloud-synced folder) can hit **`pack-objects died of signal 10`** (SIGBUS) or timeouts when Git memory-maps loose objects. Symptoms include **`packs: 0`** with very large **loose** object counts, or **`index-pack` / early EOF** on the remote during push.
+
+**What to do:**
+
+1. **Clone fresh** from GitHub into a **local, non-synced path** (for example `~/projects/AgriNexus-ai-push`), not under Desktop if Desktop is iCloud-backed.
+2. **Re-add remotes** (`origin` → public, `private` → private SSH URL) and verify with `git remote -v`.
+3. **Rescue uncommitted work** from the old tree with `cp`/`rsync` of changed files, or `git diff` / `git stash` only if those commands still complete on the old copy.
+4. Use that clone for **`fetch` / `repack` / `push`**; **retire** the old `.git` (rename or remove) on the cloud-backed copy so you do not accidentally keep pushing from a broken object store.
+
+**Day-to-day:** open your editor (Cursor) on the **healthy clone directory** so terminals and Git integrations use the reliable worktree.
+
+---
+
 ## Related
 
 - Public [LICENSE](../LICENSE) — portfolio / evaluation framing; not a substitute for keeping trade secrets off the public remote.
