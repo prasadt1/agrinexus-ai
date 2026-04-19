@@ -12,17 +12,21 @@
 
 Pick the web demo or WhatsApp experience.
 
-| 🌐 **Web Demo** | 💬 **WhatsApp Chat** |
-|----------------|---------------------|
-| [Try web demo](https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html) (no phone number) | [Open WhatsApp chat](https://demo.agrinexus-ai.farm/web-demo/chat.html) |
-| **Includes:** Text Q&A (RAG) | **Includes:** Onboarding + text (public); voice/photo/nudges (allowlisted) |
-| **Best for:** Instant judge tryout | **Best for:** Seeing the full channel UX |
-| **Privacy:** No login; minimal retention | **Privacy:** WhatsApp number required |
-| **Limits:** ~5 questions/hour | **Limits:** Rich features are allowlisted |
+| **Web demo** | **WhatsApp** |
+|--------------|--------------|
+| [Try web demo](https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html) (no phone number) | [Open WhatsApp (wa.me)](https://wa.me/4915120105731) |
+| **Includes:** Text Q&A (RAG), optional image | **Includes:** Onboarding + text (public); voice/photo/nudges (allowlisted) |
+| **Best for:** Instant tryout in a browser | **Best for:** Full channel UX (buttons, voice, nudges) |
+| **Privacy:** No login; anonymous `client_id` in browser storage for rate limits | **Privacy:** WhatsApp number required |
+| **Limits:** ~5 questions/hour per IP + client; API Gateway + WAF caps (see [RUNBOOK-ALERTS](docs/operations/RUNBOOK-ALERTS.md)) | **Limits:** Rich features are allowlisted |
 
-**WhatsApp access:** Text is open; voice/photo/nudges are available via the [demo request template](https://github.com/prasadt1/agrinexus-ai/issues/new?template=demo-request.md ).
+If your hosted site still has a **`chat.html`** redirect page, it should forward to the same **`wa.me`** number above.
 
-**Data retention (public demo):** I keep only the minimum needed to run the demo, and auto-delete demo user data after ~7 days.
+**WhatsApp access:** Text is open; voice/photo/nudges are available via the [demo request template](https://github.com/prasadt1/agrinexus-ai/issues/new?template=demo-request.md).
+
+**Data retention (summary):** Conversation rows written by the **processor** use a **90-day** TTL; short-lived **`MSG#*`** rows written by the **webhook** for the response detector use **7 days**; **WAMID** dedup keys use **24 hours**; **nudge** records use **180 days**. `demo_tier: public` limits **nudge follow-up scheduling**, not those TTLs. Details: [E2E-TEST-CHECKLIST.md](E2E-TEST-CHECKLIST.md) (section 6).
+
+**Competition / article:** [AWS 10,000 AIdeas — AgriNexus finalist story on AWS Builder](https://builder.aws.com/content/39qTnLaOki9b8RyT8MXOrg7Fns6) (external).
 
 ---
 
@@ -33,7 +37,7 @@ Pick the web demo or WhatsApp experience.
 - **AI**: Amazon Bedrock (Claude 3 Sonnet + RAG via Knowledge Base `retrieve_and_generate`), Transcribe, Polly, Claude Vision
 - **Messaging**: WhatsApp Business API
 - **Storage**: DynamoDB single-table design, S3 for knowledge base vectors + temp audio / voice
-- **Abuse / cost**: Webhook enforces **per-user rate limits** (default 10 messages/hour; `RATE_LIMIT_*` in `template-week2.yaml`) using **`MSG#*`** sort keys only; signature verification on POST. See [Security](#security).
+- **Abuse / cost**: WhatsApp **webhook** enforces **per-user rate limits** (default 10 messages/hour; `RATE_LIMIT_*` in `template-week2.yaml`) before enqueueing work; Meta **signature verification** on POST. The **public web chat** API adds **DynamoDB hourly caps** (per hashed IP + `client_id`), **API Gateway stage throttling**, and **WAF** on `/chat`. See [Security](#security) and [docs/operations/RUNBOOK-ALERTS.md](docs/operations/RUNBOOK-ALERTS.md).
 - **Cost**: ~$53/month for 1,000 farmers (all pay-per-use). See [Cost breakdown](#cost-breakdown)
 
 **Diagrams:** See [architecture/diagrams.md](architecture/diagrams.md) for Mermaid diagrams (high-level, webhook, text/voice/image flows, nudge flow). Full design: [architecture.md](architecture.md).
@@ -89,7 +93,7 @@ aws configure
 
 ```bash
 # 1. Deploy infrastructure (recommended: samconfig-week2.toml)
-sam build --template template-week2.yaml
+sam build --template-file template-week2.yaml
 sam deploy --config-file samconfig-week2.toml
 
 # Manual alternative (match parameters in samconfig-week2.toml, including TableStreamArn):
@@ -195,17 +199,29 @@ Bot: बढ़िया! आपने स्प्रे कर दिया। 
 │   ├── README.md
 │   └── diagrams.md                 # Mermaid: flows, webhook, nudge
 ├── docs/
-│   ├── E2E-TEST-GUIDE.md           # End-to-end test guide
-│   └── CODE-WALKTHROUGH.md         # Component walkthrough
+│   ├── E2E-TEST-GUIDE.md           # End-to-end test guide (WhatsApp + integration)
+│   ├── CODE-WALKTHROUGH.md         # Component walkthrough
+│   └── operations/
+│       └── RUNBOOK-ALERTS.md       # CloudWatch alarms, DLQ, web abuse envelope
+├── E2E-TEST-CHECKLIST.md           # Pre-demo manual checklist + automated smoke pointer
+├── .github/workflows/
+│   ├── ci.yml                      # PR/push: fast pytest + sam validate
+│   └── aws-smoke.yml               # Optional: workflow_dispatch golden KB tests (secrets)
 ├── scripts/
 │   ├── README.md                   # Which scripts are shared vs local
+│   ├── e2e-smoke.sh                # SAM validate + fast pytest + optional KB + web curl
+│   ├── reset-profile.sh            # Non-interactive DynamoDB user reset (wraps delete-user-data)
+│   ├── delete-user-data.sh         # Delete USER#* items for a phone (supports --yes)
 │   ├── clear-nudges.sh             # Clear NUDGE# rows for a user
 │   ├── reset-onboard-and-demo.sh   # Reset profile + optional webhook demo flow
 │   ├── demo-nudge-loop.sh          # Scripted nudge / reminder demo (uses demo.env)
+│   ├── test-complete-flow.sh       # Long synthetic webhook flow (voice/nudge/reminder)
+│   ├── deploy-web-demo.sh          # SAM deploy + notes for static demo hosting
 │   ├── create-bedrock-guardrail.sh
 │   └── … (other demo helpers; see scripts/README.md)
 ├── src/
 │   ├── webhook/                    # WhatsApp webhook handler
+│   ├── web-chat/                   # Public browser API (Bedrock RAG, rate limits)
 │   ├── processor/                  # Message processor with RAG + voice + vision
 │   ├── voice/                      # Voice input (Transcribe)
 │   ├── dlq/                        # Dead letter queue handler
@@ -230,6 +246,19 @@ Bot: बढ़िया! आपने स्प्रे कर दिया। 
 
 ## Testing
 
+### CI (GitHub Actions)
+
+On every push/PR to `main`, **`.github/workflows/ci.yml`** runs fast unit tests (`tests/test_nudge_flow.py`, `tests/test_district_helplines.py`) and **`sam validate --lint`** on `template-week2.yaml`. Optional **`aws-smoke.yml`** (`workflow_dispatch`) can run golden KB tests when repository secrets are configured.
+
+### One-command smoke (local or CI agent)
+
+From repo root:
+
+```bash
+./scripts/e2e-smoke.sh
+# Optional: export KNOWLEDGE_BASE_ID=... and WEB_CHAT_URL=https://...execute-api.../dev/chat
+```
+
 ### Text RAG
 ```bash
 # Integration tests call Bedrock; set a real KB ID or tests skip:
@@ -240,8 +269,8 @@ Without **`KNOWLEDGE_BASE_ID`**, parametrized golden tests **skip** (see `tests/
 
 ### Voice Input
 ```bash
-# Test with your own voice recording
-python tests/test_voice_simple.py path/to/audio.mp3 hi cotton
+# Test with your own voice recording (language codes: hi-IN, mr-IN, te-IN, en-IN)
+python tests/test_voice_simple.py path/to/audio.mp3 hi-IN
 ```
 
 ### Vision Analysis
@@ -258,31 +287,40 @@ python tests/test_voice_end_to_end.py
 
 ### End-to-End (All Features)
 
-See [docs/E2E-TEST-GUIDE.md](docs/E2E-TEST-GUIDE.md) for testing onboarding, Q&A, voice, vision, and nudges.
+See [docs/E2E-TEST-GUIDE.md](docs/E2E-TEST-GUIDE.md) for testing onboarding, Q&A, voice, vision, and nudges. For a **pre-demo pass/fail list**, use **[E2E-TEST-CHECKLIST.md](E2E-TEST-CHECKLIST.md)**.
 
-**Webhook scripts:** create **`scripts/demo.env`** (not committed) with at least **`WEBHOOK_URL`**, **`APP_SECRET`** (if signatures are on), and **`PHONE_NUMBER`**. Scripts such as **`reset-onboard-and-demo.sh`** and **`demo-nudge-loop.sh`** source it when present.
+**Webhook scripts:** create **`scripts/demo.env`** (not committed) with at least **`WEBHOOK_URL`**, **`APP_SECRET`** (if signatures are on), and **`PHONE_NUMBER`**. Scripts such as **`reset-onboard-and-demo.sh`**, **`test-complete-flow.sh`**, and **`demo-nudge-loop.sh`** source it when present.
 
 ### Reset profile / re-onboarding
 
-Use **`./scripts/reset-onboard-and-demo.sh --phone <E.164>`** (see script usage; requires **`WEBHOOK_URL`**), or delete the user’s **`PROFILE`** item in DynamoDB. Then send a new language choice in WhatsApp to restart onboarding.
+- **DynamoDB only (no Meta HTTP):** `./scripts/reset-profile.sh 4917647009148` (digits only; or set **`PHONE_NUMBER`** in `demo.env` and run with no args). Wraps **`delete-user-data.sh`** with confirmation skipped.
+- **Full scripted webhook flow:** `./scripts/reset-onboard-and-demo.sh --phone <digits>` (requires `WEBHOOK_URL`; see `usage()` in that script).
+
+Then send a new language choice in WhatsApp to restart onboarding.
 
 ## Architecture Details
 
 ### Lambda Functions
-1. **WebhookHandler**: Validates signature, **per-user rate limit** (DynamoDB `MSG#` count in window), deduplicates, stores messages for the response detector, routes **text/image** to the message queue and **audio** to the voice queue; for **audio**, sends localized **voice-received ACK** via WhatsApp (before enqueue) using the Common layer + secrets
-2. **MessageProcessor**: Handles text/image messages, RAG queries, Polly voice output; **does not** send a duplicate “preparing answer” ack for transcribed voice (`_source: voice`)
-3. **VoiceProcessor**: Downloads media, **Transcribe** batch job, queues transcribed text to the message queue
-4. **NudgeSender**: Sends behavioral nudges, schedules reminders
-5. **ReminderSender**: Sends T+24h and T+48h reminders
-6. **ResponseDetector**: Detects DONE/NOT YET responses via DynamoDB Streams
-7. **WeatherPoller**: Checks weather, triggers nudge workflow
-8. **DLQHandler**: Handles failed messages with dialect-aware errors
+1. **WebhookHandler**: Validates signature, **per-user rate limit** (before enqueue), deduplicates, stores short-lived **`MSG#*`** rows for the response detector, routes **text/image** to the message queue and **audio** to the voice queue; for **audio**, sends localized **voice-received ACK** via WhatsApp (before enqueue) using the Common layer + secrets
+2. **WebChatHandler**: Public **POST /chat** API for browser demo—Bedrock KB RAG, optional image analysis, **DynamoDB rate limits**, no WhatsApp
+3. **MessageProcessor**: Handles text/image messages, RAG queries, Polly voice output; **does not** send a duplicate “preparing answer” ack for transcribed voice (`_source: voice`)
+4. **VoiceProcessor**: Downloads media, **Transcribe** batch job, queues transcribed text to the message queue
+5. **NudgeSender**: Sends behavioral nudges, schedules reminders
+6. **ReminderSender**: Sends T+24h and T+48h reminders
+7. **ResponseDetector**: Detects DONE/NOT YET responses via DynamoDB Streams
+8. **WeatherPoller**: Checks weather, triggers nudge workflow
+9. **DLQHandler**: Handles failed messages with dialect-aware errors
 
 ### Data Flow
 
-**Text Query:**
+**Text Query (WhatsApp):**
 ```
 WhatsApp → Webhook → SQS → Processor → Bedrock RAG → WhatsApp
+```
+
+**Text query (web demo):**
+```
+Browser → API Gateway (+ WAF) → WebChatHandler → Bedrock RAG → JSON response
 ```
 
 **Voice Query:**
@@ -382,15 +420,13 @@ aws lambda invoke --function-name agrinexus-weather-dev --payload '{}' /tmp/resp
 
 ## Monitoring
 
-Use the [CloudWatch console](https://console.aws.amazon.com/cloudwatch/) for Lambda log groups (e.g. `/aws/lambda/agrinexus-webhook-dev`) and optional dashboards. Add your own dashboard JSON or helper scripts locally if needed.
+Use the [CloudWatch console](https://console.aws.amazon.com/cloudwatch/) for Lambda log groups (e.g. `/aws/lambda/agrinexus-webhook-dev`, `/aws/lambda/agrinexus-web-chat-dev`).
+
+**Alarms:** The SAM stack publishes **SNS** topic **`agrinexus-alerts-<env>`** (see stack output **`AlertTopicArn`**) for nudge workflow failures, high daily cost, **Lambda errors** (webhook, processor, web-chat, voice), **SQS main-queue backlog age**, and **DLQ depth**. Subscribe an email/SMS to that topic in the AWS console. Full table: **[docs/operations/RUNBOOK-ALERTS.md](docs/operations/RUNBOOK-ALERTS.md)**.
 
 **Billing:** enable [Cost Explorer](https://console.aws.amazon.com/cost-management/home#/cost-explorer) once per account, then filter by service (Bedrock, Transcribe, etc.).
 
-**Custom Metrics**:
-- `AgriNexus/NudgesSent`
-- `AgriNexus/NudgesCompleted`
-
-The dashboard includes a completion rate widget based on these metrics.
+**Custom metrics** (application code, if enabled in your deployment): `AgriNexus/NudgesSent`, `AgriNexus/NudgesCompleted`. You can build a CloudWatch dashboard (e.g. `AgriNexus-Operations-dev`) on top of these and standard Lambda/SQS metrics.
 
 ## Real Weather API (Optional)
 
@@ -441,7 +477,9 @@ This project was developed using **Kiro AI**, which enabled requirements-driven 
 
 - [architecture.md](architecture.md) — full system design
 - [architecture/diagrams.md](architecture/diagrams.md) — Mermaid flow diagrams
+- [E2E-TEST-CHECKLIST.md](E2E-TEST-CHECKLIST.md) — pre-demo checklist (manual + automated smoke pointer)
 - [docs/E2E-TEST-GUIDE.md](docs/E2E-TEST-GUIDE.md) — end-to-end test walkthrough
+- [docs/operations/RUNBOOK-ALERTS.md](docs/operations/RUNBOOK-ALERTS.md) — alarms, DLQ, web rate limits
 - [docs/CODE-WALKTHROUGH.md](docs/CODE-WALKTHROUGH.md) — component-by-component guide
 - [requirements.md](requirements.md) — EARS requirements specification
 - [ISSUES-LOG.md](ISSUES-LOG.md) — troubleshooting history (resolved issues)
@@ -481,7 +519,7 @@ See the [LICENSE](LICENSE) file for full details.
 ## Security
 
 - **Do not commit** API keys, tokens, app secrets, or real phone numbers. `scripts/demo.env` and `.aws-sam/` should stay gitignored.
-- **Webhook:** Meta **`X-Hub-Signature-256`** verification; **per-user message rate limit** before enqueueing work (see `template-week2.yaml` **`RATE_LIMIT_*`**).
+- **Webhook:** Meta **`X-Hub-Signature-256`** verification; **per-user message rate limit** before enqueueing work (see `template-week2.yaml` **`RATE_LIMIT_*`**). **Web chat:** separate rate limits + API Gateway + WAF (see template and runbook).
 - Set **KnowledgeBaseId** (and related stack params) in **`samconfig-week2.toml`** or **`--parameter-overrides`** when deploying. Processor Lambdas receive **`KNOWLEDGE_BASE_ID`** from the template.
 - For **vision / voice** integration tests, set **`TEMP_AUDIO_BUCKET`** (and any other required env vars) as documented in the test files.
 
