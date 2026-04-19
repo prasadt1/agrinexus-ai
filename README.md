@@ -217,6 +217,7 @@ Bot: बढ़िया! आपने स्प्रे कर दिया। 
 │   ├── demo-nudge-loop.sh          # Scripted nudge / reminder demo (uses demo.env)
 │   ├── test-complete-flow.sh       # Long synthetic webhook flow (voice/nudge/reminder)
 │   ├── deploy-web-demo.sh          # SAM deploy + notes for static demo hosting
+│   ├── push-to-public.sh           # Confirmation gate before git push public → open repo
 │   ├── create-bedrock-guardrail.sh
 │   └── … (other demo helpers; see scripts/README.md)
 ├── src/
@@ -480,6 +481,7 @@ This project was developed using **Kiro AI**, which enabled requirements-driven 
 - [E2E-TEST-CHECKLIST.md](E2E-TEST-CHECKLIST.md) — pre-demo checklist (manual + automated smoke pointer)
 - [docs/E2E-TEST-GUIDE.md](docs/E2E-TEST-GUIDE.md) — end-to-end test walkthrough
 - [docs/operations/RUNBOOK-ALERTS.md](docs/operations/RUNBOOK-ALERTS.md) — alarms, DLQ, web rate limits
+- [docs/PRIVATE-PUBLIC-SYNC.md](docs/PRIVATE-PUBLIC-SYNC.md) — **workflow B:** private repo = full IP (superset), public = subset; remotes and push discipline
 - [docs/CODE-WALKTHROUGH.md](docs/CODE-WALKTHROUGH.md) — component-by-component guide
 - [requirements.md](requirements.md) — EARS requirements specification
 - [ISSUES-LOG.md](ISSUES-LOG.md) — troubleshooting history (resolved issues)

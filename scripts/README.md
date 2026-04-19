@@ -6,6 +6,9 @@ This directory contains both **shared scripts** (tracked in git) and **personal/
 
 Scripts actually present in this repo (others may live under `scripts/local/` on your machine):
 
+- `push-to-public.sh` — Type **YES** to run `git push public <branch>:main` (workflow B: private = superset; see [docs/PRIVATE-PUBLIC-SYNC.md](../docs/PRIVATE-PUBLIC-SYNC.md))
+- `e2e-smoke.sh` — SAM validate + fast pytest + optional KB + web chat curl (see script header)
+- `reset-profile.sh` / `delete-user-data.sh` — Non-interactive or interactive DynamoDB user reset
 - `clear-nudges.sh` — Delete **NUDGE#** rows for a phone (keeps profile); useful before `demo-nudge-loop.sh`
 - `reset-onboard-and-demo.sh` — Reset profile / drive onboarding + optional weather + webhook messages (needs `WEBHOOK_URL`, etc.)
 - `demo-nudge-loop.sh` — **One command** demo: first nudge (default **Latur**) → **T+24h** → **T+48h**; uses `demo.env` for `PHONE_NUMBER`. Flags: `--district`, `--interval`, `--reminders-only`
@@ -13,7 +16,7 @@ Scripts actually present in this repo (others may live under `scripts/local/` on
 - `create-bedrock-guardrail.sh` — Create a Bedrock guardrail resource
 - `cleanup-internal-scripts.sh`, `remove-internal-docs.sh` — Maintainer cleanup helpers
 
-**Deploy:** use the SAM CLI from the repo root (see **README.md**): `sam build --template template-week2.yaml` then `sam deploy --config-file samconfig-week2.toml`.
+**Deploy:** use the SAM CLI from the repo root (see **README.md**): `sam build --template-file template-week2.yaml` then `sam deploy --config-file samconfig-week2.toml`.
 
 ## Personal Scripts (Keep Local)
 
