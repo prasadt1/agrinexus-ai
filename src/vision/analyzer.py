@@ -6,7 +6,7 @@ import boto3
 import json
 import base64
 import os
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
 s3 = boto3.client('s3', region_name='us-east-1')
@@ -39,14 +39,20 @@ def download_whatsapp_image(media_id: str) -> bytes:
         return response.read()
 
 
-def analyze_crop_image(image_bytes: bytes, dialect: str, crop: str = 'cotton') -> Dict[str, Any]:
+def analyze_crop_image(
+    image_bytes: bytes,
+    dialect: str,
+    crop: str = "cotton",
+    district: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     Analyze crop image for pests, diseases, or nutrient deficiencies
     
     Args:
         image_bytes: Image data
         dialect: User's dialect (hi, mr, te, en)
-        crop: Crop type (default: cotton)
+        crop: Crop type from PROFILE (default: cotton)
+        district: District / location from PROFILE (optional)
     
     Returns:
         {
@@ -75,26 +81,30 @@ def analyze_crop_image(image_bytes: bytes, dialect: str, crop: str = 'cotton') -
         'te': 'Telugu script',
         'en': 'English'
     }
-    language = language_map.get(dialect, 'English')
-    
-    # Build prompt
-    prompt = f"""You are an agricultural extension agent helping Indian farmers identify crop problems.
+    language = language_map.get(dialect, "English")
+    area = (district or "").strip() or "not specified"
 
-Analyze this {crop} plant image and provide:
+    prompt = f"""You are an agricultural extension agent helping smallholder farmers in India.
 
-1. **Diagnosis**: What pest, disease, or nutrient deficiency do you see?
-2. **Severity**: Is it low, medium, or high severity?
-3. **Recommendations**: What should the farmer do immediately? Include:
-   - Specific pesticides/fungicides (with dosage)
-   - Cultural practices (pruning, irrigation, etc.)
-   - Timing (when to apply treatment)
-   - Prevention tips
+CONTEXT (use unless the image gives *unmistakable* proof this is a different crop type, e.g. banana plantation vs wheat):
+- Registered crop in the farmer's app profile: **{crop}**
+- Registered district / area: **{area}**
 
-IMPORTANT: Respond in {language}. Use simple, practical language that farmers can understand.
+TASK: Look at the photo for pests, diseases, nutrient stress, or other visible problems — assuming this is their **{crop}** field unless proven otherwise.
 
-If you cannot identify a specific problem, say so clearly and suggest general crop health practices.
+RULES:
+1. **Profile-first**: If the picture is partly blurry, backlit, or just "green vegetation", do **not** relabel it as sugarcane, rice, etc. Say visibility is limited and give guidance for **{crop}**.
+2. **Foreground first**: Base the diagnosis on the **sharp, main subject** (e.g. hand-held leaf, insects on that leaf). Out-of-focus yellow flowers or other plants in the **background** are often weeds or intercrop—mention in **at most one short phrase**, not as the headline. **Do not** use background color alone to reject **{crop}**.
+3. **Wheat / cereals**: If **{crop}** is wheat (गेहूं) or similar small grains and you see **clusters of tiny soft-bodied insects** on a **narrow leaf with parallel veins** (typical grass/cereal blade), treat this as a **working diagnosis of cereal aphid / sucking-pest infestation consistent with {crop}** with **medium confidence**—not only "might be aphids". Give concrete scouting and IPM-style next steps (beneficials, thresholds, consult KVK/local officer for **authorized** products). Do **not** say "not infected" when obvious colonies are visible.
+4. **Uncertainty**: If species ID is unclear, state that in **one sentence** in **Confidence** only—still give **full actionable** Recommendations for **{crop}** in the same reply (do not repeat "more photos needed" in every section).
+5. **Tone**: Support the farmer. Avoid harsh denials unless the in-focus plant structure **clearly** rules out **{crop}**.
+6. **Consistency**: Use the same four numbered headings below every time so answers feel stable across retries.
 
-Format your response clearly with sections for Diagnosis, Severity, Recommendations, and Confidence level.
+OUTPUT in **{language}**, simple practical wording, with sections:
+1. **Diagnosis** (framed for their **{crop}**)
+2. **Severity** (low / medium / high, or "cannot assess from this photo alone")
+3. **Recommendations** (immediate actions, timing, cultural practices; mention consulting local agri officer for product choice where rules vary)
+4. **Confidence** (how sure you are)
 """
     
     # Call Claude 3 Sonnet Vision
@@ -106,6 +116,7 @@ Format your response clearly with sections for Diagnosis, Severity, Recommendati
             body=json.dumps({
                 "anthropic_version": "bedrock-2023-05-31",
                 "max_tokens": 2000,
+                "temperature": 0.2,
                 "messages": [
                     {
                         "role": "user",
@@ -220,7 +231,8 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         print(f"Saved to S3: s3://{TEMP_BUCKET}/{s3_key}")
         
         # Analyze image
-        result = analyze_crop_image(image_bytes, dialect, crop)
+        district = user_profile.get("district") or user_profile.get("location")
+        result = analyze_crop_image(image_bytes, dialect, crop, district=district)
         
         return result['recommendations']
         

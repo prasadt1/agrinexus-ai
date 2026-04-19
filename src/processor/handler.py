@@ -4,8 +4,9 @@ Processes messages from SQS: Onboarding state machine + Bedrock RAG queries
 """
 import json
 import os
+import re
 import boto3
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 from decimal import Decimal
 
@@ -459,6 +460,80 @@ def convert_floats_to_decimal(obj):
         return obj
 
 
+def is_rag_refusal_response(text: str) -> bool:
+    """
+    Detect KB no-hit / refusal replies. Generic FAO/ICAR footer must not be appended to these
+    (it implies a grounded answer when there was none).
+    """
+    if not text or not text.strip():
+        return True
+    low = text.lower()
+    if "don't have information" in low or "do not have information" in low:
+        return True
+    if "no information" in low and "knowledge base" in low:
+        return True
+    if "i can only help with farming" in low:
+        return True
+    # Hindi (model paraphrases the English refusal)
+    if "जानकारी संग्रह" in text:
+        return True
+    if "ज्ञानकोषात" in text and ("माहिती नाही" in text or "नाही" in text):
+        return True
+    return False
+
+
+def strip_llm_numeric_source_footer(text: str, source_keyword: str) -> str:
+    """
+    Remove trailing LLM-added placeholders like 'स्रोत: 1' or 'स्रोत: 3, 4, 5' (ADR 0005).
+    Only strips when the line contains digits/commas/spaces after the keyword — not real titles.
+    """
+    if not text or source_keyword not in text:
+        return text
+    kw = re.escape(source_keyword)
+    # Digits / commas / spaces only after keyword (not real document titles)
+    pattern = rf"(?:\n\s*)*{kw}\s*[\d,\s]+$"
+    return re.sub(pattern, "", text.rstrip(), flags=re.MULTILINE).rstrip()
+
+
+def strip_llm_numeric_source_footer_flexible(text: str, label: str) -> str:
+    """Like strip_llm_numeric_source_footer but allows optional spaces around the colon."""
+    if not text:
+        return text
+    lb = re.escape(label).rstrip(":").rstrip()
+    pattern = rf"(?:\n\s*)*{lb}\s*:\s*[\d,\s]+$"
+    return re.sub(pattern, "", text.rstrip(), flags=re.MULTILINE).rstrip()
+
+
+def strip_all_numeric_source_footers(text: str) -> str:
+    """Strip numeric citation junk for any locale keyword the model might emit."""
+    telugu_source = "\u0c2e\u0c42\u0c32\u0c02:"
+    hindi_sors = "\u0938\u094b\u0930\u094d\u0938"  # loanword "source" in Devanagari
+    for kw in ("स्रोत:", "स्त्रोत:", f"{hindi_sors}:", telugu_source, "Source:", "source:"):
+        text = strip_llm_numeric_source_footer(text, kw)
+    # Second pass: flexible spacing around colon (e.g. space before colon)
+    for label in ("स्रोत", "स्त्रोत", hindi_sors, "Source", "source", telugu_source.rstrip(":")):
+        text = strip_llm_numeric_source_footer_flexible(text, label)
+    return text
+
+
+def source_labels_from_citations(citations: Any) -> List[str]:
+    """Basenames from S3 URIs in retrieve_and_generate citations (same idea as web-chat handler)."""
+    if not citations:
+        return []
+    labels: List[str] = []
+    for citation in citations:
+        for ref in citation.get("retrievedReferences") or []:
+            loc = ref.get("location") or {}
+            s3_loc = loc.get("s3Location") or {}
+            uri = s3_loc.get("uri") or ""
+            if not uri:
+                continue
+            name = uri.rstrip("/").split("/")[-1]
+            if name and name not in labels:
+                labels.append(name)
+    return labels
+
+
 def save_message(phone_number: str, wamid: str, message_data: Dict[str, Any], response_text: str, source_citation: str):
     """Save message to DynamoDB with TTL"""
     timestamp = datetime.utcnow().isoformat()
@@ -522,6 +597,7 @@ RESPONSE STYLE (when you DO have relevant context):
 - Use everyday words; if a technical term is needed, explain it in a few words.
 - Avoid long paragraphs, dense lists, and copying long passages from the context.
 - DO NOT add any source citation or reference line at the end. The system will add it automatically.
+- NEVER end with a "source" line that lists only numbers or citation indices (e.g. comma-separated digits like 3, 4, 5). No Devanagari or English label before such numbers.
 
 CRITICAL: If you said "I don't have information" OR "I can only help with farming questions", DO NOT ADD ANY SOURCE CITATION. NO "स्रोत:", NO "Source:", NOTHING. Just end your response immediately after the refusal message.
 
@@ -788,28 +864,28 @@ Just type your question or send a photo!'''
             }
             source_keyword = source_keywords.get(dialect, 'Source:')
             
-            # Check if source citation is already in the response (and remove if it's just a number)
+            # Strip LLM "स्रोत: 1" / "स्रोत: 3, 4, 5" placeholders; append doc names or generic line
+            response_text = strip_all_numeric_source_footers(response_text)
             has_source = source_keyword in response_text
-            if has_source:
-                # Check if it's just "स्त्रोत: 1" or similar placeholder
-                import re
-                placeholder_pattern = f"{re.escape(source_keyword)}\\s*\\d+\\s*$"
-                if re.search(placeholder_pattern, response_text.strip()):
-                    # Remove the placeholder
-                    response_text = re.sub(placeholder_pattern, '', response_text).strip()
-                    has_source = False
-            
-            # Add generic source attribution if not present
-            if not has_source:
-                source_attributions = {
-                    'hi': 'FAO/ICAR कृषि मार्गदर्शिका',
-                    'mr': 'FAO/ICAR शेती मार्गदर्शक',
-                    'te': 'FAO/ICAR వ్యవసాయ మార్గదర్శకం',
-                    'en': 'FAO/ICAR Agricultural Guidelines'
-                }
-                source_text = source_attributions.get(dialect, source_attributions['en'])
-                response_text += f"\n\n{source_keyword} {source_text}"
-            
+
+            if not has_source and not is_rag_refusal_response(response_text):
+                labels = source_labels_from_citations(result.get("citations"))
+                if labels:
+                    max_show = 5
+                    tail = ", ".join(labels[:max_show])
+                    if len(labels) > max_show:
+                        tail += " …"
+                    response_text += f"\n\n{source_keyword} {tail}"
+                else:
+                    source_attributions = {
+                        'hi': 'FAO/ICAR कृषि मार्गदर्शिका',
+                        'mr': 'FAO/ICAR शेती मार्गदर्शक',
+                        'te': 'FAO/ICAR వ్యవసాయ మార్గదర్శకం',
+                        'en': 'FAO/ICAR Agricultural Guidelines'
+                    }
+                    source_text = source_attributions.get(dialect, source_attributions['en'])
+                    response_text += f"\n\n{source_keyword} {source_text}"
+
             reply_text = maybe_append_helpline_footer(
                 response_text,
                 text,

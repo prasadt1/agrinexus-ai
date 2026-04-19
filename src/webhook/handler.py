@@ -55,8 +55,23 @@ RATE_LIMIT_MESSAGES = int(os.environ.get('RATE_LIMIT_MESSAGES', '10'))
 RATE_LIMIT_WINDOW_SECONDS = int(os.environ.get('RATE_LIMIT_WINDOW_SECONDS', '3600'))
 
 
+def _rate_limit_globally_disabled() -> bool:
+    v = (os.environ.get("RATE_LIMIT_DISABLED") or "").strip().lower()
+    return v in ("1", "true", "yes", "on")
+
+
+def _rate_limit_bypass_phones() -> set:
+    raw = os.environ.get("RATE_LIMIT_BYPASS_PHONES") or ""
+    return {p.strip().lstrip("+") for p in raw.split(",") if p.strip()}
+
+
 def check_rate_limit(phone_number: str) -> bool:
     """Count only MSG# items in the time window (excludes NUDGE#, PROFILE, etc.)."""
+    if _rate_limit_globally_disabled():
+        return True
+    norm = (phone_number or "").strip().lstrip("+")
+    if norm and norm in _rate_limit_bypass_phones():
+        return True
     try:
         now_ts = int(datetime.utcnow().timestamp())
         window_start = now_ts - RATE_LIMIT_WINDOW_SECONDS
