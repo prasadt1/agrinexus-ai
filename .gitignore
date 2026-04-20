@@ -173,6 +173,11 @@ QUICK-START-WEB-DEMO.md
 scripts/cleanup-internal-scripts.sh
 scripts/remove-internal-docs.sh
 
+# Root-level local helpers (commit staging, personal AWS cost checks — keep local)
+COMMIT-CLEANUP.sh
+check-credits.sh
+check-costs-simple.sh
+
 # Test audio files (too large for Git, regenerate locally)
 tests/test-audio/*.aiff
 tests/test-audio/*.mp3
