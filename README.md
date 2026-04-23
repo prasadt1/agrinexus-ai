@@ -2,9 +2,16 @@
 
 # AgriNexus AI – WhatsApp Agricultural Advisory
 
-**Close the last mile:** AI-powered agronomic advice and weather-timed nudges for smallholder farmers—in their language, on WhatsApp. Built with **Kiro**, **EARS**, and **Amazon Bedrock**.
+**Close the last mile:** AI-powered agronomic advice and weather-timed nudges for smallholder farmers—in their language, on WhatsApp. Built with **AWS Serverless** + **Amazon Bedrock** and a requirements-driven workflow (**Kiro** + **EARS**).
 
 **In 30 seconds:** Send a voice note → get cited agronomic advice in your language. Send a crop photo → get pest/disease ID and recommendations. Get a nudge when weather is right for spraying—reply "हो गया" (done) to close the loop.
+
+[![AWS Serverless](https://img.shields.io/badge/AWS-Serverless-232F3E?logo=amazonaws&logoColor=white)](https://aws.amazon.com/serverless/)
+[![Amazon Bedrock](https://img.shields.io/badge/Amazon%20Bedrock-Claude%203%20Sonnet-FF9900?logo=amazonaws&logoColor=white)](https://aws.amazon.com/bedrock/)
+[![WhatsApp Business Platform](https://img.shields.io/badge/WhatsApp-Business%20Platform-25D366?logo=whatsapp&logoColor=white)](https://www.whatsapp.com/business/platform/)
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![AWS SQS](https://img.shields.io/badge/AWS-SQS-232F3E?logo=amazonaws&logoColor=white)](https://aws.amazon.com/sqs/)
+[![AWS DynamoDB](https://img.shields.io/badge/AWS-DynamoDB-4053D6?logo=amazondynamodb&logoColor=white)](https://aws.amazon.com/dynamodb/)
 
 ---
 
@@ -18,7 +25,7 @@ Pick the web demo or WhatsApp experience.
 | **Includes:** Text Q&A (RAG), optional image | **Includes:** Onboarding + text (public); voice/photo/nudges (allowlisted) |
 | **Best for:** Instant tryout in a browser | **Best for:** Full channel UX (buttons, voice, nudges) |
 | **Privacy:** No login; anonymous `client_id` in browser storage for rate limits | **Privacy:** WhatsApp number required |
-| **Limits:** ~5 questions/hour per IP + client; API Gateway + WAF caps (see [RUNBOOK-ALERTS](docs/operations/RUNBOOK-ALERTS.md)) | **Limits:** Rich features are allowlisted |
+| **Limits:** ~5 questions/hour per IP + client; API Gateway + WAF caps | **Limits:** Rich features are allowlisted |
 
 If your hosted site still has a **`chat.html`** redirect page, it should forward to the same **`wa.me`** number above.
 
@@ -30,15 +37,25 @@ If your hosted site still has a **`chat.html`** redirect page, it should forward
 
 ---
 
+## What it does (high level)
+
+- **Multi-modal input**: text, voice notes (Transcribe), crop images (Vision)
+- **Grounded answers**: Bedrock Knowledge Base RAG with citations (FAO + regional agronomy sources)
+- **Behavioral nudges**: weather-timed spray reminders + DONE/NOT YET loop with follow-ups (full tier)
+- **Multi-dialect**: Hindi, Marathi, Telugu, English
+- **Safety**: farming-domain guardrails, banned pesticide blocking (optional), abuse/cost controls
+
 ## Architecture
 
-- **Onboarding**: Language → district (**Latur**, **Jalna**, **Nagpur**) → crop → nudge consent (`src/processor/handler.py`). New profiles include **`demo_tier: public`** (public demo: one weather nudge, no T+24h/T+48h follow-ups). Set **`demo_tier`** to another value in DynamoDB (e.g. `full`) for pilot partners who need the full reminder loop.
-- **Serverless**: Lambda, DynamoDB, EventBridge Scheduler, Step Functions
-- **AI**: Amazon Bedrock (Claude 3 Sonnet + RAG via Knowledge Base `retrieve_and_generate`), Transcribe, Polly, Claude Vision
-- **Messaging**: WhatsApp Business API
-- **Storage**: DynamoDB single-table design, S3 for knowledge base vectors + temp audio / voice
-- **Abuse / cost**: WhatsApp **webhook** enforces **per-user rate limits** (default 10 messages/hour; `RATE_LIMIT_*` in `template-week2.yaml`) before enqueueing work; Meta **signature verification** on POST. The **public web chat** API adds **DynamoDB hourly caps** (per hashed IP + `client_id`), **API Gateway stage throttling**, and **WAF** on `/chat`. See [Security](#security) and [docs/operations/RUNBOOK-ALERTS.md](docs/operations/RUNBOOK-ALERTS.md).
-- **Cost**: ~$53/month for 1,000 farmers (all pay-per-use). See [Cost breakdown](#cost-breakdown)
+- **Onboarding**: language → district (**Latur**, **Jalna**, **Nagpur**) → crop → nudge consent (`src/processor/handler.py`).
+- **Serverless**: Lambda, DynamoDB, SQS, EventBridge Scheduler, Step Functions
+- **AI**: Amazon Bedrock (Claude 3 Sonnet + Knowledge Base RAG), Transcribe, Polly, Claude Vision
+- **Messaging**: WhatsApp Business Platform (Cloud API)
+- **Storage**: DynamoDB single-table design, S3 for knowledge base sources + temp audio/images
+- **Abuse / cost controls**:
+  - WhatsApp **webhook**: Meta signature verification + per-user message rate limits (defaults in `template-week2.yaml`)
+  - Public **web chat**: per-IP + per-client caps + API Gateway throttling + WAF on `/chat`
+- **Cost**: modeled **~$53/month for 1,000 farmers** (pay-per-use). See [Cost breakdown](#cost-breakdown)
 
 **Diagrams:** See [architecture/diagrams.md](architecture/diagrams.md) for Mermaid diagrams (high-level, webhook, text/voice/image flows, nudge flow). Full design: [architecture.md](architecture.md).
 
@@ -73,7 +90,9 @@ If your hosted site still has a **`chat.html`** redirect page, it should forward
 - **Guardrails**: Blocks banned pesticides (optional)
 - **Error Handling**: Dialect-aware error messages via DLQ
 
-## Quick Start
+---
+
+## Quick start (deploy your own)
 
 ### Prerequisites
 
@@ -126,7 +145,7 @@ aws secretsmanager create-secret \
 # Subscribe to 'messages' field
 ```
 
-### Knowledge Base Setup
+### Knowledge base setup
 
 **Important**: The source PDF documents are **not included in this repository** due to copyright considerations. You need to obtain and upload them separately.
 
@@ -135,10 +154,14 @@ See [data/fao-pdfs/README.md](data/fao-pdfs/README.md) for:
 - Copyright and licensing information
 - Instructions for uploading to S3
 - Alternative knowledge sources
+- **URL manifests (cotton / wheat / soybean):** tracked CSVs under `data/fao-pdfs/` (`kb_url_manifest_all.csv`, `kb_url_manifest_download.csv`, `kb_url_manifest_manual.csv`) and helper script **`scripts/download_kb_from_manifest.py`** to fetch direct-PDF rows into `data/fao-pdfs/en/<crop>/` (run `--dry-run` first). Details: [data/fao-pdfs/README.md](data/fao-pdfs/README.md).
 
 Quick setup:
 ```bash
 # 1. Download PDFs from sources listed in data/fao-pdfs/README.md
+#    Optional: batch-fetch direct PDFs from kb_url_manifest_download.csv
+#    python3 scripts/download_kb_from_manifest.py --dry-run
+#    python3 scripts/download_kb_from_manifest.py
 # 2. Place them in data/fao-pdfs/en/
 # 3. Upload to S3
 aws s3 sync data/fao-pdfs/en/ s3://agrinexus-knowledge-base-dev/en/ \
@@ -429,6 +452,8 @@ Use the [CloudWatch console](https://console.aws.amazon.com/cloudwatch/) for Lam
 
 **Custom metrics** (application code, if enabled in your deployment): `AgriNexus/NudgesSent`, `AgriNexus/NudgesCompleted`. You can build a CloudWatch dashboard (e.g. `AgriNexus-Operations-dev`) on top of these and standard Lambda/SQS metrics.
 
+**Traffic visibility vs. browser analytics:** **Web demo** and **WhatsApp** traffic are understood through **AWS**—CloudWatch metrics and logs (API Gateway and `agrinexus-web-chat` for the public `/chat` path; webhook, processor, queues, and DLQ for WhatsApp), optional **WAF** metrics and sampled requests on `/chat`, and the nudge custom metrics above. The **[`dashboards/cloudwatch-dashboard.json`](dashboards/cloudwatch-dashboard.json)** template includes **web demo** API and Lambda widgets plus an on-dashboard pointer to **CloudWatch RUM** for optional **page-view** telemetry. **Optional RUM** (off by default) is configured in **`docs/web-demo/assets/rum-config.js`**; there is no third-party page analytics (e.g. Google Analytics). Details: **[docs/web-demo/README.md#traffic-visibility-vs-browser-analytics](docs/web-demo/README.md#traffic-visibility-vs-browser-analytics)**.
+
 ## Real Weather API (Optional)
 
 Production uses **OpenWeatherMap** when `MOCK_WEATHER` is false and the API key is available from **Secrets Manager** (`WEATHER_API_KEY_SECRET` on the Weather Lambda, e.g. `agrinexus/weather/api-key`). Store the key in Secrets Manager—do not put it in `samconfig` or git. Set `MOCK_WEATHER=true` on the Weather poller only for deterministic demo weather. See [WEATHER-API-SETUP.md](WEATHER-API-SETUP.md).
@@ -480,11 +505,17 @@ This project was developed using **Kiro AI**, which enabled requirements-driven 
 - [architecture/diagrams.md](architecture/diagrams.md) — Mermaid flow diagrams
 - [E2E-TEST-CHECKLIST.md](E2E-TEST-CHECKLIST.md) — pre-demo checklist (manual + automated smoke pointer)
 - [docs/E2E-TEST-GUIDE.md](docs/E2E-TEST-GUIDE.md) — end-to-end test walkthrough
-- [docs/operations/RUNBOOK-ALERTS.md](docs/operations/RUNBOOK-ALERTS.md) — alarms, DLQ, web rate limits
-- [docs/PRIVATE-PUBLIC-SYNC.md](docs/PRIVATE-PUBLIC-SYNC.md) — **workflow B:** private repo = full IP (superset), public = subset; remotes and push discipline
 - [docs/CODE-WALKTHROUGH.md](docs/CODE-WALKTHROUGH.md) — component-by-component guide
+- [data/fao-pdfs/README.md](data/fao-pdfs/README.md) — knowledge-base PDF sources, S3 sync, and **URL manifests / batch download** (`kb_url_manifest_*.csv`, `scripts/download_kb_from_manifest.py`)
 - [requirements.md](requirements.md) — EARS requirements specification
 - [ISSUES-LOG.md](ISSUES-LOG.md) — troubleshooting history (resolved issues)
+
+### Maintainers (internal / non-public)
+
+Some documents are intentionally **not** part of the public “judge quickstart” narrative (operations runbooks, private/public sync workflow, etc.). If you’re maintaining a deployed stack, you may also consult:
+
+- `docs/operations/RUNBOOK-ALERTS.md` — alarms, DLQ, abuse envelope, rate limits
+- `docs/PRIVATE-PUBLIC-SYNC.md` — internal repo sync discipline
 
 ## Resources
 
