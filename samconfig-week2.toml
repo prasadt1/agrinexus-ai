@@ -19,8 +19,8 @@ parameter_overrides = [
     # Guardrail disabled: Bedrock Guardrails add per-request cost at scale; re-enable with GuardrailId=\"YOUR_ID\" when budget allows.
     "GuardrailId=\"\"",
     "GuardrailVersion=1",
-    # Demo: exempt this WhatsApp from hourly MSG# rate limit (nudge button tests). Remove or empty for production.
-    "RateLimitBypassPhones=4917647009148",
+    # Optional: comma-separated digits (no +) exempt from webhook MSG rate limit for pilot demos. Leave empty in public clones.
+    "RateLimitBypassPhones=",
     "RateLimitDisabled=false"
 ]
 

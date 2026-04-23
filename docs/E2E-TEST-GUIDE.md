@@ -44,7 +44,7 @@ If you only have **one** test number (e.g. your own: `+919876543210`), each onbo
 ./scripts/reset-profile.sh 919876543210
 ```
 
-Use **digits only** (E.164 without `+`), matching the `from` field WhatsApp sends (e.g. `4917647009148`). If `PHONE_NUMBER` is set in `scripts/demo.env`, you can run `./scripts/reset-profile.sh` with no arguments.
+Use **digits only** (E.164 without `+`), matching the `from` field WhatsApp sends (e.g. `1555123456789`). If `PHONE_NUMBER` is set in `scripts/demo.env`, you can run `./scripts/reset-profile.sh` with no arguments.
 
 This script calls **`delete-user-data.sh`** with **`DELETE_CONFIRM=yes`** (non-interactive). For an interactive delete, run `./scripts/delete-user-data.sh` and confirm at the prompt.
 

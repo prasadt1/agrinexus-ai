@@ -6,7 +6,7 @@ This directory contains both **shared scripts** (tracked in git) and **personal/
 
 Scripts actually present in this repo (others may live under `scripts/local/` on your machine):
 
-- `push-to-public.sh` — Type **YES** to run `git push public <branch>:main` (workflow B: private = superset; see [docs/PRIVATE-PUBLIC-SYNC.md](../docs/PRIVATE-PUBLIC-SYNC.md))
+- `push-to-public.sh` — Type **YES** to run `git push public <branch>:main` (workflow B: treat **private** as the superset repo; review diffs before pushing to **public**)
 - `e2e-smoke.sh` — SAM validate + fast pytest + optional KB + web chat curl (see script header)
 - `reset-profile.sh` / `delete-user-data.sh` — Non-interactive or interactive DynamoDB user reset
 - `clear-nudges.sh` — Delete **NUDGE#** rows for a phone (keeps profile); useful before `demo-nudge-loop.sh`

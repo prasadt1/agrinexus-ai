@@ -38,7 +38,7 @@
 ```bash
 aws dynamodb update-item \
   --table-name agrinexus-data \
-  --key '{"PK":{"S":"USER#4917647009148"},"SK":{"S":"PROFILE"}}' \
+  --key '{"PK":{"S":"USER#1555123456789"},"SK":{"S":"PROFILE"}}' \
   --update-expression "SET demo_tier = :tier" \
   --expression-attribute-values '{":tier":{"S":"full"}}'
 ```
@@ -147,7 +147,7 @@ First, get the nudge ID:
 aws dynamodb query \
   --table-name agrinexus-data \
   --key-condition-expression "PK = :pk AND begins_with(SK, :sk)" \
-  --expression-attribute-values '{"pk":{"S":"USER#4917647009148"},":sk":{"S":"NUDGE#"}}' \
+  --expression-attribute-values '{"pk":{"S":"USER#1555123456789"},":sk":{"S":"NUDGE#"}}' \
   --query 'Items[0].SK.S' \
   --output text
 ```
@@ -159,7 +159,7 @@ Then invoke reminder:
 aws lambda invoke \
   --function-name agrinexus-reminder-dev \
   --payload '{
-    "phone_number": "4917647009148",
+    "phone_number": "1555123456789",
     "nudge_id": "2026-04-17T10:15:02.636018#spray",
     "reminder_type": "T+24h",
     "dialect": "mr"
@@ -191,7 +191,7 @@ Buttons: [झाला] [नाही झाला]
 ```bash
 aws dynamodb get-item \
   --table-name agrinexus-data \
-  --key '{"PK":{"S":"USER#4917647009148"},"SK":{"S":"PROFILE"}}' \
+  --key '{"PK":{"S":"USER#1555123456789"},"SK":{"S":"PROFILE"}}' \
   --query 'Item.{dialect:dialect.S,location:location.S,crop:crop.S,demo_tier:demo_tier.S,consent:consent.BOOL}'
 ```
 
@@ -200,7 +200,7 @@ aws dynamodb get-item \
 aws dynamodb query \
   --table-name agrinexus-data \
   --key-condition-expression "PK = :pk AND begins_with(SK, :sk)" \
-  --expression-attribute-values '{"pk":{"S":"USER#4917647009148"},":sk":{"S":"MSG#"}}' \
+  --expression-attribute-values '{"pk":{"S":"USER#1555123456789"},":sk":{"S":"MSG#"}}' \
   --query 'Count'
 ```
 
@@ -209,7 +209,7 @@ aws dynamodb query \
 aws dynamodb query \
   --table-name agrinexus-data \
   --key-condition-expression "PK = :pk AND begins_with(SK, :sk)" \
-  --expression-attribute-values '{"pk":{"S":"USER#4917647009148"},":sk":{"S":"NUDGE#"}}' \
+  --expression-attribute-values '{"pk":{"S":"USER#1555123456789"},":sk":{"S":"NUDGE#"}}' \
   --query 'Items[*].{nudge_id:SK.S,status:status.S,activity:activity.S}'
 ```
 
@@ -313,7 +313,7 @@ aws logs tail /aws/lambda/agrinexus-processor-dev --since 5m | grep -i vision
 aws dynamodb query \
   --table-name agrinexus-data \
   --key-condition-expression "PK = :pk AND begins_with(SK, :sk)" \
-  --expression-attribute-values '{"pk":{"S":"USER#4917647009148"},":sk":{"S":"NUDGE#"}}'
+  --expression-attribute-values '{"pk":{"S":"USER#1555123456789"},":sk":{"S":"NUDGE#"}}'
 
 # Check reminder Lambda logs
 aws logs tail /aws/lambda/agrinexus-reminder-dev --since 5m

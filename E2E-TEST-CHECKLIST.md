@@ -61,7 +61,7 @@ Operational context: [docs/operations/RUNBOOK-ALERTS.md](docs/operations/RUNBOOK
 ## 2. WhatsApp Flow Tests
 
 ### 2.1 Onboarding Flow (Fresh User)
-**Prerequisites:** Reset user data for 4917647009148
+**Prerequisites:** Reset user data for your test WhatsApp digits (E.164 without `+`, e.g. `1555123456789`)
 
 - [ ] ⏳ Send "Hi" → Receive language selection list
 - [ ] ⏳ Select "हिंदी (Hindi)" → Receive district buttons

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Reset WhatsApp user profile and related DynamoDB items (same as delete-user-data, non-interactive).
 # Usage:
-#   ./scripts/reset-profile.sh 4917647009148
+#   ./scripts/reset-profile.sh 1555123456789
 #   ./scripts/reset-profile.sh   # uses PHONE_NUMBER from scripts/demo.env (digits, no +)
 #
 # Keys use the same format as WhatsApp (typically country code + number, no leading +).
@@ -16,7 +16,7 @@ fi
 RAW="${1:-${PHONE_NUMBER:-}}"
 if [[ -z "$RAW" ]]; then
   echo "Usage: $0 <phone_e164_digits>" >&2
-  echo "Example: $0 4917647009148" >&2
+  echo "Example: $0 1555123456789" >&2
   echo "Or set PHONE_NUMBER in scripts/demo.env" >&2
   exit 1
 fi

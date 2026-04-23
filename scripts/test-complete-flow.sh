@@ -8,7 +8,10 @@ if [[ -f "$(dirname "$0")/demo.env" ]]; then
 fi
 
 WEBHOOK_URL="${WEBHOOK_URL:-}"
-FROM_NUMBER="${FROM_NUMBER:-4917647009148}"
+if [[ -z "${FROM_NUMBER:-}" && -n "${PHONE_NUMBER:-}" ]]; then
+  FROM_NUMBER="${PHONE_NUMBER}"
+fi
+FROM_NUMBER="${FROM_NUMBER:-}"
 APP_SECRET="${APP_SECRET:-}"
 ENVIRONMENT="${ENVIRONMENT:-dev}"
 WEATHER_LAMBDA="agrinexus-weather-${ENVIRONMENT}"
@@ -17,6 +20,11 @@ NUDGE_SENDER_LAMBDA="agrinexus-nudge-sender-${ENVIRONMENT}"
 if [[ -z "$WEBHOOK_URL" ]]; then
   echo "Error: WEBHOOK_URL not set"
   echo "Usage: WEBHOOK_URL=https://... [APP_SECRET=...] $0"
+  exit 1
+fi
+
+if [[ -z "$FROM_NUMBER" ]]; then
+  echo "Error: set FROM_NUMBER or PHONE_NUMBER (E.164 digits without +) in environment or scripts/demo.env"
   exit 1
 fi
 

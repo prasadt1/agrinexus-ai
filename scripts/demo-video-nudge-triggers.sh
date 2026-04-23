@@ -2,10 +2,10 @@
 # Automate demo nudge invokes so you can record on phone without copy-pasting NUDGE_ID.
 # Prereq: AWS CLI configured, same account/region as Lambdas.
 #
-# Primary tester (see docs/demo/TRIGGER-COMMANDS.md):
-#   WhatsApp +4917647009148  →  PHONE/Dynamo: 4917647009148  →  PK USER#4917647009148
-#   Onboard as: Ramesh, Latur, Wheat. Default PROFILE demo_tier after onboarding is "public"
-#   (one nudge, no auto T+24/T+48 schedules). cmd_profile() sets "full" for closed-loop demos.
+# Set PHONE to your WhatsApp E.164 digits without + (same as Dynamo PK USER#...).
+# Optional local cheat-sheet (gitignored): docs/demo/TRIGGER-COMMANDS.md
+# Default PROFILE demo_tier after onboarding is often "public" (one contextual nudge);
+# cmd_profile() sets "full" for closed-loop reminder demos.
 #
 # Usage:
 #   ./scripts/demo-video-nudge-triggers.sh profile # Latur + Wheat + full tier (optional)
@@ -15,13 +15,13 @@
 #   ./scripts/demo-video-nudge-triggers.sh guided # first → wait Enter → 24 → wait Enter → 48
 #
 # Env overrides:
-#   PHONE=4917647009148  REGION=us-east-1  ENV=dev
+#   PHONE=1555123456789  REGION=us-east-1  ENV=dev
 #   TABLE=agrinexus-data
 #   NUDGE_FN=agrinexus-nudge-sender-dev#   REMINDER_FN=agrinexus-reminder-dev
 
 set -euo pipefail
 
-PHONE="${PHONE:-4917647009148}"
+PHONE="${PHONE:-}"
 REGION="${REGION:-us-east-1}"
 ENV="${ENV:-dev}"
 TABLE="${TABLE:-agrinexus-data}"
@@ -32,11 +32,16 @@ PK="USER#${PHONE}"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
+require_phone() {
+  [[ -n "$PHONE" ]] || die "Set PHONE to WhatsApp E.164 digits without + (example: export PHONE=1555123456789)"
+}
+
 require_aws() {
   command -v aws >/dev/null 2>&1 || die "aws CLI not found"
 }
 
 cmd_profile() {
+  require_phone
   require_aws
   echo "Updating PROFILE for $PK (Latur, Wheat, full)..."
   aws dynamodb update-item \
@@ -50,6 +55,7 @@ cmd_profile() {
 }
 
 cmd_first() {
+  require_phone
   require_aws
   echo "Invoking $NUDGE_FN (first nudge, Latur)..."
   aws lambda invoke \
@@ -64,6 +70,7 @@ cmd_first() {
 }
 
 latest_nudge_id() {
+  require_phone
   require_aws
   local sk
   sk="$(aws dynamodb query \

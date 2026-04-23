@@ -1,7 +1,7 @@
 #!/bin/bash
 # Delete all data for a specific user from DynamoDB
 # Usage: ./scripts/delete-user-data.sh [--yes] <phone_digits>
-#   Example: ./scripts/delete-user-data.sh --yes 4917647009148
+#   Example: ./scripts/delete-user-data.sh --yes 1555123456789
 #   --yes   Skip confirmation (for scripts; or set DELETE_CONFIRM=yes)
 
 set -e
@@ -11,7 +11,12 @@ if [[ "${1:-}" == "--yes" ]]; then
   AUTO_CONFIRM=yes
   shift
 fi
-PHONE_NUMBER="${1:-4917647009148}"
+PHONE_NUMBER="${1:-}"
+if [[ -z "$PHONE_NUMBER" ]]; then
+  echo "Usage: $0 [--yes] <phone_digits>" >&2
+  echo "Example: $0 --yes 1555123456789   # E.164 digits without +" >&2
+  exit 1
+fi
 
 TABLE_NAME="${TABLE_NAME:-agrinexus-data}"
 

@@ -232,3 +232,29 @@ test-diagram.sh
 scripts/cleanup-repo-for-public.sh
 scripts/setup-diagram-generation.sh
 
+# ---------------------------------------------------------------------------
+# Maintainer-only / local working notes (not for public repo browsing)
+# Keep copies under these paths on your machine; do not commit updates.
+# ---------------------------------------------------------------------------
+docs/notes/
+
+# Demo trigger sheet (tester phone, hand-tuned Lambda payloads, stack-specific)
+docs/demo/TRIGGER-COMMANDS.md
+
+# Private vs public clone workflow (your remotes discipline)
+docs/PRIVATE-PUBLIC-SYNC.md
+
+# Graphify / code-graph exploration outputs
+graphify-out/
+.graphify_cached.json
+
+# Local DynamoDB / CLI scratch
+query-params.json
+
+# One-off verification helpers (PR checklists, rate-limit probes)
+verify-pr1-fixes.sh
+verify-pr2-fixes.sh
+verify-rate-limiting.sh
+check-latest-nudge.sh
+check-user-nudges.sh
+

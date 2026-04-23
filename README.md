@@ -327,7 +327,7 @@ See [docs/E2E-TEST-GUIDE.md](docs/E2E-TEST-GUIDE.md) for testing onboarding, Q&A
 
 ### Reset profile / re-onboarding
 
-- **DynamoDB only (no Meta HTTP):** `./scripts/reset-profile.sh 4917647009148` (digits only; or set **`PHONE_NUMBER`** in `demo.env` and run with no args). Wraps **`delete-user-data.sh`** with confirmation skipped.
+- **DynamoDB only (no Meta HTTP):** `./scripts/reset-profile.sh <your_e164_digits>` (digits only, no `+`; or set **`PHONE_NUMBER`** in `demo.env` and run with no args). Wraps **`delete-user-data.sh`** with confirmation skipped.
 - **Full scripted webhook flow:** `./scripts/reset-onboard-and-demo.sh --phone <digits>` (requires `WEBHOOK_URL`; see `usage()` in that script).
 
 Then send a new language choice in WhatsApp to restart onboarding.
@@ -519,15 +519,13 @@ This project was developed using **Kiro AI**, which enabled requirements-driven 
 - [data/fao-pdfs/README.md](data/fao-pdfs/README.md) — knowledge-base PDF sources, S3 sync, and **URL manifests / batch download** (`kb_url_manifest_*.csv`, `scripts/download_kb_from_manifest.py`)
 - [requirements.md](requirements.md) — EARS requirements specification
 - [ISSUES-LOG.md](ISSUES-LOG.md) — troubleshooting history (resolved issues)
-- [docs/notes/INDEX.md](docs/notes/INDEX.md) — working notes and one-off reports (optional)
-- [docs/demo/TRIGGER-COMMANDS.md](docs/demo/TRIGGER-COMMANDS.md) — scripted demo triggers for nudge/reminder flows (video / manual testing)
 
 ### Maintainers (internal / non-public)
 
-Some documents are intentionally **not** part of the public “judge quickstart” narrative (operations runbooks, private/public sync workflow, etc.). If you’re maintaining a deployed stack, you may also consult:
+Some documents are intentionally **not** part of the public “judge quickstart” narrative (operations runbooks, session notes, demo trigger sheets). If you’re maintaining a deployed stack, you may also consult:
 
 - `docs/operations/RUNBOOK-ALERTS.md` — alarms, DLQ, abuse envelope, rate limits
-- `docs/PRIVATE-PUBLIC-SYNC.md` — internal repo sync discipline
+- [scripts/demo-video-nudge-triggers.sh](scripts/demo-video-nudge-triggers.sh) — optional guided Lambda invokes for nudge/reminder recordings (**set `PHONE`**; keep any personal command cheat-sheets **local** — see `.gitignore` for `docs/demo/TRIGGER-COMMANDS.md` and `docs/notes/`)
 
 ## Resources
 

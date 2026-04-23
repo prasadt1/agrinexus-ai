@@ -214,7 +214,7 @@ def test_detector_not_yet_uses_newest_nudge_for_t48_final_message(monkeypatch):
                 "eventName": "INSERT",
                 "dynamodb": {
                     "NewImage": {
-                        "PK": {"S": "USER#4917647009148"},
+                        "PK": {"S": "USER#1555123456789"},
                         "SK": {"S": "MSG#2026-04-07T12:05:00"},
                         "message": {
                             "M": {
