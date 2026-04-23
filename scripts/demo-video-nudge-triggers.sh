@@ -2,7 +2,7 @@
 # Automate demo nudge invokes so you can record on phone without copy-pasting NUDGE_ID.
 # Prereq: AWS CLI configured, same account/region as Lambdas.
 #
-# Primary tester (see TRIGGER-COMMANDS.md):
+# Primary tester (see docs/demo/TRIGGER-COMMANDS.md):
 #   WhatsApp +4917647009148  →  PHONE/Dynamo: 4917647009148  →  PK USER#4917647009148
 #   Onboard as: Ramesh, Latur, Wheat. Default PROFILE demo_tier after onboarding is "public"
 #   (one nudge, no auto T+24/T+48 schedules). cmd_profile() sets "full" for closed-loop demos.
