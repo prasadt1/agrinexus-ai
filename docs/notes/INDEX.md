@@ -15,3 +15,7 @@ If/when you want to reduce root-level clutter, move these into subfolders like:
 
 and leave small stub files at repo root that link to the new locations (to avoid breaking existing links).
 
+## Already relocated
+
+- Demo nudge trigger playbook: [`docs/demo/TRIGGER-COMMANDS.md`](../demo/TRIGGER-COMMANDS.md)
+

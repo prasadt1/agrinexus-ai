@@ -512,6 +512,7 @@ This project was developed using **Kiro AI**, which enabled requirements-driven 
 - [requirements.md](requirements.md) — EARS requirements specification
 - [ISSUES-LOG.md](ISSUES-LOG.md) — troubleshooting history (resolved issues)
 - [docs/notes/INDEX.md](docs/notes/INDEX.md) — working notes and one-off reports (optional)
+- [docs/demo/TRIGGER-COMMANDS.md](docs/demo/TRIGGER-COMMANDS.md) — scripted demo triggers for nudge/reminder flows (video / manual testing)
 
 ### Maintainers (internal / non-public)
 
