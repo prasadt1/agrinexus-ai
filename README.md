@@ -29,6 +29,10 @@ Pick the web demo or WhatsApp experience.
 | **Privacy:** No login; anonymous `client_id` in browser storage for rate limits | **Privacy:** WhatsApp number required |
 | **Limits:** ~5 questions/hour per IP + client; API Gateway + WAF caps | **Limits:** Rich features are allowlisted |
 
+**WhatsApp access:** Text is open; voice/photo/nudges are available via the [demo request template](https://github.com/prasadt1/agrinexus-ai/issues/new?template=demo-request.md).
+
+**Data retention (summary):** Conversation rows written by the **processor** use a **90-day** TTL; short-lived **`MSG#*`** rows written by the **webhook** for the response detector use **7 days**; **WAMID** dedup keys use **24 hours**; **nudge** records use **180 days**. `demo_tier: public` limits **nudge follow-up scheduling**, not those TTLs. Details: [E2E-TEST-CHECKLIST.md](E2E-TEST-CHECKLIST.md) (section 6).
+
 ### YouTube demo
 
 Full walkthrough (voice, RAG, nudges, and how the pieces fit):
@@ -38,12 +42,6 @@ Full walkthrough (voice, RAG, nudges, and how the pieces fit):
 [![Video preview — opens on YouTube](https://img.youtube.com/vi/Hr9EcblzkwI/hqdefault.jpg)](https://www.youtube.com/watch?v=Hr9EcblzkwI)
 
 Direct link: [https://www.youtube.com/watch?v=Hr9EcblzkwI](https://www.youtube.com/watch?v=Hr9EcblzkwI)
-
-If your hosted site still has a **`chat.html`** redirect page, it should forward to the same **`wa.me`** number above.
-
-**WhatsApp access:** Text is open; voice/photo/nudges are available via the [demo request template](https://github.com/prasadt1/agrinexus-ai/issues/new?template=demo-request.md).
-
-**Data retention (summary):** Conversation rows written by the **processor** use a **90-day** TTL; short-lived **`MSG#*`** rows written by the **webhook** for the response detector use **7 days**; **WAMID** dedup keys use **24 hours**; **nudge** records use **180 days**. `demo_tier: public` limits **nudge follow-up scheduling**, not those TTLs. Details: [E2E-TEST-CHECKLIST.md](E2E-TEST-CHECKLIST.md) (section 6).
 
 **Competition / article:** [AWS 10,000 AIdeas — AgriNexus finalist story on AWS Builder](https://builder.aws.com/content/3C8hBRTcsRuQrHzE3Pq243yhXTF/aideas-finalist-agrinexus-ai) (external).
 
