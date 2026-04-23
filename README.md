@@ -29,6 +29,10 @@ Pick the web demo or WhatsApp experience.
 | **Privacy:** No login; anonymous `client_id` in browser storage for rate limits | **Privacy:** WhatsApp number required |
 | **Limits:** ~5 questions/hour per IP + client; API Gateway + WAF caps | **Limits:** Rich features are allowlisted |
 
+### YouTube demo
+
+Full walkthrough (voice, RAG, nudges, and how the pieces fit): [https://www.youtube.com/watch?v=Hr9EcblzkwI](https://www.youtube.com/watch?v=Hr9EcblzkwI)
+
 If your hosted site still has a **`chat.html`** redirect page, it should forward to the same **`wa.me`** number above.
 
 **WhatsApp access:** Text is open; voice/photo/nudges are available via the [demo request template](https://github.com/prasadt1/agrinexus-ai/issues/new?template=demo-request.md).
