@@ -12,6 +12,8 @@
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![AWS SQS](https://img.shields.io/badge/AWS-SQS-232F3E?logo=amazonaws&logoColor=white)](https://aws.amazon.com/sqs/)
 [![AWS DynamoDB](https://img.shields.io/badge/AWS-DynamoDB-4053D6?logo=amazondynamodb&logoColor=white)](https://aws.amazon.com/dynamodb/)
+[![Kiro](https://img.shields.io/badge/Kiro-Requirements%20to%20Code-6E56CF)](https://kiro.ai/)
+[![EARS](https://img.shields.io/badge/Requirements-EARS-0B7285)](https://en.wikipedia.org/wiki/Easy_Approach_to_Requirements_Syntax)
 
 ---
 
@@ -19,7 +21,7 @@
 
 Pick the web demo or WhatsApp experience.
 
-| **Web demo** | **WhatsApp** |
+| **🌐 Web demo** | **💬 WhatsApp** |
 |--------------|--------------|
 | [Try web demo](https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html) (no phone number) | [Open WhatsApp (wa.me)](https://wa.me/4915120105731) |
 | **Includes:** Text Q&A (RAG), optional image | **Includes:** Onboarding + text (public); voice/photo/nudges (allowlisted) |
@@ -509,6 +511,7 @@ This project was developed using **Kiro AI**, which enabled requirements-driven 
 - [data/fao-pdfs/README.md](data/fao-pdfs/README.md) — knowledge-base PDF sources, S3 sync, and **URL manifests / batch download** (`kb_url_manifest_*.csv`, `scripts/download_kb_from_manifest.py`)
 - [requirements.md](requirements.md) — EARS requirements specification
 - [ISSUES-LOG.md](ISSUES-LOG.md) — troubleshooting history (resolved issues)
+- [docs/notes/INDEX.md](docs/notes/INDEX.md) — working notes and one-off reports (optional)
 
 ### Maintainers (internal / non-public)
 
