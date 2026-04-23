@@ -31,7 +31,13 @@ Pick the web demo or WhatsApp experience.
 
 ### YouTube demo
 
-Full walkthrough (voice, RAG, nudges, and how the pieces fit): [https://www.youtube.com/watch?v=Hr9EcblzkwI](https://www.youtube.com/watch?v=Hr9EcblzkwI)
+Full walkthrough (voice, RAG, nudges, and how the pieces fit):
+
+[![Watch on YouTube](https://img.shields.io/badge/YouTube-Watch%20walkthrough-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=Hr9EcblzkwI)
+
+[![Video preview — opens on YouTube](https://img.youtube.com/vi/Hr9EcblzkwI/hqdefault.jpg)](https://www.youtube.com/watch?v=Hr9EcblzkwI)
+
+Direct link: [https://www.youtube.com/watch?v=Hr9EcblzkwI](https://www.youtube.com/watch?v=Hr9EcblzkwI)
 
 If your hosted site still has a **`chat.html`** redirect page, it should forward to the same **`wa.me`** number above.
 
