@@ -53,6 +53,16 @@ def _looks_like_screenshot_or_ui(image_bytes: bytes) -> bool:
         # Pixels with noticeable edge strength
         edge_frac = sum(ehist[40:256]) / edge_total
 
+        # Green dominance: real crop photos usually have significant green pixels.
+        # UI/screenshots (documents, web pages) typically don't.
+        s2 = img.resize((128, 128))
+        gp = list(s2.getdata())
+        green = 0
+        for r, g, b in gp:
+            if g > r + 18 and g > b + 18 and g > 60:
+                green += 1
+        green_frac = green / float(len(gp) or 1.0)
+
         # Screenshots tend to be edge-heavy (text/UI lines) and have strong black/white peaks.
         if edge_frac > 0.16 and white_frac > 0.18 and black_frac > 0.008:
             return True
@@ -61,6 +71,10 @@ def _looks_like_screenshot_or_ui(image_bytes: bytes) -> bool:
         # Dark-mode chat/app screenshots: lots of near-black pixels + moderate edges.
         # This is uncommon for real crop photos (which typically have mid/high luminance greens).
         if black_frac > 0.22 and edge_frac > 0.085:
+            return True
+        # Very small/compressed images: edges get smeared, but UI thumbnails are still
+        # mostly white/black and low-green.
+        if (min(w, h) <= 320) and (green_frac < 0.12) and (white_frac > 0.60 or black_frac > 0.18):
             return True
         return False
     except Exception:

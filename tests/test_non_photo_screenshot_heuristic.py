@@ -58,6 +58,21 @@ def _make_darkmode_chat_screenshot_like_bytes():
     img.save(buf, format="JPEG", quality=88)
     return buf.getvalue()
 
+def _make_small_blurry_ui_thumbnail_bytes():
+    PIL = pytest.importorskip("PIL")
+    from PIL import Image, ImageDraw, ImageFilter  # type: ignore
+
+    img = Image.new("RGB", (240, 240), (250, 250, 250))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([10, 20, 230, 70], fill=(235, 235, 235))
+    draw.rectangle([10, 90, 230, 140], fill=(245, 245, 245))
+    draw.rectangle([10, 160, 230, 210], fill=(240, 240, 240))
+    # blur to simulate heavy compression where edges smear
+    img = img.filter(ImageFilter.GaussianBlur(radius=1.6))
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=35)
+    return buf.getvalue()
+
 
 def test_processor_screenshot_heuristic_blocks_before_model(monkeypatch):
     from src.processor import analyzer as proc_analyzer
@@ -98,3 +113,22 @@ def test_processor_darkmode_screenshot_heuristic_blocks_before_model(monkeypatch
     assert result["diagnosis"] == "non_photo"
     assert called["bedrock"] is False
 
+
+def test_processor_small_blurry_ui_thumbnail_blocks(monkeypatch):
+    from src.processor import analyzer as proc_analyzer
+
+    called = {"bedrock": False}
+
+    class _DummyBedrock:
+        def invoke_model(self, *args, **kwargs):
+            called["bedrock"] = True
+            raise AssertionError("bedrock.invoke_model should not be called for small blurry UI thumbnails")
+
+    monkeypatch.setattr(proc_analyzer, "bedrock", _DummyBedrock())
+    monkeypatch.setattr(proc_analyzer, "_extract_primary_frame", lambda b: b)
+
+    image_bytes = _make_small_blurry_ui_thumbnail_bytes()
+    assert proc_analyzer._looks_like_screenshot_or_ui(image_bytes) is True
+    result = proc_analyzer.analyze_crop_image(image_bytes=image_bytes, dialect="en", crop="wheat")
+    assert result["diagnosis"] == "non_photo"
+    assert called["bedrock"] is False

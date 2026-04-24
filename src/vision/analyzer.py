@@ -39,11 +39,20 @@ def _looks_like_screenshot_or_ui(image_bytes: bytes) -> bool:
         ehist = edges.histogram()
         edge_total = float(sum(ehist) or 1.0)
         edge_frac = sum(ehist[40:256]) / edge_total
+        s2 = img.resize((128, 128))
+        gp = list(s2.getdata())
+        green = 0
+        for r, g, b in gp:
+            if g > r + 18 and g > b + 18 and g > 60:
+                green += 1
+        green_frac = green / float(len(gp) or 1.0)
         if edge_frac > 0.16 and white_frac > 0.18 and black_frac > 0.008:
             return True
         if edge_frac > 0.22 and white_frac > 0.28:
             return True
         if black_frac > 0.22 and edge_frac > 0.085:
+            return True
+        if (min(w, h) <= 320) and (green_frac < 0.12) and (white_frac > 0.60 or black_frac > 0.18):
             return True
         return False
     except Exception:
