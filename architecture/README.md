@@ -9,7 +9,7 @@ Diagrams and high-level design for AgriNexus AI.
   - **Overall stack**: [`docs/diagrams/builder-full-architecture.png`](../docs/diagrams/builder-full-architecture.png)
   - **Nudge loop**: [`docs/diagrams/builder-nudge-flow.png`](../docs/diagrams/builder-nudge-flow.png) (and [`builder-nudge-loop.gif`](../docs/diagrams/builder-nudge-loop.gif) / [`builder-nudge-loop.mp4`](../docs/diagrams/builder-nudge-loop.mp4))
   - **Text / Voice / Vision flows**: [`architecture/polished/`](./polished/)
-- **Root [architecture.md](../architecture.md)** – Full architecture document (components, data model, security, cost).
+- **Full architecture doc**: [`docs/architecture.md`](../docs/architecture.md) (components, data model, security, cost).
 
 ## Quick reference
 

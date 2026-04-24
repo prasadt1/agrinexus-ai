@@ -275,8 +275,8 @@ Received AWS Free Tier alert (SQS at 85% of 1M limit). Performed comprehensive c
 ### Testing Documentation and Audio Files (Feb 28, 2026)
 - **Feature**: Added comprehensive testing guides and test audio files
 - **Implementation**:
-  - `NUDGE-BEHAVIOR-GUIDE.md` - Complete nudge workflow documentation
-  - `WHATSAPP-SETUP-GUIDE.md` - WhatsApp Business API configuration
+  - `docs/product/NUDGE-BEHAVIOR-GUIDE.md` - Complete nudge workflow documentation
+  - `docs/guides/WHATSAPP-SETUP-GUIDE.md` - WhatsApp Business API configuration
   - `tests/test-audio/` - English and Hindi test audio files for voice testing
   - `samconfig.toml` - SAM deployment configuration
 - **Impact**: Easier testing and onboarding for new developers, better documentation for judges
@@ -435,7 +435,7 @@ Received AWS Free Tier alert (SQS at 85% of 1M limit). Performed comprehensive c
 - **Impact**: Response detector now works correctly in all environments
 
 ### Cost Consistency Update
-- **Issue**: README showed ~$32/month but architecture.md and requirements.md showed ~$50/month
+- **Issue**: README showed ~$32/month but `docs/architecture.md` and `docs/requirements.md` showed ~$50/month
 - **Fix**: Updated README cost table to show ~$47/month (more realistic usage estimates)
 - **Impact**: All documentation now consistent at ~$50/month
 
@@ -599,7 +599,7 @@ Received AWS Free Tier alert (SQS at 85% of 1M limit). Performed comprehensive c
 ## Week 1 (Feb 3-9, 2026)
 
 ### Strategic Reframing — Chatbot → Behavioral Intervention Engine
-- **Issue**: All three spec documents (requirements.md, design.md, architecture.md) framed AgriNexus as a "WhatsApp agricultural chatbot" — indistinguishable from existing solutions (FarmerChat, FarmSawa)
+- **Issue**: All three spec documents (`docs/requirements.md`, design.md, `docs/architecture.md`) framed AgriNexus as a "WhatsApp agricultural chatbot" — indistinguishable from existing solutions (FarmerChat, FarmSawa)
 - **Fix**: Reframed entire narrative around behavioral closed-loop. Nudge Completion Rate defined as primary metric. Removed all "chatbot" references.
 - **Impact**: Clear competitive differentiation; judges see behavioral change system, not another Q&A bot
 
@@ -617,7 +617,7 @@ Received AWS Free Tier alert (SQS at 85% of 1M limit). Performed comprehensive c
 
 ### Cost Estimate Correction — $28 → $50/month
 - **Issue**: Original spec claimed ~$28/month but didn't account for OpenSearch Serverless (~$20/month minimum for 1 OCU indexing + 1 OCU search)
-- **Fix**: Updated cost references across 7 files (architecture.md, requirements.md, README, WEEK1-SUMMARY, etc.) to ~$50/month. Updated billing alarms to $50/$75/$100.
+- **Fix**: Updated cost references across 7 files (`docs/architecture.md`, `docs/requirements.md`, README, WEEK1-SUMMARY, etc.) to ~$50/month. Updated billing alarms to $50/$75/$100.
 - **Impact**: Honest cost reporting. Still $0.05/user/month — 100x cheaper than commercial agricultural advisory services.
 
 ### Free Tier Claim Correction
@@ -631,7 +631,7 @@ Received AWS Free Tier alert (SQS at 85% of 1M limit). Performed comprehensive c
 - **Impact**: Specs consistent with India-focused MVP
 
 ### Data Model Contradiction — 3 Tables vs Single Table
-- **Issue**: architecture.md defined three separate DynamoDB tables (UserProfiles, Conversations, Nudges) while design.md implemented single-table design
+- **Issue**: `docs/architecture.md` defined three separate DynamoDB tables (UserProfiles, Conversations, Nudges) while design.md implemented single-table design
 - **Fix**: Unified to single-table `agrinexus-data` with PK/SK composite keys (USER#<phone>/PROFILE, MSG#<ts>, NUDGE#<ts>#<activity>) everywhere
 - **Impact**: Lower cost, simpler transactions, consistent documentation
 
@@ -641,12 +641,12 @@ Received AWS Free Tier alert (SQS at 85% of 1M limit). Performed comprehensive c
 - **Impact**: Dramatic cost reduction; executions measured in seconds not days
 
 ### GPS Coordinates in Profile Entity
-- **Issue**: design.md profile entity stored latitude/longitude coordinates, contradicting requirements.md REQ-SEC-007 ("store location as region name, not precise GPS")
+- **Issue**: design.md profile entity stored latitude/longitude coordinates, contradicting `docs/requirements.md` REQ-SEC-007 ("store location as region name, not precise GPS")
 - **Fix**: Removed lat/lng from profile entity schema; location stored as region/district/state only
 - **Impact**: Privacy compliance; consistent with requirements
 
 ### Profile Entity Missing Fields
-- **Issue**: design.md profile entity schema lacked `voicePreference` and `consent` fields required by architecture.md and requirements.md REQ-STATE-005
+- **Issue**: design.md profile entity schema lacked `voicePreference` and `consent` fields required by `docs/architecture.md` and `docs/requirements.md` REQ-STATE-005
 - **Fix**: Added `voicePreference`, `consent`, and `consentedAt` to profile entity
 - **Impact**: Schema consistency across all three spec documents
 
@@ -655,7 +655,7 @@ Received AWS Free Tier alert (SQS at 85% of 1M limit). Performed comprehensive c
 - **Fix**: Deleted the old duplicate section entirely
 - **Impact**: Single source of truth for response detection logic
 
-### Section Numbering Collision in architecture.md
+### Section Numbering Collision in docs/architecture.md
 - **Issue**: Both "Risk Mitigation" and "Success Metrics" numbered as Section 10
 - **Fix**: Renumbered sections sequentially (10: Risk, 11: Success Metrics, 12: Post-MVP, 13: Appendix)
 - **Impact**: Clean document structure

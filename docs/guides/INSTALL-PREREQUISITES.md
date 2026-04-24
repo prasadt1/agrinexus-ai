@@ -116,7 +116,7 @@ aws secretsmanager create-secret \
 
 ## 6.6 Weather API Key (Optional)
 
-For real spray-condition checks, create an OpenWeatherMap key and store it in **Secrets Manager** as `agrinexus/weather/api-key` (see `WEATHER-API-SETUP.md` and `scripts/rotate-weather-api-key.sh`). The Weather Lambda uses `WEATHER_API_KEY_SECRET`—**do not** pass the key via `sam deploy` parameters or commit it to git.
+For real spray-condition checks, create an OpenWeatherMap key and store it in **Secrets Manager** as `agrinexus/weather/api-key` (see `WEATHER-API-SETUP.md`). The Weather Lambda uses `WEATHER_API_KEY_SECRET`—**do not** pass the key via `sam deploy` parameters or commit it to git.
 
 Ensure `MOCK_WEATHER` is false on the Weather poller for production when you want live weather.
 
@@ -164,7 +164,7 @@ Before deploying, use **`README.md`** as the source of truth for **current** cos
 
 **Legacy note:** OpenSearch Serverless was **~$174/month fixed** and drove **~$214/month** totals in early deployments—replaced by S3 Vectors for this project.
 
-> **Detail:** See `architecture.md` and `REBUILD-KB-WITH-S3-VECTORS.md`.
+> **Detail:** See `../architecture.md` for system-level context.
 
 ## Ready to Deploy?
 

@@ -46,4 +46,4 @@ export WEB_CHAT_URL='https://YOUR_API.execute-api.us-east-1.amazonaws.com/dev/ch
 ./scripts/e2e-smoke.sh
 ```
 
-See [E2E-TEST-CHECKLIST.md](../../E2E-TEST-CHECKLIST.md) for the full manual checklist.
+See [E2E-TEST-CHECKLIST.md](../testing/E2E-TEST-CHECKLIST.md) for the full manual checklist.

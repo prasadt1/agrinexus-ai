@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+title: "AgriNexus AI: A Closed-Loop WhatsApp Advisory System for Smallholder Farmers"
+message: "If you use or reference this work, please cite it using this metadata."
+type: software
+authors:
+  - family-names: Tilloo
+    given-names: Prasad
+    affiliation: Independent
+date-released: 2026-04-18
+version: 1.0.0
+repository-code: "https://github.com/prasadt1/agrinexus-ai"
+url: "https://prasadtilloo.com"
+license: "Proprietary (Source-Available)"

@@ -76,7 +76,7 @@ Pick the web demo or WhatsApp experience.
 
 **WhatsApp access:** Text is open; voice/photo/nudges are available via the [demo request template](https://github.com/prasadt1/agrinexus-ai/issues/new?template=demo-request.md).
 
-**Data retention (summary):** Conversation rows written by the **processor** use a **90-day** TTL; short-lived **`MSG#*`** rows written by the **webhook** for the response detector use **7 days**; **WAMID** dedup keys use **24 hours**; **nudge** records use **180 days**. `demo_tier: public` limits **nudge follow-up scheduling**, not those TTLs. Details: [E2E-TEST-CHECKLIST.md](E2E-TEST-CHECKLIST.md) (section 6).
+**Data retention (summary):** Conversation rows written by the **processor** use a **90-day** TTL; short-lived **`MSG#*`** rows written by the **webhook** for the response detector use **7 days**; **WAMID** dedup keys use **24 hours**; **nudge** records use **180 days**. `demo_tier: public` limits **nudge follow-up scheduling**, not those TTLs. Details: [docs/testing/E2E-TEST-CHECKLIST.md](docs/testing/E2E-TEST-CHECKLIST.md) (section 6).
 
 ---
 
@@ -126,7 +126,7 @@ AgriNexus is a working system with production observability — not a prototype.
   - Public **web chat**: per-IP + per-client caps + API Gateway throttling + WAF on `/chat`
 - **Cost**: modeled **~$53/month for 1,000 farmers** (pay-per-use). See [Cost breakdown](#cost-breakdown)
 
-**Diagrams:** See [architecture/diagrams.md](architecture/diagrams.md) for Mermaid diagrams (high-level, webhook, text/voice/image flows, nudge flow). Full design: [architecture.md](architecture.md).
+**Diagrams:** See [architecture/diagrams.md](architecture/diagrams.md) for Mermaid diagrams (high-level, webhook, text/voice/image flows, nudge flow). Full design: [docs/architecture.md](docs/architecture.md).
 
 ---
 
@@ -220,7 +220,7 @@ aws bedrock-agent start-ingestion-job \
 - **Sending messages**: Webhook/processor/nudge Lambdas use Secrets Manager (`agrinexus/whatsapp/access-token`, `agrinexus/whatsapp/phone-number-id`) to call the WhatsApp Cloud API. The webhook sends a short “received / preparing reply” text quickly for inbound audio (before Transcribe).
 - **Deploy / test**: `sam build` / `sam deploy --config-file samconfig-week2.toml`, then run the E2E guide with `scripts/demo.env`.
 
-Details (templates, cutover, troubleshooting): [WHATSAPP-SETUP-GUIDE.md](WHATSAPP-SETUP-GUIDE.md).
+Details (templates, cutover, troubleshooting): [docs/guides/WHATSAPP-SETUP-GUIDE.md](docs/guides/WHATSAPP-SETUP-GUIDE.md).
 
 ## Usage
 
@@ -302,7 +302,7 @@ python tests/test_voice_end_to_end.py
 
 ### End-to-End (All Features)
 
-See [docs/E2E-TEST-GUIDE.md](docs/E2E-TEST-GUIDE.md) for testing onboarding, Q&A, voice, vision, and nudges. For a **pre-demo pass/fail list**, use **[E2E-TEST-CHECKLIST.md](E2E-TEST-CHECKLIST.md)**.
+See [docs/E2E-TEST-GUIDE.md](docs/E2E-TEST-GUIDE.md) for testing onboarding, Q&A, voice, vision, and nudges. For a **pre-demo pass/fail list**, use **[docs/testing/E2E-TEST-CHECKLIST.md](docs/testing/E2E-TEST-CHECKLIST.md)**.
 
 **Webhook scripts:** create **`scripts/demo.env`** (not committed) with at least **`WEBHOOK_URL`**, **`APP_SECRET`** (if signatures are on), and **`PHONE_NUMBER`**. Scripts such as **`reset-onboard-and-demo.sh`**, **`test-complete-flow.sh`**, and **`demo-nudge-loop.sh`** source it when present.
 
@@ -380,7 +380,7 @@ Weather Poller → Step Functions → Nudge Sender → WhatsApp
 - **1,000 farmers**: ~$53/month total → ~**$0.053**/farmer/month → ~**$0.64**/farmer/year  
 - **10,000 farmers** (projected): ~**$450**/month total → ~**$0.045**/farmer/month → ~**$0.54**/farmer/year  
 
-The **$0.54** figure is **not** a separate measurement—it is **($450 × 12) ÷ 10,000** from the §8.2 projection in `architecture.md`. **Minimal economies of scale** (~16% lower per farmer vs 1K) because **Bedrock / Transcribe / Polly** scale roughly with usage; **S3 Vectors** stays a small slice.
+The **$0.54** figure is **not** a separate measurement—it is **($450 × 12) ÷ 10,000** from the §8.2 projection in `docs/architecture.md`. **Minimal economies of scale** (~16% lower per farmer vs 1K) because **Bedrock / Transcribe / Polly** scale roughly with usage; **S3 Vectors** stays a small slice.
 
 **How to read this:** **~$53/mo @ 1K** and **~$450/mo @ 10K** are **modeled** from AWS-style usage assumptions (see architecture §8), **not** audited Cost Explorer totals. **Validate** with your account before publishing hard commitments.
 
@@ -450,7 +450,7 @@ Use the [CloudWatch console](https://console.aws.amazon.com/cloudwatch/) for Lam
 
 ## Real Weather API (Optional)
 
-Production uses **OpenWeatherMap** when `MOCK_WEATHER` is false and the API key is available from **Secrets Manager** (`WEATHER_API_KEY_SECRET` on the Weather Lambda, e.g. `agrinexus/weather/api-key`). Store the key in Secrets Manager—do not put it in `samconfig` or git. Set `MOCK_WEATHER=true` on the Weather poller only for deterministic demo weather. See [WEATHER-API-SETUP.md](WEATHER-API-SETUP.md).
+Production uses **OpenWeatherMap** when `MOCK_WEATHER` is false and the API key is available from **Secrets Manager** (`WEATHER_API_KEY_SECRET` on the Weather Lambda, e.g. `agrinexus/weather/api-key`). Store the key in Secrets Manager—do not put it in `samconfig` or git. Set `MOCK_WEATHER=true` on the Weather poller only for deterministic demo weather. See [docs/guides/WEATHER-API-SETUP.md](docs/guides/WEATHER-API-SETUP.md).
 
 ## Requirements Methodology: EARS
 
@@ -482,27 +482,27 @@ def test_done_response_marks_complete():
     assert get_scheduled_reminders() == []
 ```
 
-See [requirements.md](requirements.md) for the complete EARS specification (100+ requirements covering all features).
+See [docs/requirements.md](docs/requirements.md) for the complete EARS specification (100+ requirements covering all features).
 
 ## Development Workflow: Kiro AI
 
 This project was developed using **Kiro AI**, which enabled requirements-driven development from EARS specs through to deployed Lambda functions. Kiro's steering documents (`.kiro/specs/`) defined feature specs, implementation plans, and acceptance criteria—keeping requirements, code, and tests traceable throughout the 4-week build.
 
 **Key metrics:**
-- 100+ EARS requirements in [requirements.md](requirements.md)
+- 100+ EARS requirements in [docs/requirements.md](docs/requirements.md)
 - ~3,000 lines of Python across 8 Lambda functions
 - Full test coverage: voice, vision, RAG, nudges
 
 ## Documentation
 
-- [architecture.md](architecture.md) — full system design
+- [docs/architecture.md](docs/architecture.md) — full system design
 - [architecture/diagrams.md](architecture/diagrams.md) — Mermaid flow diagrams
-- [E2E-TEST-CHECKLIST.md](E2E-TEST-CHECKLIST.md) — pre-demo checklist (manual + automated smoke pointer)
+- [docs/testing/E2E-TEST-CHECKLIST.md](docs/testing/E2E-TEST-CHECKLIST.md) — pre-demo checklist (manual + automated smoke pointer)
 - [docs/E2E-TEST-GUIDE.md](docs/E2E-TEST-GUIDE.md) — end-to-end test walkthrough
 - [docs/CODE-WALKTHROUGH.md](docs/CODE-WALKTHROUGH.md) — component-by-component guide
 - [data/fao-pdfs/README.md](data/fao-pdfs/README.md) — knowledge-base PDF sources, S3 sync, and **URL manifests / batch download** (`kb_url_manifest_*.csv`, `scripts/download_kb_from_manifest.py`)
-- [requirements.md](requirements.md) — EARS requirements specification
-- [ISSUES-LOG.md](ISSUES-LOG.md) — troubleshooting history (resolved issues)
+- [docs/requirements.md](docs/requirements.md) — EARS requirements specification
+- [docs/ISSUES-LOG.md](docs/ISSUES-LOG.md) — troubleshooting history (resolved issues)
 
 <details>
 <summary><strong>Maintainers (internal / non-public)</strong></summary>
@@ -576,7 +576,7 @@ See the [LICENSE](LICENSE) file for full details.
 
 For technical issues:
 1. Check CloudWatch Logs
-2. Review [ISSUES-LOG.md](ISSUES-LOG.md) for similar problems
+2. Review [docs/ISSUES-LOG.md](docs/ISSUES-LOG.md) for similar problems
 3. Verify IAM permissions and secrets configuration
 
 For agricultural advice:

@@ -361,8 +361,8 @@ agrinexus-ai/
 ├── dashboards/                   # CloudWatch dashboard JSON
 ├── template-week2.yaml           # SAM/CloudFormation (722 lines)
 ├── samconfig-week2.toml          # Deployment config
-├── requirements.md               # EARS requirements (100+)
-├── architecture.md               # Full architecture doc
+├── docs/requirements.md               # EARS requirements (100+)
+├── docs/architecture.md               # Full architecture doc
 └── README.md                     # Project overview
 ```
 
@@ -394,8 +394,8 @@ agrinexus-ai/
 | File | Purpose | Lines | Quality Indicator |
 |------|---------|-------|-------------------|
 | `template-week2.yaml` | Infrastructure definition | 722 | 24 AWS resources, parameterized |
-| `requirements.md` | EARS requirements | 2,500+ | 100+ requirements, traceable |
-| `architecture.md` | System design | 3,000+ | Complete architecture doc |
+| `docs/requirements.md` | EARS requirements | 2,500+ | 100+ requirements, traceable |
+| `docs/architecture.md` | System design | 3,000+ | Complete architecture doc |
 | `README.md` | Project overview | 800+ | Quick start, features, cost breakdown |
 | `docs/adr/*.md` | Architecture decisions | 8 files | ADR 0001-0008, cost analysis |
 | `docs/E2E-TEST-GUIDE.md` | Testing guide | 500+ | Step-by-step test procedures |

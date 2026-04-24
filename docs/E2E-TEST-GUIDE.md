@@ -205,10 +205,10 @@ See `AGENTS.md` for env vars (e.g. `TABLE_NAME`, `KNOWLEDGE_BASE_ID`) and expect
 
 | Area        | Automated (script/tests)              | Manual (WhatsApp)                    |
 |------------|----------------------------------------|--------------------------------------|
-| Onboarding | `reset-onboard-and-demo.sh` / `test-complete-flow.sh` | Verify templates in app        |
-| Q&A chat   | `e2e-smoke.sh` (optional KB) + scripts above | Send more questions           |
+| Onboarding | `scripts/reset-profile.sh` + WhatsApp onboarding | Verify templates in app        |
+| Q&A chat   | `scripts/e2e-smoke.sh` (optional KB) | Send more questions           |
 | Voice      | `test_voice_*.py` (integration)        | Send voice note (real number)        |
 | Vision     | `test_vision.py` (integration)       | Send crop image                       |
-| Nudges     | `reset-onboard-and-demo.sh` / poller | Trigger poller, reply DONE/NOT YET   |
+| Nudges     | Weather poller (EventBridge) + manual trigger | Reply DONE/NOT YET   |
 
-Use **[E2E-TEST-CHECKLIST.md](../../E2E-TEST-CHECKLIST.md)** before high-visibility demos. Ops alarms: **[RUNBOOK-ALERTS.md](../operations/RUNBOOK-ALERTS.md)**.
+Use **[E2E-TEST-CHECKLIST.md](testing/E2E-TEST-CHECKLIST.md)** before high-visibility demos. Ops alarms: **[RUNBOOK-ALERTS.md](operations/RUNBOOK-ALERTS.md)**.

@@ -200,7 +200,7 @@ Before going to production:
 
 If you encounter issues:
 1. Check CloudWatch Logs (see monitoring commands above)
-2. Review ISSUES-LOG.md for similar problems
+2. Review `docs/ISSUES-LOG.md` for similar problems
 3. Verify all secrets are configured correctly
 4. Test webhook with curl before testing with WhatsApp
 

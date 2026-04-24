@@ -212,4 +212,4 @@ aws bedrock-agent start-ingestion-job \
 
 RAG answers are invoked from the **MessageProcessor** Lambda after WhatsApp → SQS. Voice and vision use separate paths (Transcribe/Polly and Bedrock Vision) but text RAG uses the same `retrieve_and_generate` flow described above.
 
-See `architecture.md` and `README.md` for the full pipeline and KB rebuild notes (`REBUILD-KB-WITH-S3-VECTORS.md` if you use S3 Vectors).
+See `docs/architecture.md` and `README.md` for the full pipeline and KB rebuild notes.
