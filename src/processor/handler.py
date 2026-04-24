@@ -222,7 +222,7 @@ def handle_onboarding(phone_number: str, message_text: str, profile: Optional[Di
 
 Demo note: Built for AWS 10,000 AIdeas. Voice/photo and nudges are allowlisted (public demo may limit nudge follow-ups). Request full access via GitHub issues.
 
-Tip: Send HELP for the capability list.
+Tip: Send HELP / मदद / मदत / సహాయం for the capability list.
 
 Please choose your language / कृपया अपनी भाषा चुनें:"""
         return {
@@ -279,7 +279,7 @@ Please choose your language / कृपया अपनी भाषा चु�
 
 Demo note: Built for AWS 10,000 AIdeas. Voice/photo and nudges are allowlisted (public demo may limit nudge follow-ups). Request full access via GitHub issues.
 
-Tip: Send HELP for the capability list.
+Tip: Send HELP / मदद / मदत / సహాయం for the capability list.
 
 Please choose your language / कृपया अपनी भाषा चुनें:"""
             return {
@@ -699,14 +699,17 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 • "गेहूं में खाद कब डालें?"
 • "मौसम के अनुसार क्या करें?"
 
+🎤 वॉइस (allowlisted):
+• वॉइस नोट भेजें — मैं ट्रांसक्राइब करके जवाब दूंगा
+
 📸 फोटो भेजें:
 • पत्तियों की फोटो
 • कीट/रोग की फोटो
 • मैं पहचान करूंगा और सलाह दूंगा
 
-🎤 आवाज़ में पूछें:
-• वॉइस नोट भेजें
-• मैं समझूंगा और जवाब दूंगा
+🔔 नज (opt‑in):
+• सही मौसम में स्प्रे/कृषि कार्य की याद दिलाना
+• Public demo में follow‑up reminders (T+24h/T+48h) सीमित हो सकते हैं
 
 बस अपना सवाल टाइप करें या फोटो भेजें!
 
@@ -720,14 +723,17 @@ Full access (voice/photo/nudges): GitHub request → {request_url}''',
 • "गहूमध्ये खत कधी घालावे?"
 • "हवामानानुसार काय करावे?"
 
+🎤 व्हॉइस (allowlisted):
+• व्हॉइस नोट पाठवा — मी ट्रान्सक्राइब करून उत्तर देईन
+
 📸 फोटो पाठवा:
 • पानांचा फोटो
 • किडे/रोगाचा फोटो
 • मी ओळखेन आणि सल्ला देईन
 
-🎤 आवाजात विचारा:
-• व्हॉइस नोट पाठवा
-• मी समजेन आणि उत्तर देईन
+🔔 नज (opt‑in):
+• योग्य हवामानात फवारणी/कृषी कामाची आठवण
+• Public demo मध्ये follow‑up reminders (T+24h/T+48h) मर्यादित असू शकतात
 
 फक्त तुमचा प्रश्न टाइप करा किंवा फोटो पाठवा!
 
@@ -741,14 +747,17 @@ Full access (voice/photo/nudges): GitHub request → {request_url}''',
 • "గోధుమలో ఎరువులు ఎప్పుడు వేయాలి?"
 • "వాతావరణం ప్రకారం ఏమి చేయాలి?"
 
+🎤 వాయిస్ (allowlisted):
+• వాయిస్ నోట్ పంపండి — నేను ట్రాన్స్‌క్రైబ్ చేసి సమాధానం ఇస్తాను
+
 📸 ఫోటో పంపండి:
 • ఆకుల ఫోటో
 • పురుగు/వ్యాధి ఫోటో
 • నేను గుర్తించి సలహా ఇస్తాను
 
-🎤 వాయిస్‌లో అడగండి:
-• వాయిస్ నోట్ పంపండి
-• నేను అర్థం చేసుకుని సమాధానం ఇస్తాను
+🔔 నజ్ (opt‑in):
+• సరైన వాతావరణంలో స్ప్రే/పనికి రిమైండర్
+• Public demo లో follow‑up reminders (T+24h/T+48h) పరిమితం అయ్యే అవకాశం ఉంది
 
 మీ ప్రశ్న టైప్ చేయండి లేదా ఫోటో పంపండి!
 
@@ -762,14 +771,17 @@ I can help you with your farming:
 • "When to apply fertilizer to wheat?"
 • "What to do based on weather?"
 
-📸 Send Photos:
+🎤 Voice (allowlisted):
+• Send a voice note — I’ll transcribe and reply
+
+📸 Photos (allowlisted):
 • Leaf photos
 • Pest/disease photos
 • I'll identify and advise
 
-🎤 Ask by Voice:
-• Send voice note
-• I'll understand and respond
+🔔 Nudges (opt‑in):
+• Weather-timed reminders to do farm actions (e.g., spraying)
+• Public demo may limit follow-up reminders (T+24h/T+48h)
 
 Just type your question or send a photo!
 
@@ -816,9 +828,19 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             
             if text:
                 # HELP must work even during onboarding (judges try it immediately).
-                if text.strip().upper() in ['HELP', 'मदद', 'मदत', 'సహాయం']:
-                    # During onboarding (before dialect is chosen) default HELP to English for demos.
-                    dialect = (profile or {}).get('dialect') or 'en'
+                stripped = text.strip()
+                upper = stripped.upper()
+                if upper in ['HELP', 'मदद', 'मदत', 'సహాయం']:
+                    # If they ask in a specific script, respond in that language even before selection.
+                    if stripped == 'मदद':
+                        dialect = 'hi'
+                    elif stripped == 'मदत':
+                        dialect = 'mr'
+                    elif stripped == 'సహాయం':
+                        dialect = 'te'
+                    else:
+                        # During onboarding (before dialect is chosen) default HELP to English for demos.
+                        dialect = (profile or {}).get('dialect') or 'en'
                     _send_help(from_number, dialect)
                     continue
 
