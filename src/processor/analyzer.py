@@ -641,7 +641,7 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         # but can't infer crop confidently, do NOT return a profile-biased agronomy answer.
         photo_kind = str(result.get("photo_kind") or "unknown")
         crop_conf = str(result.get("crop_confidence") or "low")
-        if photo_kind in ("pest_macro", "leaf_symptom") and crop_conf != "high":
+        if photo_kind in ("pest_macro", "leaf_symptom", "unknown") and crop_conf != "high":
             profile_crop = str(crop or "").strip() or "unknown"
             prompt_msgs = {
                 "hi": f"यह एक *कीट का क्लोज़‑अप* फोटो लग रहा है। सही सलाह देने के लिए बताइए यह फोटो किस फसल पर है?\n\nCotton / Wheat / Soybean / Maize में से लिखें (या प्रोफ़ाइल वाली फसल: **{profile_crop}**).",
