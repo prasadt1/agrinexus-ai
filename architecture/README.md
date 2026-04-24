@@ -7,7 +7,7 @@ Diagrams and high-level design for AgriNexus AI.
 - **[Diagrams](diagrams.md)** – Mermaid diagrams: high-level system, message flows (text / voice / image), webhook, and nudge flow.
 - **Polished article diagrams (PNG)** – Higher-fidelity, slide-ready diagrams:
   - **Overall stack**: [`docs/diagrams/builder-full-architecture.png`](../docs/diagrams/builder-full-architecture.png)
-  - **Nudge loop**: [`docs/diagrams/builder-nudge-flow.png`](../docs/diagrams/builder-nudge-flow.png) (and [`builder-nudge-loop.gif`](../docs/diagrams/builder-nudge-loop.gif) / [`builder-nudge-loop.mp4`](../docs/diagrams/builder-nudge-loop.mp4))
+  - **Nudge loop**: [`docs/diagrams/builder-nudge-flow.png`](../docs/diagrams/builder-nudge-flow.png) 
   - **Text / Voice / Vision flows**: [`architecture/polished/`](./polished/)
 - **Full architecture doc**: [`docs/architecture.md`](../docs/architecture.md) (components, data model, security, cost).
 
