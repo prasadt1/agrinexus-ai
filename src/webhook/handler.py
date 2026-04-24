@@ -22,6 +22,7 @@ dynamodb = boto3.resource('dynamodb')
 secrets = boto3.client('secretsmanager')
 
 QUEUE_URL = os.environ['QUEUE_URL']
+QUEUE_URL_BETA = os.environ.get('QUEUE_URL_BETA') or ""
 TABLE_NAME = os.environ['TABLE_NAME']
 VERIFY_TOKEN_SECRET = os.environ.get('VERIFY_TOKEN_SECRET', 'agrinexus/whatsapp/verify-token')
 APP_SECRET_NAME = os.environ.get('APP_SECRET_NAME', 'agrinexus/whatsapp/app-secret')
@@ -63,6 +64,16 @@ def _rate_limit_globally_disabled() -> bool:
 def _rate_limit_bypass_phones() -> set:
     raw = os.environ.get("RATE_LIMIT_BYPASS_PHONES") or ""
     return {p.strip().lstrip("+") for p in raw.split(",") if p.strip()}
+
+def _beta_phones() -> set:
+    raw = os.environ.get("BETA_PHONES") or ""
+    return {p.strip().lstrip("+") for p in raw.split(",") if p.strip()}
+
+def _select_queue_url(from_number: str) -> str:
+    norm = (from_number or "").strip().lstrip("+")
+    if QUEUE_URL_BETA and norm and norm in _beta_phones():
+        return QUEUE_URL_BETA
+    return QUEUE_URL
 
 
 def check_rate_limit(phone_number: str) -> bool:
@@ -391,8 +402,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             # Queue message for processing (FIFO queue requires MessageGroupId and MessageDeduplicationId)
             try:
+                target_queue_url = _select_queue_url(from_number)
                 sqs.send_message(
-                    QueueUrl=QUEUE_URL,
+                    QueueUrl=target_queue_url,
                     MessageBody=json.dumps({
                         'wamid': wamid,
                         'from': from_number,
@@ -403,7 +415,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     MessageGroupId=from_number,  # Group by phone number to maintain order per user
                     MessageDeduplicationId=wamid  # Use wamid for deduplication
                 )
-                logger.info(f"Message queued successfully - wamid: {wamid}")
+                logger.info(f"Message queued successfully - wamid: {wamid}, beta={target_queue_url == QUEUE_URL_BETA}")
             except Exception as e:
                 logger.error(f"Error queuing message: {e}")
                 raise

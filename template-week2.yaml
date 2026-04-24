@@ -49,6 +49,13 @@ Parameters:
       - "false"
     Description: If true, disables per-user WhatsApp message rate limiting (demo only).
 
+  BetaPhones:
+    Type: String
+    Default: ""
+    Description: >-
+      Comma-separated WhatsApp numbers (digits only, no +) routed to the beta vision pipeline.
+      Leave empty to disable beta routing.
+
 Globals:
   Function:
     Runtime: python3.11
@@ -108,6 +115,30 @@ Resources:
       FifoQueue: true
       MessageRetentionPeriod: 1209600  # 14 days
       ReceiveMessageWaitTimeSeconds: 20  # Long polling - reduces SQS API calls
+
+  # ============================================================================
+  # SQS Queue for Beta Message Processing (your phone only)
+  # ============================================================================
+  BetaMessageQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub agrinexus-messages-beta-${Environment}.fifo
+      FifoQueue: true
+      ContentBasedDeduplication: true
+      VisibilityTimeout: 180
+      MessageRetentionPeriod: 345600  # 4 days
+      ReceiveMessageWaitTimeSeconds: 20
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt BetaMessageDLQ.Arn
+        maxReceiveCount: 3
+
+  BetaMessageDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub agrinexus-messages-beta-dlq-${Environment}.fifo
+      FifoQueue: true
+      MessageRetentionPeriod: 1209600  # 14 days
+      ReceiveMessageWaitTimeSeconds: 20
 
   # ============================================================================
   # SQS Queue for Voice Processing
@@ -238,7 +269,9 @@ Resources:
       Environment:
         Variables:
           QUEUE_URL: !Ref MessageQueue
+          QUEUE_URL_BETA: !Ref BetaMessageQueue
           VOICE_QUEUE_URL: !Ref VoiceQueue
+          BETA_PHONES: !Ref BetaPhones
           VERIFY_TOKEN_SECRET: agrinexus/whatsapp/verify-token
           APP_SECRET_NAME: agrinexus/whatsapp/app-secret
           VERIFY_SIGNATURE: "true"
@@ -249,6 +282,8 @@ Resources:
       Policies:
         - SQSSendMessagePolicy:
             QueueName: !GetAtt MessageQueue.QueueName
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt BetaMessageQueue.QueueName
         - SQSSendMessagePolicy:
             QueueName: !GetAtt VoiceQueue.QueueName
         - DynamoDBCrudPolicy:
@@ -395,6 +430,61 @@ Resources:
           Properties:
             Queue: !GetAtt MessageQueue.Arn
             BatchSize: 1  # Process one message at a time to maintain strict ordering
+
+  # ============================================================================
+  # Lambda: Message Processor (Beta lane)
+  # ============================================================================
+  BetaMessageProcessor:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-processor-beta-${Environment}
+      CodeUri: src/processor/
+      Handler: handler.lambda_handler
+      Description: Beta message processor (isolated from judges)
+      Timeout: 60
+      Layers:
+        - !Ref CommonLayer
+      Environment:
+        Variables:
+          QUEUE_URL: !Ref BetaMessageQueue
+          ACCESS_TOKEN_SECRET: agrinexus/whatsapp/access-token
+          PHONE_NUMBER_ID_SECRET: agrinexus/whatsapp/phone-number-id
+          TEMP_AUDIO_BUCKET: !Ref TempAudioBucket
+          MODEL_ARN: arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0
+          APPEND_DISTRICT_HELPLINE: "true"
+          VOICE_TTS_MAX_CHARS: "700"
+          IMAGE_MAX_BYTES: "5242880"
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TableName
+        - S3CrudPolicy:
+            BucketName: !Ref TempAudioBucket
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
+                - bedrock:RetrieveAndGenerate
+                - bedrock:Retrieve
+                - bedrock-agent:Retrieve
+                - bedrock-agent:RetrieveAndGenerate
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - polly:SynthesizeSpeech
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus/whatsapp/*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus-whatsapp-*
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt BetaMessageQueue.Arn
+            BatchSize: 1
 
   # ============================================================================
   # Lambda: Voice Processor (Amazon Transcribe)
