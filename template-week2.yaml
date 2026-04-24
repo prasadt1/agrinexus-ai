@@ -454,6 +454,11 @@ Resources:
           APPEND_DISTRICT_HELPLINE: "true"
           VOICE_TTS_MAX_CHARS: "700"
           IMAGE_MAX_BYTES: "5242880"
+          VISION_QUALITY_GATE_ENABLED: "true"
+          LAST_IMAGE_OVERRIDE_ENABLED: "true"
+          LAST_IMAGE_TTL_SECONDS: "600"
+          VISION_MIN_DIMENSION: "320"
+          VISION_MIN_FILE_BYTES: "3000"
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TableName

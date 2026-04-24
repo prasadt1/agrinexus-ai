@@ -47,6 +47,41 @@ table = dynamodb.Table(TABLE_NAME)
 
 _PENDING_CROP_CONFIRM_SK = "PENDING#CROP_CONFIRM"
 _PENDING_TTL_SECONDS = int(os.environ.get("PENDING_CROP_CONFIRM_TTL_SECONDS", "600"))
+_LAST_IMAGE_SK = "PENDING#LAST_IMAGE"
+_LAST_IMAGE_TTL_SECONDS = int(os.environ.get("LAST_IMAGE_TTL_SECONDS", "600"))
+
+
+def _last_image_override_enabled() -> bool:
+    return (os.environ.get("LAST_IMAGE_OVERRIDE_ENABLED") or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _put_last_image_pointer(phone_number: str, bucket: str, key: str):
+    if not _last_image_override_enabled():
+        return
+    import time
+    ttl = int(time.time()) + _LAST_IMAGE_TTL_SECONDS
+    table.put_item(
+        Item={
+            "PK": f"USER#{phone_number}",
+            "SK": _LAST_IMAGE_SK,
+            "bucket": bucket,
+            "key": key,
+            "ttl": ttl,
+        }
+    )
+
+
+def _get_last_image_pointer(phone_number: str) -> Optional[Dict[str, Any]]:
+    if not _last_image_override_enabled():
+        return None
+    resp = table.get_item(Key={"PK": f"USER#{phone_number}", "SK": _LAST_IMAGE_SK})
+    return resp.get("Item")
+
+
+def _delete_last_image_pointer(phone_number: str):
+    if not _last_image_override_enabled():
+        return
+    table.delete_item(Key={"PK": f"USER#{phone_number}", "SK": _LAST_IMAGE_SK})
 
 
 def _get_pending_crop_confirm(phone_number: str) -> Optional[Dict[str, Any]]:
@@ -104,6 +139,21 @@ def _parse_crop_confirm_reply(text: str, inferred_crop: str, profile_crop: str) 
         return profile_crop
 
     return None
+
+
+def _parse_crop_word(text: str) -> Optional[str]:
+    """
+    Minimal crop parser for the "last image" override.
+    Accepts only English crop names to keep demo behavior predictable.
+    """
+    t = (text or "").strip().lower()
+    crop_words = {
+        "wheat": "Wheat",
+        "cotton": "Cotton",
+        "soybean": "Soybean",
+        "maize": "Maize",
+    }
+    return crop_words.get(t)
 
 # Onboarding configuration
 VALID_DISTRICTS = ['Latur', 'Jalna', 'Nagpur']
@@ -957,6 +1007,27 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                         continue
 
                 # Not a crop-confirm response; fall through to normal handling.
+
+            # "Last image" override (beta-only via env flag).
+            # If the user sends just a crop name (e.g., "Cotton") after an image,
+            # re-run analysis on the most recent saved image.
+            last_img = _get_last_image_pointer(from_number)
+            chosen = _parse_crop_word(text)
+            if last_img and chosen:
+                bucket = last_img.get("bucket") or os.environ.get("TEMP_AUDIO_BUCKET")
+                key = last_img.get("key")
+                if bucket and key:
+                    try:
+                        obj = s3.get_object(Bucket=bucket, Key=key)
+                        image_bytes = obj["Body"].read()
+                        district = profile.get("district") or profile.get("location")
+                        result = analyzer.analyze_crop_image(image_bytes, dialect, chosen, district=district)
+                        reply_text = str(result.get("recommendations") or "")
+                        save_message(from_number, wamid, message, reply_text, "vision_last_image_override")
+                        send_whatsapp_message(from_number, reply_text)
+                    finally:
+                        _delete_last_image_pointer(from_number)
+                    continue
             
             # Check for DONE/NOT YET keywords - these are handled by response detector
             done_keywords = ['हो गया', 'कर दिया', 'हो गया है', 'कर लिया', 'done', 'completed',
@@ -1080,6 +1151,12 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             
             # Analyze image
             analysis = analyzer.process_image_message(message, profile)
+
+            # Record last image pointer for user-driven override (beta-only via env flag).
+            if isinstance(analysis, dict):
+                s3info = analysis.get("s3") or {}
+                if isinstance(s3info, dict) and s3info.get("bucket") and s3info.get("key"):
+                    _put_last_image_pointer(from_number, str(s3info["bucket"]), str(s3info["key"]))
 
             # If vision asks for a crop override confirmation, store pending state and ask user.
             if isinstance(analysis, dict) and analysis.get("pending_crop_confirm"):

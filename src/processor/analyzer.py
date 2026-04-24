@@ -19,6 +19,62 @@ secrets = boto3.client("secretsmanager", region_name=_region)
 TEMP_BUCKET = os.environ.get("TEMP_AUDIO_BUCKET")
 IMAGE_MAX_BYTES = int(os.environ.get("IMAGE_MAX_BYTES", str(5 * 1024 * 1024)))
 
+def _quality_gate_enabled() -> bool:
+    return (os.environ.get("VISION_QUALITY_GATE_ENABLED") or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _check_image_quality(image_bytes: bytes) -> Dict[str, Any]:
+    """
+    Conservative, deterministic quality gate.
+    Blocks only obviously unusable thumbnails to prevent hallucinated diagnoses.
+    """
+    try:
+        from PIL import Image  # type: ignore
+    except Exception:
+        # If Pillow isn't available, don't block.
+        return {"is_acceptable": True, "reason": None, "metrics": {}}
+
+    try:
+        import io as _io
+
+        img = Image.open(_io.BytesIO(image_bytes))
+        w, h = img.size
+        file_size = len(image_bytes)
+        min_dim = min(w, h)
+
+        # Conservative thresholds (align with Kiro): only block obviously bad.
+        if min_dim < int(os.environ.get("VISION_MIN_DIMENSION", "320")):
+            return {
+                "is_acceptable": False,
+                "reason": "too_small",
+                "metrics": {"width": w, "height": h, "file_size": file_size, "min_dimension": min_dim},
+            }
+        if file_size < int(os.environ.get("VISION_MIN_FILE_BYTES", "3000")):
+            return {
+                "is_acceptable": False,
+                "reason": "file_too_small",
+                "metrics": {"width": w, "height": h, "file_size": file_size, "min_dimension": min_dim},
+            }
+
+        return {
+            "is_acceptable": True,
+            "reason": None,
+            "metrics": {"width": w, "height": h, "file_size": file_size, "min_dimension": min_dim},
+        }
+    except Exception as e:
+        return {"is_acceptable": False, "reason": f"error:{type(e).__name__}", "metrics": {}}
+
+
+def _insufficient_quality_message(dialect: str, reason: str) -> str:
+    msgs = {
+        "hi": "फोटो बहुत छोटा/धुंधला लग रहा है, इसलिए पक्का निदान करना सुरक्षित नहीं है।\n\nकृपया:\n- पत्ते/कीट के पास जाकर फोटो लें (लगभग 30cm)\n- फोकस के लिए स्क्रीन पर टैप करें\n- अच्छी रोशनी में फोटो लें\n\nफिर दोबारा फोटो भेजें।",
+        "mr": "फोटो खूप छोटा/अस्पष्ट दिसतो, त्यामुळे खात्रीशीर निदान सुरक्षित नाही.\n\nकृपया:\n- पान/किडीजवळ जाऊन फोटो घ्या (सुमारे 30cm)\n- फोकससाठी टॅप करा\n- चांगल्या प्रकाशात फोटो घ्या\n\nमग फोटो पुन्हा पाठवा.",
+        "te": "ఫోటో చాలా చిన్నగా/అస్పష్టంగా ఉంది, కాబట్టి ఖచ్చితమైన నిర్ధారణ చేయడం సురక్షితం కాదు.\n\nదయచేసి:\n- ఆకుకు/పురుగుకు దగ్గరగా (సుమారు 30cm) ఫోటో తీసండి\n- ఫోకస్ కోసం ట్యాప్ చేయండి\n- మంచి వెలుతురులో ఫోటో తీసండి\n\nతర్వాత మళ్లీ ఫోటో పంపండి.",
+        "en": "The photo is too small/unclear to diagnose reliably.\n\nPlease:\n- Move closer (~30cm)\n- Tap to focus\n- Take in good light\n\nThen resend the photo.",
+    }
+    _ = reason  # reserved for future per-reason messaging
+    return msgs.get(dialect, msgs["en"])
+
 def _looks_like_screenshot_or_ui(image_bytes: bytes) -> bool:
     """
     Deterministic rejection for screenshots / UI captures that often trigger hallucinations.
@@ -616,6 +672,32 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         print("Downloading image from WhatsApp...")
         image_bytes = download_whatsapp_image(image_id)
         print(f"Downloaded {len(image_bytes)} bytes")
+
+        # Deterministic quality gate (beta-only via env flag).
+        if _quality_gate_enabled():
+            q = _check_image_quality(image_bytes)
+            if not q.get("is_acceptable", True):
+                txt = _insufficient_quality_message(dialect, str(q.get("reason") or "unclear"))
+                # Still store for possible user-driven override / debugging.
+                import time
+                timestamp = int(time.time())
+                phone = user_profile.get('phone_number') or message.get('from', 'unknown')
+                s3_key = f"images/{phone}/{timestamp}.jpg"
+                if not TEMP_BUCKET:
+                    raise RuntimeError('TEMP_AUDIO_BUCKET is required for the WhatsApp image pipeline')
+                s3.put_object(
+                    Bucket=TEMP_BUCKET,
+                    Key=s3_key,
+                    Body=image_bytes,
+                    ContentType='image/jpeg'
+                )
+                print(f"Saved to S3 (quality_fail): s3://{TEMP_BUCKET}/{s3_key}")
+                return {
+                    "text": txt,
+                    "quality_gate_failed": True,
+                    "quality": q,
+                    "s3": {"bucket": TEMP_BUCKET, "key": s3_key},
+                }
         
         # Optional: Save to S3 for record-keeping
         import time
@@ -657,6 +739,7 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
                     "profile_crop": profile_crop,
                     "inferred_crop": "",
                 },
+                "s3": {"bucket": TEMP_BUCKET, "key": s3_key},
             }
 
         if result.get("needs_crop_confirm") and isinstance(result.get("inferred_crop"), str):
@@ -677,9 +760,13 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
                         "profile_crop": profile_crop,
                         "inferred_crop": inferred,
                     },
+                    "s3": {"bucket": TEMP_BUCKET, "key": s3_key},
                 }
 
-        return result["recommendations"]
+        return {
+            "text": result["recommendations"],
+            "s3": {"bucket": TEMP_BUCKET, "key": s3_key},
+        }
         
     except Exception as e:
         print(f"Error processing image message: {e}")
