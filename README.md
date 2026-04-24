@@ -119,17 +119,17 @@ AgriNexus is a working system with production observability — not a prototype.
 |---|---|
 | Production WhatsApp number live | ✅ [wa.me/4915120105731](https://wa.me/4915120105731) |
 | Public web demo live | ✅ [demo.agrinexus-ai.farm](https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html) |
-| Health endpoint (liveness) | ✅ Stack output `WebChatHealthUrl` (from `template-week2.yaml`) |
+| Health endpoint (liveness) | ✅ Stack output `WebChatHealthUrl` (from [`template-week2.yaml`](template-week2.yaml)) |
 | Webhook API (Meta verified) | ✅ Stack output `WebhookUrl` (Meta Developer Portal callback) |
-| Real weather data integration | ✅ OpenWeatherMap via Secrets Manager |
-| End-to-end voice round-trip | ✅ ~20–34s (batch Transcribe) |
+| Real weather data integration | ✅ [OpenWeatherMap](https://openweathermap.org/api) via Secrets Manager |
+| End-to-end voice round-trip | ✅ ~20–34s (batch [Transcribe](https://aws.amazon.com/transcribe/)) |
 | Vision pipeline (Claude Vision) | ✅ pest/disease schema validated + non-agri gating |
 | Closed-loop behavioral nudges | ✅ T+24h/T+48h follow-ups + cancel-on-DONE |
-| Test-to-code ratio | **64%** |
-| Infrastructure-as-Code resources | **31** (SAM) |
-| Architecture Decision Records | **8** |
-| EARS requirements traced to code | **100+** |
-| CI/CD | ✅ GitHub Actions (`ci.yml` + `aws-smoke.yml`) |
+| Test-to-code ratio | **64%** ([metrics](docs/IMPLEMENTATION-QUALITY-METRICS.md#1-test-coverage)) |
+| Infrastructure-as-Code resources | **34** ([SAM template](template-week2.yaml)) |
+| Architecture Decision Records | **8** ([docs/adr/](docs/adr/)) |
+| EARS requirements traced to code | **144** ([docs/requirements.md](docs/requirements.md)) |
+| CI/CD | ✅ GitHub Actions ([`.github/workflows/`](.github/workflows/)) |
 
 **Metrics & alarms:** full breakdown in [`docs/METRICS-AND-MONITORING.md`](docs/METRICS-AND-MONITORING.md) (7-day snapshot, 9 alarms, cost controls, and metric methodology).
 
