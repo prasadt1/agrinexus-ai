@@ -378,10 +378,10 @@
         // Two are real RAG questions; one explains the nudge flow (no KB call).
         const NUDGE_DEMO_SENTINEL = "__NUDGE_DEMO__";
         const NUDGE_DEMO_LABEL = {
-            en: "Show me the nudge demo flow",
-            hi: "नज डेमो फ्लो दिखाओ",
-            mr: "नज डेमो फ्लो दाखवा",
-            te: "నజ్ డెమో ఫ్లో చూపండి"
+            en: "🔔 Show nudge demo flow",
+            hi: "🔔 नज डेमो फ्लो दिखाओ",
+            mr: "🔔 नज डेमो फ्लो दाखवा",
+            te: "🔔 నజ్ డెమో ఫ్లో చూపండి"
         };
         const SAMPLE_QUESTIONS = {
             en: [
@@ -443,19 +443,19 @@
         function useSampleQuestion(question) {
             if (question === NUDGE_DEMO_SENTINEL) {
                 const lang = languageSelect.value;
+                const userLabel = NUDGE_DEMO_LABEL[lang] || NUDGE_DEMO_LABEL.en;
+                addMessage(userLabel, false);
                 const msg = {
-                    en: "Nudge demo flow (WhatsApp full tier): Weather → Nudge → reply DONE/NOT YET → optional T+24h / T+48h reminders → cancel on DONE.\n\nTry it on WhatsApp for the full closed-loop experience.",
-                    hi: "नज डेमो फ्लो (WhatsApp full tier): मौसम → नज → 'हो गया' / 'अभी नहीं' → (ज़रूरत हो तो) T+24h / T+48h रिमाइंडर → 'हो गया' पर तुरंत बंद.\n\nफुल एक्सपीरियंस के लिए WhatsApp पर ट्राय करें।",
-                    mr: "नज डेमो फ्लो (WhatsApp full tier): हवामान → नज → 'झाला' / 'अजून नाही' → (गरज असल्यास) T+24h / T+48h रिमाइंडर → 'झाला' वर लगेच बंद.\n\nफुल अनुभवासाठी WhatsApp वर ट्राय करा.",
-                    te: "నజ్ డెమో ఫ్లో (WhatsApp full tier): వాతావరణం → నజ్ → 'అయ్యింది' / 'ఇంకా లేదు' → (అవసరమైతే) T+24h / T+48h రిమైండర్లు → 'అయ్యింది' అయితే వెంటనే ఆపుతుంది.\n\nపూర్తి అనుభవం కోసం WhatsApp లో ప్రయత్నించండి."
+                    en: "Nudge demo flow (WhatsApp full tier):\n\n☀️ Weather favorable → 🔔 Spray nudge sent → Farmer replies 'DONE' or 'NOT YET' → If 'NOT YET': T+24h and T+48h reminders → On 'DONE': reminders cancelled instantly.\n\nThis closed-loop runs on WhatsApp only (voice, photo, nudges). Try it there for the full experience.",
+                    hi: "नज डेमो फ्लो (WhatsApp full tier):\n\n☀️ मौसम अनुकूल → 🔔 स्प्रे नज भेजा → किसान 'हो गया' या 'अभी नहीं' बोलता है → 'अभी नहीं' पर: T+24h और T+48h रिमाइंडर → 'हो गया' पर: रिमाइंडर तुरंत बंद।\n\nयह क्लोज्ड-लूप सिर्फ WhatsApp पर चलता है (वॉइस, फोटो, नज)। पूरा अनुभव वहाँ ट्राय करें।",
+                    mr: "नज डेमो फ्लो (WhatsApp full tier):\n\n☀️ हवामान अनुकूल → 🔔 फवारणी नज पाठवला → शेतकरी 'झाला' किंवा 'अजून नाही' म्हणतो → 'अजून नाही' वर: T+24h आणि T+48h रिमाइंडर → 'झाला' वर: रिमाइंडर लगेच बंद।\n\nहा क्लोज्ड-लूप फक्त WhatsApp वर चालतो (व्हॉइस, फोटो, नज). पूर्ण अनुभवासाठी तिथे ट्राय करा.",
+                    te: "నజ్ డెమో ఫ్లో (WhatsApp full tier):\n\n☀️ వాతావరణం అనుకూలం → 🔔 స్ప్రే నజ్ పంపబడింది → రైతు 'అయ్యింది' లేదా 'ఇంకా లేదు' అని చెప్తారు → 'ఇంకా లేదు' అయితే: T+24h మరియు T+48h రిమైండర్లు → 'అయ్యింది' అయితే: రిమైండర్లు వెంటనే ఆపబడతాయి.\n\nఈ క్లోజ్డ్-లూప్ WhatsApp లో మాత్రమే నడుస్తుంది (వాయిస్, ఫోటో, నజ్). పూర్తి అనుభవం కోసం అక్కడ ప్రయత్నించండి."
                 }[lang] || "Nudge demo flow: Weather → nudge → DONE/NOT YET → reminders → cancel on DONE.";
                 addMessage(msg, true);
                 return;
             }
             messageInput.value = question;
             messageInput.focus();
-            // Optionally auto-send:
-            // sendMessage();
         }
 
         function loadRateLimitState() {
