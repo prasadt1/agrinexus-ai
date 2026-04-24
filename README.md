@@ -1,4 +1,4 @@
-![AgriNexus AI - Bridging the Last Mile: From trapped research to accessible WhatsApp-based agricultural advice for smallholder farmers](https://github.com/user-attachments/assets/8aa328e4-327b-4d73-aaed-338800a656a1)
+![AgriNexus AI — system overview](docs/diagrams/builder-full-architecture.png)
 
 # AgriNexus AI – WhatsApp Agricultural Advisory
 
@@ -56,6 +56,7 @@ on — advice plus accountability, not just information.
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![AWS SQS](https://img.shields.io/badge/AWS-SQS-232F3E?logo=amazonaws&logoColor=white)](https://aws.amazon.com/sqs/)
 [![AWS DynamoDB](https://img.shields.io/badge/AWS-DynamoDB-4053D6?logo=amazondynamodb&logoColor=white)](https://aws.amazon.com/dynamodb/)
+[![AWS 10,000 AIdeas Finalist](https://img.shields.io/badge/AWS%2010%2C000%20AIdeas-Top%2050%20Finalist-FF9900?logo=amazonaws&logoColor=white)](https://builder.aws.com/content/3C8hBRTcsRuQrHzE3Pq243yhXTF/aideas-finalist-agrinexus-ai)
 [![Kiro](https://img.shields.io/badge/Kiro-Requirements%20to%20Code-6E56CF)](https://kiro.ai/)
 [![EARS](https://img.shields.io/badge/Requirements-EARS-0B7285)](https://en.wikipedia.org/wiki/Easy_Approach_to_Requirements_Syntax)
 
@@ -343,10 +344,11 @@ aws bedrock-agent start-ingestion-job \
 - **Webhook URL**: After deploy, use the stack output `WebhookUrl` (e.g. `https://<api-id>.execute-api.us-east-1.amazonaws.com/dev/webhook`). In Meta Developer Portal → WhatsApp → Configuration, set this as **Callback URL** and subscribe to **messages**.
 - **Verification (GET)**: Meta sends `hub.mode=subscribe`, `hub.verify_token`, `hub.challenge`. The webhook Lambda reads `agrinexus/whatsapp/verify-token` from Secrets Manager and returns `hub.challenge` if the token matches.
 - **Signatures (POST)**: Incoming message payloads are verified with `X-Hub-Signature-256` (HMAC-SHA256) using `agrinexus/whatsapp/app-secret`. Reject if invalid.
-- **Sending messages**: The **webhook** Lambda (via Common layer), **processor**, and **nudge** Lambdas use `agrinexus/whatsapp/access-token` and `agrinexus/whatsapp/phone-number-id` to call the WhatsApp Cloud API. For **inbound audio**, the webhook sends a short “received / preparing reply” text **immediately after deduplication** (before SQS → Voice Processor) so feedback is not delayed by queue or Transcribe. Text/interactive/template sends work as before.
-- **Production number cutover** (new eSIM / WABA / templates): update the Meta Developer app, **phone number ID**, approved **message templates**, and **webhook** URL; refresh **`agrinexus/whatsapp/*`** secrets in **Secrets Manager** (never commit tokens).
-- **Deploy / test**: **`sam build`** / **`sam deploy --config-file samconfig-week2.toml`**, then manual WhatsApp checks or [docs/E2E-TEST-GUIDE.md](docs/E2E-TEST-GUIDE.md) with **`scripts/demo.env`**.
-- **Message types**: Inbound text, image, and audio are supported. Outbound: text, optional interactive buttons (e.g. language/location during onboarding), and template messages for nudges (see [architecture/diagrams.md](architecture/diagrams.md)).
+
+- **Sending messages**: Webhook/processor/nudge Lambdas use Secrets Manager (`agrinexus/whatsapp/access-token`, `agrinexus/whatsapp/phone-number-id`) to call the WhatsApp Cloud API. The webhook sends a short “received / preparing reply” text quickly for inbound audio (before Transcribe).
+- **Deploy / test**: `sam build` / `sam deploy --config-file samconfig-week2.toml`, then run the E2E guide with `scripts/demo.env`.
+
+Details (templates, cutover, troubleshooting): [WHATSAPP-SETUP-GUIDE.md](WHATSAPP-SETUP-GUIDE.md).
 
 ## Usage
 
@@ -675,12 +677,14 @@ This project was developed using **Kiro AI**, which enabled requirements-driven 
 - [requirements.md](requirements.md) — EARS requirements specification
 - [ISSUES-LOG.md](ISSUES-LOG.md) — troubleshooting history (resolved issues)
 
-### Maintainers (internal / non-public)
+<details>
+<summary><strong>Maintainers (internal / non-public)</strong></summary>
 
-Some documents are intentionally **not** part of the public “judge quickstart” narrative (operations runbooks, session notes, demo trigger sheets). If you’re maintaining a deployed stack, you may also consult:
+Some documents are intentionally **not** part of the public “judge quickstart” narrative. If you’re maintaining a deployed stack, you may also consult:
 
 - `docs/operations/RUNBOOK-ALERTS.md` — alarms, DLQ, abuse envelope, rate limits
-- [scripts/demo-video-nudge-triggers.sh](scripts/demo-video-nudge-triggers.sh) — optional guided Lambda invokes for nudge/reminder recordings (**set `PHONE`**; keep any personal command cheat-sheets **local** — see `.gitignore` for `docs/demo/TRIGGER-COMMANDS.md` and `docs/notes/`)
+
+</details>
 
 ## Resources
 
