@@ -86,3 +86,34 @@ def test_white_dominant_ui_like_image_is_rejected(monkeypatch):
     out = analyzer.analyze_crop_image(img_bytes, "en", "Wheat", district="Latur")
     assert out.get("diagnosis") == "non_photo"
 
+
+def test_process_image_message_does_not_crop_prompt_on_screenshot(monkeypatch):
+    # Use the exact WhatsApp-downloaded JPEG screenshot shape that previously triggered
+    # the pest-macro crop prompt.
+    p = "/tmp/wa_latest2.jpg"
+    img_bytes = open(p, "rb").read()
+
+    os.environ["VISION_QUALITY_GATE_ENABLED"] = "false"
+    from src.processor import analyzer
+    monkeypatch.setattr(analyzer, "TEMP_BUCKET", "bucket", raising=False)
+
+    monkeypatch.setattr(analyzer, "download_whatsapp_image", lambda _image_id: img_bytes)
+
+    class _FakeS3:
+        def put_object(self, **kwargs):
+            return {"ETag": "x"}
+
+    monkeypatch.setattr(analyzer, "s3", _FakeS3())
+
+    # If bedrock invocation happens, screenshot detector failed.
+    def _boom(*args, **kwargs):
+        raise RuntimeError("should_not_call_model")
+
+    monkeypatch.setattr(analyzer, "bedrock", type("B", (), {"invoke_model": _boom})(), raising=False)
+
+    out = analyzer.process_image_message({"image": {"id": "img1"}, "from": "123"}, {"dialect": "hi", "crop": "Wheat", "phone_number": "123"})
+    assert isinstance(out, dict)
+    txt = (out.get("text") or "")
+    assert out.get("non_photo") is True
+    assert "फसल" not in txt or "Cotton / Wheat" not in txt
+

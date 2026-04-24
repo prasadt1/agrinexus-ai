@@ -383,6 +383,9 @@ def analyze_crop_image(
             "severity": "unknown",
             "recommendations": msg,
             "confidence": "low",
+            "photo_kind": "unknown",
+            "inferred_crop": "unknown",
+            "crop_confidence": "low",
             "raw_analysis": msg,
         }
 

@@ -483,6 +483,9 @@ def analyze_crop_image(
             "severity": "unknown",
             "recommendations": msg,
             "confidence": "low",
+            "photo_kind": "unknown",
+            "inferred_crop": "unknown",
+            "crop_confidence": "low",
             "raw_analysis": msg,
         }
 
@@ -737,6 +740,15 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         # Analyze image
         district = user_profile.get("district") or user_profile.get("location")
         result = analyze_crop_image(image_bytes, dialect, crop, district=district)
+
+        # If we deterministically rejected as non-photo / screenshot, return that message
+        # and do not fall into the pest-macro crop prompt.
+        if str(result.get("diagnosis") or "").strip().lower() == "non_photo":
+            return {
+                "text": str(result.get("recommendations") or _non_photo_message(dialect)),
+                "s3": {"bucket": TEMP_BUCKET, "key": s3_key},
+                "non_photo": True,
+            }
 
         # Pest macro shots often don't contain enough crop context. If Vision says it's a pest macro
         # but can't infer crop confidently, do NOT return a profile-biased agronomy answer.
