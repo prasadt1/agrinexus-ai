@@ -108,8 +108,7 @@ AgriNexus is a working system with production observability — not a prototype.
 | EARS requirements traced to code | **100+** |
 | CI/CD | ✅ GitHub Actions (`ci.yml` + `aws-smoke.yml`) |
 
-**Metrics & alarms:** full breakdown in [`docs/METRICS-AND-MONITORING.md`](docs/METRICS-AND-MONITORING.md) (7-day snapshot, 9 alarms, cost controls).
-**Metric audit:** see [`docs/ACCURATE-METRICS.md`](docs/ACCURATE-METRICS.md) for SAM resource counts and how to interpret the test-to-code ratio.
+**Metrics & alarms:** full breakdown in [`docs/METRICS-AND-MONITORING.md`](docs/METRICS-AND-MONITORING.md) (7-day snapshot, 9 alarms, cost controls, and metric methodology).
 
 **Judge note:** Live URLs are either directly linked above or exposed via CloudFormation outputs (`WebhookUrl`, `WebChatHealthUrl`) so reviewers can verify without us hardcoding stack-specific API ids in the README.
 

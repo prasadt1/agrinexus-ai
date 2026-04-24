@@ -304,3 +304,39 @@ Honest inventory of what's next on the observability and reliability front. Noth
 
 For the full production evidence summary, see [README — Production Evidence](../README.md#production-evidence).
 
+---
+
+## Metric methodology (counts & definitions)
+
+### SAM resources (Infrastructure-as-Code)
+
+Counted from `template-week2.yaml` as **non-`String`** entries under `Resources`.
+
+**Total:** **31** resources
+
+Breakdown:
+
+- **10** `AWS::Serverless::Function`
+- **8** `AWS::CloudWatch::Alarm`
+- **3** `AWS::SQS::Queue`
+- **2** `AWS::Serverless::Api`
+- **1** `AWS::WAFv2::WebACL`
+- **1** `AWS::WAFv2::WebACLAssociation`
+- **1** `AWS::Serverless::StateMachine`
+- **1** `AWS::Lambda::EventSourceMapping`
+- **1** `AWS::Serverless::LayerVersion`
+- **1** `AWS::SNS::Topic`
+- **1** `AWS::S3::Bucket`
+- **1** `AWS::IAM::Role`
+
+> Note: The template also contains **8** `Type: String` entries under `Resources` (SAM helper values). These are **not** deployed AWS resources.
+
+### Test-to-code ratio (how to interpret “64%”)
+
+Depending on what you count as “source”, the ratio varies:
+
+- **Handlers-only** (Lambda handler-heavy view) tends to be higher
+- **All source code** (including shared helpers, non-handler modules) tends to be lower
+
+The README’s **64%** is a **headline** intended to be directionally correct across both views.
+
