@@ -20,7 +20,7 @@ parameter_overrides = [
     "GuardrailId=\"\"",
     "GuardrailVersion=1",
     # Optional: comma-separated digits (no +) exempt from webhook MSG rate limit for pilot demos. Leave empty in public clones.
-    "RateLimitBypassPhones=",
+    "RateLimitBypassPhones=\"\"",
     "RateLimitDisabled=false"
 ]
 
