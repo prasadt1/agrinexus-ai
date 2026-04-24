@@ -547,23 +547,32 @@ def analyze_crop_image(
             "raw_analysis": msg,
         }
 
-    # Profile-first prompt: avoids false "not your crop" / "not infected" denials on noisy field photos.
+    # Visual-first prompt: profile is context only; distinctive crop organs must override it.
     # Force JSON so we can deterministically block non-photos.
     prompt = f"""You are an agricultural extension agent helping smallholder farmers in India.
 
-CONTEXT (use unless the image gives *unmistakable* proof this is a different crop type, e.g. banana plantation vs wheat):
+CONTEXT (profile crop is background context, NOT proof of what is in the image):
 - Registered crop in the farmer's app profile: **{crop}**
 - Registered district / area: **{area}**
 
-TASK: Look at the photo for pests, diseases, nutrient stress, or other visible problems — assuming this is their **{crop}** field unless proven otherwise.
+TASK: Look at the photo for pests, diseases, nutrient stress, or other visible problems. First identify what the visible plant/crop part actually is; then use the profile crop only if the image itself is ambiguous.
 
 RULES:
+VISUAL CROP EVIDENCE WINS:
+- Distinctive crop organs override profile context. If you clearly see **cotton boll/fiber** on a plant, set `inferred_crop="Cotton"` and `crop_confidence="high"` even if the registered crop is Wheat or another crop.
+- Do not call cotton lint/fiber, white boll lobes, flowers, pods, fruit, or bracts “insects” unless actual insects are clearly visible.
+- Only describe the crop as Wheat/cereal if you clearly see cereal plant structure (narrow blade leaves, cereal ear/head, stem/tillers). A cotton boll/fiber photo is never wheat.
+NO VISIBLE PROBLEM IS A VALID DIAGNOSIS:
+- If you can identify the crop/plant part but do **not** clearly see pests, disease spots, wilting, rot, nutrient stress, chewing, holes, or other damage, say that no clear pest/disease symptom is visible in this photo.
+- Do not recommend pesticides, fungicides, insecticides, or spray schedules unless an actual pest/disease/damage symptom is clearly visible.
+- Normal crop structures are not symptoms: cotton lint/fiber, brown dry bracts, boll seams, stems, shadows, and dried plant parts should not be labeled as pests or disease by themselves.
 0. **Non-photo guardrail (be conservative)**: If the image is a logo, illustration, screenshot/UI, document, meme, diagram, or you are not clearly seeing a real plant/leaf captured by a camera, set `is_real_crop_photo=false`. Examples: a stylized leaf icon with clean lines on a white background; app/file browser screenshots; **GitHub/repo/code listings, IDE panels, or folder trees** (thin colored text on dark backgrounds); graphics with flat colors. Do not invent pests/diseases. **Never** call something a wheat/cotton/soy field from these UI images.
-1. **Profile-first**: If the picture is partly blurry, backlit, or just "green vegetation", do **not** relabel it as sugarcane, rice, etc. Say visibility is limited and give guidance for **{crop}**.
+   But a real close-up photo of a crop part is still a crop photo: cotton boll/fiber on the plant, flower, fruit/pod, leaf, stem, pest on plant tissue, or field canopy. Do **not** reject a cotton boll or white cotton fiber as "logo/illustration" just because it is white-dominant.
+1. **Profile fallback only**: If the picture is partly blurry, backlit, or just "green vegetation" with no distinctive crop part, do **not** relabel it as sugarcane, rice, etc. Say visibility is limited and give guidance for **{crop}**.
 2. **Foreground first**: Base the diagnosis on the **sharp, main subject** (e.g. hand-held leaf, insects on that leaf). Out-of-focus yellow flowers or other plants in the **background** are often weeds or intercrop—mention in **at most one short phrase**, not as the headline. **Do not** use background color alone to reject **{crop}**.
 3. **Visual fidelity**: Describe what you can actually see (including insect color if visible). Do not contradict obvious colors (e.g., don't call black insects “white”). If color is unclear, say “color not clear in this photo”.
 4. **Wheat / cereals (apply ONLY when conditions match)**: Only use this rule if you **clearly** see a **cereal leaf blade** (narrow leaf with parallel veins) AND **clusters of tiny soft-bodied insects** (aphid-like colonies). **Do not apply** this rule to photos of **large larvae/caterpillars**, **buds/flowers/bolls**, or macro insect shots with no cereal leaf visible. If you see a **caterpillar/larva chewing**, describe it as a chewing pest (e.g., bollworm/armyworm-type) with appropriate scouting/IPM steps, even if the profile crop is different.
-5. **Uncertainty**: If species ID is unclear, state that in **one sentence** in **Confidence** only—still give **full actionable** Recommendations for **{crop}** in the same reply (do not repeat "more photos needed" in every section).
+5. **Uncertainty**: If species ID or symptoms are unclear, state that briefly in **Confidence** and give conservative next steps (monitor, send a closer symptom/pest photo, check nearby plants). Do not invent a treatment.
 6. **Tone**: Support the farmer. Avoid harsh denials unless the in-focus plant structure **clearly** rules out **{crop}**.
 7. **Consistency**: Use the same four numbered headings below every time so answers feel stable across retries.
 
@@ -574,6 +583,7 @@ Return ONLY one JSON object (no prose, no markdown) with keys:
 - photo_kind: one of ["leaf_symptom","pest_macro","field_view","unknown"]
 - inferred_crop: one of ["Cotton","Wheat","Soybean","Maize","unknown"]
 - crop_confidence: one of ["low","medium","high"]
+- visible_problem: boolean
 - insect_color: one of ["black","white","green","brown","mixed","unknown"]
 - severity: one of ["low","medium","high","unknown"]
 - confidence: one of ["low","medium","high"]
@@ -585,6 +595,9 @@ Return ONLY one JSON object (no prose, no markdown) with keys:
 
 If is_real_crop_photo is false:
 - final_message must ask for a real crop/leaf close-up photo and must NOT mention pests/diseases.
+If visible_problem is false:
+- final_message must say no clear pest/disease/damage symptom is visible in this photo.
+- Recommendations should be monitoring / sending a clearer close-up if symptoms appear; no pesticide or spray advice.
 """
     
     # Call Claude 3 Sonnet Vision
@@ -596,7 +609,7 @@ If is_real_crop_photo is false:
             body=json.dumps({
                 "anthropic_version": "bedrock-2023-05-31",
                 "max_tokens": 2000,
-                "temperature": 0.2,
+                "temperature": 0,
                 "messages": [
                     {
                         "role": "user",
@@ -646,9 +659,10 @@ If is_real_crop_photo is false:
             photo_kind = norm["photo_kind"]
             inferred_crop = norm["inferred_crop"]
             crop_confidence = norm["crop_confidence"]
+            visible_problem = bool(obj.get("visible_problem", True))
             severity = str(obj.get("severity") or "unknown")
             confidence = str(obj.get("confidence") or "medium")
-            needs_confirm = (crop_confidence == "high" and inferred_crop in ("Cotton", "Wheat", "Soybean", "Maize") and inferred_crop != crop)
+            needs_confirm = False
             return {
                 "diagnosis": "Unknown",
                 "severity": severity,
@@ -657,6 +671,7 @@ If is_real_crop_photo is false:
                 "photo_kind": photo_kind,
                 "inferred_crop": inferred_crop,
                 "crop_confidence": crop_confidence,
+                "visible_problem": visible_problem,
                 "needs_crop_confirm": needs_confirm,
                 "raw_analysis": analysis,
             }
@@ -779,10 +794,10 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         if photo_kind in ("pest_macro", "leaf_symptom", "unknown") and crop_conf != "high":
             profile_crop = str(crop or "").strip() or "unknown"
             prompt_msgs = {
-                "hi": f"यह *कीट का क्लोज़‑अप* फोटो लग रहा है। सही सलाह के लिए बताइए यह फोटो किस फसल पर है?",
-                "mr": f"हा *किडीचा क्लोज‑अप* फोटो दिसतो. योग्य सल्ल्यासाठी हा फोटो कोणत्या पिकावर आहे?",
-                "te": f"ఇది *పురుగు క్లోస్‑అప్* ఫోటోలా ఉంది. సరైన సలహా కోసం ఇది ఏ పంటపై ఉందో చెప్పండి.",
-                "en": f"This looks like a *close-up pest photo*. To give the right recommendation, which crop is this on?",
+                "hi": "यह *क्लोज़‑अप/आंशिक फसल फोटो* लग रहा है। सही सलाह के लिए बताइए यह फोटो किस फसल पर है?",
+                "mr": "हा *जवळून/अंशतः घेतलेला पीक फोटो* दिसतो. योग्य सल्ल्यासाठी हा फोटो कोणत्या पिकावर आहे?",
+                "te": "ఇది *దగ్గరగా/భాగంగా తీసిన పంట ఫోటోలా* ఉంది. సరైన సలహా కోసం ఇది ఏ పంటపై ఉందో చెప్పండి.",
+                "en": "This looks like a *close-up/partial crop photo*. To give the right recommendation, which crop is this?",
             }
             button_titles = {
                 "hi": ["कपास", "गेहूं", "सोयाबीन"],
@@ -801,27 +816,6 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
                 },
                 "s3": {"bucket": TEMP_BUCKET, "key": s3_key},
             }
-
-        if result.get("needs_crop_confirm") and isinstance(result.get("inferred_crop"), str):
-            inferred = str(result.get("inferred_crop") or "").strip()
-            profile_crop = str(crop or "").strip() or "unknown"
-            if inferred and inferred != profile_crop:
-                confirm_msgs = {
-                    "hi": f"आपके प्रोफ़ाइल में फसल **{profile_crop}** है, लेकिन यह फोटो **{inferred}** जैसी लग रही है।\n\n{inferred} के रूप में विश्लेषण करने के लिए `YES` भेजें, या प्रोफ़ाइल वाली फसल के लिए `{profile_crop.upper()}` भेजें।",
-                    "mr": f"तुमच्या प्रोफाईलमध्ये पीक **{profile_crop}** आहे, पण हा फोटो **{inferred}** सारखा दिसतो.\n\n{inferred} म्हणून विश्लेषणासाठी `YES` पाठवा, किंवा प्रोफाईल पिकासाठी `{profile_crop.upper()}` पाठवा.",
-                    "te": f"మీ ప్రొఫైల్‌లో పంట **{profile_crop}** ఉంది, కానీ ఈ ఫోటో **{inferred}** లాగా కనిపిస్తోంది.\n\n{inferred} గా విశ్లేషించడానికి `YES` పంపండి, లేదా ప్రొఫైల్ పంట కోసం `{profile_crop.upper()}` పంపండి.",
-                    "en": f"Your profile crop is **{profile_crop}**, but this photo looks like **{inferred}**.\n\nReply `YES` to analyze as {inferred}, or reply `{profile_crop.upper()}` to analyze using your profile crop.",
-                }
-                return {
-                    "text": confirm_msgs.get(dialect, confirm_msgs["en"]),
-                    "pending_crop_confirm": {
-                        "bucket": TEMP_BUCKET,
-                        "key": s3_key,
-                        "profile_crop": profile_crop,
-                        "inferred_crop": inferred,
-                    },
-                    "s3": {"bucket": TEMP_BUCKET, "key": s3_key},
-                }
 
         return {
             "text": result["recommendations"],

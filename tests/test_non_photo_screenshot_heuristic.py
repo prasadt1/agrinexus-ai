@@ -100,6 +100,28 @@ def _make_github_dark_repo_tree_like_bytes():
     return buf.getvalue()
 
 
+def _make_cotton_boll_like_bytes():
+    PIL = pytest.importorskip("PIL")
+    from PIL import Image, ImageDraw, ImageFilter  # type: ignore
+
+    img = Image.new("RGB", (640, 480), (58, 112, 45))
+    draw = ImageDraw.Draw(img)
+    # Green leaf/background shapes.
+    for box in ([0, 0, 320, 260], [300, 130, 640, 480], [40, 300, 360, 500]):
+        draw.ellipse(box, fill=(72, 145, 54))
+    # Brown boll bracts.
+    draw.polygon([(240, 210), (305, 130), (330, 245)], fill=(126, 86, 50))
+    draw.polygon([(385, 210), (340, 130), (320, 245)], fill=(116, 76, 45))
+    draw.polygon([(310, 270), (250, 340), (365, 330)], fill=(92, 55, 35))
+    # White cotton lobes, softly blurred to look photographic.
+    for box in ([190, 105, 340, 260], [300, 90, 470, 260], [230, 220, 395, 390], [365, 220, 520, 380]):
+        draw.ellipse(box, fill=(246, 246, 242))
+    img = img.filter(ImageFilter.GaussianBlur(radius=1.2))
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=86)
+    return buf.getvalue()
+
+
 def _make_limited_palette_ui_bytes():
     PIL = pytest.importorskip("PIL")
     from PIL import Image, ImageDraw  # type: ignore
@@ -214,3 +236,81 @@ def test_processor_limited_palette_ui_blocks(monkeypatch):
     result = proc_analyzer.analyze_crop_image(image_bytes=image_bytes, dialect="en", crop="wheat")
     assert result["diagnosis"] == "non_photo"
     assert called["bedrock"] is False
+
+
+def test_processor_cotton_boll_photo_is_not_rejected_as_logo():
+    from src.processor import analyzer as proc_analyzer
+
+    image_bytes = _make_cotton_boll_like_bytes()
+    assert proc_analyzer._looks_like_screenshot_or_ui(image_bytes) is False
+    assert proc_analyzer._looks_like_logo_or_illustration(image_bytes) is False
+
+
+def test_processor_prompt_makes_visible_crop_evidence_win(monkeypatch):
+    from src.processor import analyzer as proc_analyzer
+
+    captured = {}
+
+    class _Body:
+        def read(self):
+            return b'''{
+                "content": [{
+                    "text": "{\\"is_real_crop_photo\\": true, \\"non_photo_reason\\": \\"\\", \\"photo_kind\\": \\"leaf_symptom\\", \\"inferred_crop\\": \\"Cotton\\", \\"crop_confidence\\": \\"high\\", \\"insect_color\\": \\"unknown\\", \\"severity\\": \\"low\\", \\"confidence\\": \\"medium\\", \\"final_message\\": \\"ok\\"}"
+                }]
+            }'''
+
+    class _DummyBedrock:
+        def invoke_model(self, **kwargs):
+            import json
+
+            body = json.loads(kwargs["body"])
+            captured["prompt"] = body["messages"][0]["content"][1]["text"]
+            return {"body": _Body()}
+
+    monkeypatch.setattr(proc_analyzer, "bedrock", _DummyBedrock())
+    proc_analyzer.analyze_crop_image(_make_cotton_boll_like_bytes(), dialect="en", crop="Wheat")
+
+    prompt = captured["prompt"]
+    assert "VISUAL CROP EVIDENCE WINS" in prompt
+    assert "cotton boll/fiber" in prompt
+    assert "NO VISIBLE PROBLEM IS A VALID DIAGNOSIS" in prompt
+    assert "Do not recommend pesticides" in prompt
+    assert "assuming this is their" not in prompt
+    assert "full actionable" not in prompt
+
+
+def test_processor_high_confidence_visible_crop_bypasses_crop_prompt(monkeypatch):
+    from src.processor import analyzer as proc_analyzer
+
+    proc_analyzer.TEMP_BUCKET = "tmp-bucket"
+    monkeypatch.setattr(proc_analyzer, "download_whatsapp_image", lambda _mid: _make_cotton_boll_like_bytes())
+
+    class _FakeS3:
+        def put_object(self, **_kwargs):
+            return {"ResponseMetadata": {"HTTPStatusCode": 200}}
+
+    monkeypatch.setattr(proc_analyzer, "s3", _FakeS3())
+    monkeypatch.setattr(
+        proc_analyzer,
+        "analyze_crop_image",
+        lambda *_args, **_kwargs: {
+            "diagnosis": "Unknown",
+            "severity": "unknown",
+            "recommendations": "Cotton boll visible; no clear pest or disease symptoms are visible.",
+            "confidence": "medium",
+            "photo_kind": "leaf_symptom",
+            "inferred_crop": "Cotton",
+            "crop_confidence": "high",
+            "needs_crop_confirm": False,
+        },
+    )
+
+    out = proc_analyzer.process_image_message(
+        {"image": {"id": "mid-cotton"}, "from": "1555"},
+        {"dialect": "en", "crop": "Wheat", "phone_number": "1555"},
+    )
+
+    assert isinstance(out, dict)
+    assert "buttons" not in out
+    assert "pending_crop_confirm" not in out
+    assert "Cotton boll visible" in out["text"]
