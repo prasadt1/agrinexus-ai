@@ -122,15 +122,9 @@ def _parse_crop_confirm_reply(text: str, inferred_crop: str, profile_crop: str) 
     if t in no:
         return profile_crop
 
-    # Allow explicit crop names (English). Keep it minimal for judge demos.
-    crop_words = {
-        "wheat": "Wheat",
-        "cotton": "Cotton",
-        "soybean": "Soybean",
-        "maize": "Maize",
-    }
-    if t in crop_words:
-        return crop_words[t]
+    chosen = _parse_crop_word(text)
+    if chosen:
+        return chosen
 
     # Also accept sending the exact inferred crop or profile crop.
     if t == (inferred_crop or "").strip().lower():
@@ -142,16 +136,27 @@ def _parse_crop_confirm_reply(text: str, inferred_crop: str, profile_crop: str) 
 
 
 def _parse_crop_word(text: str) -> Optional[str]:
-    """
-    Minimal crop parser for the "last image" override.
-    Accepts only English crop names to keep demo behavior predictable.
-    """
     t = (text or "").strip().lower()
     crop_words = {
+        # English
         "wheat": "Wheat",
         "cotton": "Cotton",
         "soybean": "Soybean",
         "maize": "Maize",
+        # Hindi
+        "गेहूं": "Wheat",
+        "कपास": "Cotton",
+        "सोयाबीन": "Soybean",
+        "मक्का": "Maize",
+        # Marathi
+        "गहू": "Wheat",
+        "कापूस": "Cotton",
+        "मका": "Maize",
+        # Telugu (common forms)
+        "గోధుమ": "Wheat",
+        "పత్తి": "Cotton",
+        "సోయాబీన్": "Soybean",
+        "మొక్కజొన్న": "Maize",
     }
     return crop_words.get(t)
 
@@ -979,8 +984,19 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
         approved = is_approved_user(table, from_number)
         
         # Process based on message type
-        if message_type == 'text':
-            text = message.get('text', {}).get('body', '')
+        if message_type in ('text', 'interactive'):
+            text = ''
+            if message_type == 'text':
+                text = message.get('text', {}).get('body', '')
+            else:
+                interactive = message.get('interactive', {}) if isinstance(message, dict) else {}
+                interactive_type = interactive.get('type', '')
+                if interactive_type == 'button_reply':
+                    button_reply = interactive.get('button_reply', {})
+                    text = button_reply.get('title', '')
+                elif interactive_type == 'list_reply':
+                    list_reply = interactive.get('list_reply', {})
+                    text = list_reply.get('title') or list_reply.get('id', '')
 
             # If we are waiting for crop confirmation from a previous photo, intercept first.
             pending = _get_pending_crop_confirm(from_number)
@@ -1166,7 +1182,11 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                 _put_pending_crop_confirm(from_number, pending)
                 text_out = str(analysis.get("text") or "")
                 save_message(from_number, wamid, message, text_out, "vision_crop_confirm")
-                send_whatsapp_message(from_number, text_out)
+                buttons = analysis.get("buttons") if isinstance(analysis, dict) else None
+                if isinstance(buttons, list) and buttons:
+                    send_whatsapp_buttons(from_number, text_out, buttons)
+                else:
+                    send_whatsapp_message(from_number, text_out)
                 continue
 
             # Backward compatible (string return)

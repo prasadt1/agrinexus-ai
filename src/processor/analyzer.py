@@ -757,13 +757,20 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         if photo_kind in ("pest_macro", "leaf_symptom", "unknown") and crop_conf != "high":
             profile_crop = str(crop or "").strip() or "unknown"
             prompt_msgs = {
-                "hi": f"यह एक *कीट का क्लोज़‑अप* फोटो लग रहा है। सही सलाह देने के लिए बताइए यह फोटो किस फसल पर है?\n\nCotton / Wheat / Soybean / Maize में से लिखें (या प्रोफ़ाइल वाली फसल: **{profile_crop}**).",
-                "mr": f"हा *किडीचा क्लोज‑अप* फोटो दिसतो. योग्य सल्ल्यासाठी हा फोटो कोणत्या पिकाचा आहे?\n\nCotton / Wheat / Soybean / Maize पैकी लिहा (किंवा प्रोफाईल पीक: **{profile_crop}**).",
-                "te": f"ఇది *పురుగు క్లోస్‑అప్* ఫోటోలా ఉంది. సరైన సలహా కోసం ఇది ఏ పంటపై ఉందో చెప్పండి.\n\nCotton / Wheat / Soybean / Maize లో ఒకటి పంపండి (లేదా ప్రొఫైల్ పంట: **{profile_crop}**).",
-                "en": f"This looks like a *close-up pest photo*. To give the right recommendation, which crop is this on?\n\nReply with one: Cotton / Wheat / Soybean / Maize (or your profile crop: **{profile_crop}**).",
+                "hi": f"यह *कीट का क्लोज़‑अप* फोटो लग रहा है। सही सलाह के लिए बताइए यह फोटो किस फसल पर है?",
+                "mr": f"हा *किडीचा क्लोज‑अप* फोटो दिसतो. योग्य सल्ल्यासाठी हा फोटो कोणत्या पिकावर आहे?",
+                "te": f"ఇది *పురుగు క్లోస్‑అప్* ఫోటోలా ఉంది. సరైన సలహా కోసం ఇది ఏ పంటపై ఉందో చెప్పండి.",
+                "en": f"This looks like a *close-up pest photo*. To give the right recommendation, which crop is this on?",
+            }
+            button_titles = {
+                "hi": ["कपास", "गेहूं", "सोयाबीन"],
+                "mr": ["कापूस", "गहू", "सोयाबीन"],
+                "te": ["పత్తి", "గోధుమ", "సోయాబీన్"],
+                "en": ["Cotton", "Wheat", "Soybean"],
             }
             return {
                 "text": prompt_msgs.get(dialect, prompt_msgs["en"]),
+                "buttons": button_titles.get(dialect, button_titles["en"]),
                 "pending_crop_confirm": {
                     "bucket": TEMP_BUCKET,
                     "key": s3_key,

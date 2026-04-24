@@ -39,7 +39,7 @@ def test_pest_macro_low_confidence_prompts_for_crop(monkeypatch):
 
     assert isinstance(out, dict)
     assert "pending_crop_confirm" in out
-    assert "Which crop" in out["text"] or "profile crop" in out["text"]
+    assert "which crop" in out["text"].lower() or "profile crop" in out["text"].lower()
 
 
 def test_leaf_symptom_low_confidence_prompts_for_crop(monkeypatch):
