@@ -6,6 +6,7 @@ import boto3
 import json
 import base64
 import os
+import io
 from typing import Any, Dict, Optional
 
 bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
@@ -13,6 +14,45 @@ s3 = boto3.client('s3', region_name='us-east-1')
 secrets = boto3.client('secretsmanager', region_name='us-east-1')
 
 TEMP_BUCKET = os.environ.get('TEMP_AUDIO_BUCKET')
+
+def _looks_like_logo_or_illustration(image_bytes: bytes) -> bool:
+    try:
+        from PIL import Image  # type: ignore
+    except Exception:
+        return False
+    try:
+        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        w, h = img.size
+        if w < 64 or h < 64:
+            return True
+        small = img.resize((96, 96))
+        pixels = list(small.getdata())
+        total = len(pixels)
+        if total == 0:
+            return True
+        whiteish = 0
+        colors = set()
+        step = 2
+        for i, (r, g, b) in enumerate(pixels):
+            if r > 245 and g > 245 and b > 245:
+                whiteish += 1
+            if i % step == 0:
+                colors.add((r // 8, g // 8, b // 8))
+        if (whiteish / total) >= 0.70 and len(colors) <= 180:
+            return True
+        return False
+    except Exception:
+        return False
+
+
+def _non_photo_message(dialect: str) -> str:
+    msgs = {
+        "hi": "यह तस्वीर फसल/पत्ते की वास्तविक फोटो नहीं लग रही (logo/illustration). कृपया प्रभावित पत्ता/फसल की साफ़, पास से ली हुई फोटो भेजें।",
+        "mr": "ही प्रतिमा फसल/पानाची वास्तविक फोटो वाटत नाही (logo/illustration). कृपया प्रभावित पान/पीक याचा स्पष्ट जवळून घेतलेला फोटो पाठवा.",
+        "te": "ఇది పంట/ఆకు యొక్క నిజమైన ఫోటోలా లేదు (logo/illustration). దయచేసి ప్రభావిత ఆకు/పంట యొక్క స్పష్టమైన దగ్గరి ఫోటో పంపండి.",
+        "en": "This doesn’t look like a real crop/leaf photo (logo/illustration). Please send a clear close-up photo of the affected leaf/plant.",
+    }
+    return msgs.get(dialect, msgs["en"])
 
 
 def download_whatsapp_image(media_id: str) -> bytes:
@@ -84,6 +124,16 @@ def analyze_crop_image(
     language = language_map.get(dialect, "English")
     area = (district or "").strip() or "not specified"
 
+    if _looks_like_logo_or_illustration(image_bytes):
+        msg = _non_photo_message(dialect)
+        return {
+            "diagnosis": "non_photo",
+            "severity": "unknown",
+            "recommendations": msg,
+            "confidence": "low",
+            "raw_analysis": msg,
+        }
+
     prompt = f"""You are an agricultural extension agent helping smallholder farmers in India.
 
 CONTEXT (use unless the image gives *unmistakable* proof this is a different crop type, e.g. banana plantation vs wheat):
@@ -93,12 +143,14 @@ CONTEXT (use unless the image gives *unmistakable* proof this is a different cro
 TASK: Look at the photo for pests, diseases, nutrient stress, or other visible problems — assuming this is their **{crop}** field unless proven otherwise.
 
 RULES:
+0. **Non-photo guardrail**: If the image is a logo, illustration, screenshot, document, or not a real crop/leaf photo, say so and ask for a clear close-up photo. Do not invent pests/diseases.
 1. **Profile-first**: If the picture is partly blurry, backlit, or just "green vegetation", do **not** relabel it as sugarcane, rice, etc. Say visibility is limited and give guidance for **{crop}**.
 2. **Foreground first**: Base the diagnosis on the **sharp, main subject** (e.g. hand-held leaf, insects on that leaf). Out-of-focus yellow flowers or other plants in the **background** are often weeds or intercrop—mention in **at most one short phrase**, not as the headline. **Do not** use background color alone to reject **{crop}**.
-3. **Wheat / cereals**: If **{crop}** is wheat (गेहूं) or similar small grains and you see **clusters of tiny soft-bodied insects** on a **narrow leaf with parallel veins** (typical grass/cereal blade), treat this as a **working diagnosis of cereal aphid / sucking-pest infestation consistent with {crop}** with **medium confidence**—not only "might be aphids". Give concrete scouting and IPM-style next steps (beneficials, thresholds, consult KVK/local officer for **authorized** products). Do **not** say "not infected" when obvious colonies are visible.
-4. **Uncertainty**: If species ID is unclear, state that in **one sentence** in **Confidence** only—still give **full actionable** Recommendations for **{crop}** in the same reply (do not repeat "more photos needed" in every section).
-5. **Tone**: Support the farmer. Avoid harsh denials unless the in-focus plant structure **clearly** rules out **{crop}**.
-6. **Consistency**: Use the same four numbered headings below every time so answers feel stable across retries.
+3. **Visual fidelity**: Describe what you can actually see (including insect color if visible). Do not contradict obvious colors (e.g., don't call black insects “white”). If color is unclear, say “color not clear in this photo”.
+4. **Wheat / cereals**: If **{crop}** is wheat (गेहूं) or similar small grains and you see **clusters of tiny soft-bodied insects** on a **narrow leaf with parallel veins** (typical grass/cereal blade), treat this as a **working diagnosis of cereal aphid / sucking-pest infestation consistent with {crop}** with **medium confidence**—not only "might be aphids". Give concrete scouting and IPM-style next steps (beneficials, thresholds, consult KVK/local officer for **authorized** products). Do **not** say "not infected" when obvious colonies are visible.
+5. **Uncertainty**: If species ID is unclear, state that in **one sentence** in **Confidence** only—still give **full actionable** Recommendations for **{crop}** in the same reply (do not repeat "more photos needed" in every section).
+6. **Tone**: Support the farmer. Avoid harsh denials unless the in-focus plant structure **clearly** rules out **{crop}**.
+7. **Consistency**: Use the same four numbered headings below every time so answers feel stable across retries.
 
 OUTPUT in **{language}**, simple practical wording, with sections:
 1. **Diagnosis** (framed for their **{crop}**)
