@@ -13,8 +13,18 @@ Your WhatsApp integration is **COMPLETE** and ready to use! Here's what's alread
 - ✅ Webhook URL deployed and active
 
 ### Webhook URL
-```
-https://nwo9tkvpoi.execute-api.us-east-1.amazonaws.com/dev/webhook
+Your deployed webhook endpoint will look like:
+
+`https://<api-id>.execute-api.<region>.amazonaws.com/<env>/webhook`
+
+To fetch the exact URL after deploy, use the CloudFormation outputs for your stack:
+
+```bash
+STACK_NAME="agrinexus-week2"
+aws cloudformation describe-stacks \
+  --stack-name "$STACK_NAME" \
+  --query "Stacks[0].Outputs[?contains(OutputKey, 'Webhook')].OutputValue" \
+  --output text
 ```
 
 ### Secrets Configured
@@ -32,10 +42,13 @@ https://nwo9tkvpoi.execute-api.us-east-1.amazonaws.com/dev/webhook
 3. Navigate to **WhatsApp > Configuration**
 4. Click **Edit** on the Webhook section
 5. Enter the following:
-   - **Callback URL**: `https://nwo9tkvpoi.execute-api.us-east-1.amazonaws.com/dev/webhook`
-   - **Verify Token**: Get it from AWS Secrets Manager:
+   - **Callback URL**: `https://<api-id>.execute-api.<region>.amazonaws.com/<env>/webhook`
+   - **Verify Token**: Get it from AWS Secrets Manager (example secret id shown):
      ```bash
-     aws secretsmanager get-secret-value --secret-id agrinexus/whatsapp/verify-token --query SecretString --output text
+     aws secretsmanager get-secret-value \
+       --secret-id agrinexus/whatsapp/verify-token \
+       --query SecretString \
+       --output text
      ```
 6. Click **Verify and Save**
 7. Subscribe to the **messages** webhook field
@@ -48,7 +61,8 @@ https://nwo9tkvpoi.execute-api.us-east-1.amazonaws.com/dev/webhook
 VERIFY_TOKEN=$(aws secretsmanager get-secret-value --secret-id agrinexus/whatsapp/verify-token --query SecretString --output text)
 
 # Test webhook verification
-curl "https://nwo9tkvpoi.execute-api.us-east-1.amazonaws.com/dev/webhook?hub.mode=subscribe&hub.verify_token=$VERIFY_TOKEN&hub.challenge=test123"
+WEBHOOK_URL="https://<api-id>.execute-api.<region>.amazonaws.com/<env>/webhook"
+curl "${WEBHOOK_URL}?hub.mode=subscribe&hub.verify_token=${VERIFY_TOKEN}&hub.challenge=test123"
 ```
 
 Expected response: `test123`
