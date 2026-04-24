@@ -208,7 +208,7 @@ These are real numbers from the running production stack — not projections.
 
 ### Judge Note
 
-> All numbers above are **verifiable in the repository and live CloudWatch dashboards** — see [SAM template](template-week2.yaml), [ADRs](docs/adr), [EARS requirements](requirements.md), [CI workflows](.github/workflows), and the [full metrics report](docs/METRICS-AND-MONITORING.md). Cost figures at scale (~$0.54/farmer/year at 10K) are **modeled**; current production costs (~$1.70/day, ~$53/month) are **real** — see [finops-public.md](docs/finops-public.md).
+> All numbers above are **verifiable in the repository and live CloudWatch dashboards** — see [SAM template](template-week2.yaml), [ADRs](docs/adr), [EARS requirements](requirements.md), [CI workflows](.github/workflows), and the [full metrics report](docs/METRICS-AND-MONITORING.md). Cost figures at scale (about $0.54/farmer/year at 10K) are **modeled**; current production costs (about $1.70/day, about $53/month) are **real** — see [finops-public.md](docs/finops-public.md).
 
 ## Architecture
 
@@ -689,6 +689,26 @@ Some documents are intentionally **not** part of the public “judge quickstart�
 - [Amazon Transcribe](https://docs.aws.amazon.com/transcribe/)
 - [Amazon Polly](https://docs.aws.amazon.com/polly/)
 - [WhatsApp Business API](https://developers.facebook.com/docs/whatsapp)
+
+## Beyond Agriculture: Productization Roadmap
+
+AgriNexus is built as an **accountability engine** where only the trigger and copy change. The closed-loop architecture applies beyond farming:
+
+- **Irrigation scheduling** — reservoir level triggers, district-scoped reminders
+- **Medication adherence** — rural health worker follow-ups
+- **Micro-savings nudges** — financial literacy programs
+- **Vaccine schedule reminders** — maternal health networks
+
+### Current Productization Thinking
+
+| Layer | Now | Next 6 months | Commercial model |
+|---|---|---|---|
+| Core nudge engine | AWS-serverless reference | Deploy-in-a-day SAM package | Per-seat / per-farmer licensing |
+| Knowledge base | FAO + ICAR + NFSM | State-specific corpus per partner | Partner content + co-branded |
+| Integration | WhatsApp Business | + IVR, + state agri apps | White-label for NGOs/KVKs |
+| Analytics | CloudWatch + custom metrics | Farmer cohort analytics | Per-partner dashboards |
+
+**Commercial licensing:** see [License](#license) — source available for review; commercial use via [prasad@prasadtilloo.com](mailto:prasad@prasadtilloo.com).
 
 ## License
 
