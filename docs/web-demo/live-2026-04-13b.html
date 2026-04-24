@@ -537,7 +537,18 @@
                 messageInput.disabled = true;
                 sendButton.disabled = true;
                 document.querySelector('.input-container').style.display = 'none';
-                rateLimitInfo.textContent = '⏳ Rate limit reached. Please try again later.';
+                // Show reset time from persisted state
+                let resetMsg = '⏳ Rate limit reached. Resets in ~1 hour.';
+                try {
+                    const raw = localStorage.getItem(STORAGE_KEY);
+                    const state = raw ? JSON.parse(raw) : {};
+                    const resetAt = Number(state.resetAtSeconds || 0) * 1000;
+                    if (resetAt > Date.now()) {
+                        const mins = Math.max(1, Math.ceil((resetAt - Date.now()) / 60000));
+                        resetMsg = `⏳ Rate limit reached. Resets in ~${mins} minute${mins !== 1 ? 's' : ''}.`;
+                    }
+                } catch { /* ignore */ }
+                rateLimitInfo.textContent = resetMsg;
                 rateLimitInfo.classList.add('exhausted');
             } else {
                 messageInput.disabled = false;
