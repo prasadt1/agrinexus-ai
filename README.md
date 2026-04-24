@@ -76,6 +76,8 @@ Pick the web demo or WhatsApp experience.
 
 **WhatsApp access:** Text is open; voice/photo/nudges are available via the [demo request template](https://github.com/prasadt1/agrinexus-ai/issues/new?template=demo-request.md).
 
+**Phone format (international):** The `wa.me` link works globally in most regions. If it doesn’t open, save the number as `+49 151 2010 5731` and message “HELP”.
+
 **Data retention (summary):** Conversation rows written by the **processor** use a **90-day** TTL; short-lived **`MSG#*`** rows written by the **webhook** for the response detector use **7 days**; **WAMID** dedup keys use **24 hours**; **nudge** records use **180 days**. `demo_tier: public` limits **nudge follow-up scheduling**, not those TTLs. Details: [docs/testing/E2E-TEST-CHECKLIST.md](docs/testing/E2E-TEST-CHECKLIST.md) (section 6).
 
 ---

@@ -60,10 +60,10 @@ DISTRICT_COORDS = {
 # Onboarding messages by dialect
 ONBOARDING_MESSAGES = {
     'welcome': {
-        'hi': 'नमस्ते! AgriNexus AI में आपका स्वागत है। मैं आपकी खेती में मदद करूंगा। कृपया अपनी भाषा चुनें:',
-        'mr': 'नमस्कार! AgriNexus AI मध्ये आपले स्वागत आहे. मी तुमच्या शेतीत मदत करेन. कृपया तुमची भाषा निवडा:',
-        'te': 'నమస్కారం! AgriNexus AI కి స్వాగతం. నేను మీ వ్యవసాయంలో సహాయం చేస్తాను. దయచేసి మీ భాషను ఎంచుకోండి:',
-        'en': 'Welcome to AgriNexus AI! I will help you with your farming. Please choose your language:'
+        'hi': 'नमस्ते! AgriNexus AI में आपका स्वागत है।\n\nयह AWS 10,000 AIdeas प्रतियोगिता का डेमो है। Voice/Photo/Nudges allowlist पर हैं — full access के लिए GitHub issue खोलें।\n\nकृपया अपनी भाषा चुनें:',
+        'mr': 'नमस्कार! AgriNexus AI मध्ये आपले स्वागत आहे.\n\nहा AWS 10,000 AIdeas स्पर्धेसाठीचा डेमो आहे. Voice/Photo/Nudges allowlist वर आहेत — full access साठी GitHub issue उघडा.\n\nकृपया तुमची भाषा निवडा:',
+        'te': 'నమస్కారం! AgriNexus AI కి స్వాగతం.\n\nఇది AWS 10,000 AIdeas పోటీ కోసం డెమో. Voice/Photo/Nudges allowlist లో ఉన్నాయి — full access కోసం GitHub issue పెట్టండి.\n\nదయచేసి మీ భాషను ఎంచుకోండి:',
+        'en': 'Welcome to AgriNexus AI!\n\nThis is a demo built for AWS 10,000 AIdeas. Voice/photo/nudges are allowlisted — request full access via a GitHub issue.\n\nPlease choose your language:'
     },
     'ask_location': {
         'hi': 'बढ़िया! अब मुझे बताएं आप किस जिले में हैं?',
@@ -220,6 +220,8 @@ def handle_onboarding(phone_number: str, message_text: str, profile: Optional[Di
 नमस्कार! AgriNexus AI मध्ये आपले स्वागत आहे.
 నమస్కారం! AgriNexus AI కి స్వాగతం.
 
+Demo note: Built for AWS 10,000 AIdeas. Voice/photo/nudges are allowlisted — request full access via GitHub issues.
+
 Please choose your language / कृपया अपनी भाषा चुनें:"""
         return {
             'type': 'list',
@@ -272,6 +274,8 @@ Please choose your language / कृपया अपनी भाषा चु�
 नमस्ते! AgriNexus AI में आपका स्वागत है।
 नमस्कार! AgriNexus AI मध्ये आपले स्वागत आहे.
 నమస్కారం! AgriNexus AI కి స్వాగతం.
+
+Demo note: Built for AWS 10,000 AIdeas. Voice/photo/nudges are allowlisted — request full access via GitHub issues.
 
 Please choose your language / कृपया अपनी भाषा चुनें:"""
             return {
