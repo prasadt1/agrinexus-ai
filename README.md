@@ -128,37 +128,6 @@ AgriNexus is a working system with production observability — not a prototype.
 
 **Diagrams:** See [architecture/diagrams.md](architecture/diagrams.md) for Mermaid diagrams (high-level, webhook, text/voice/image flows, nudge flow). Full design: [architecture.md](architecture.md).
 
-## Features
-
-### 1. Multi-Modal Input
-- **Text**: Type questions in Hindi, Marathi, Telugu, or English
-- **Voice**: Send voice notes - automatically transcribed and processed
-- **Images**: Send crop photos for pest/disease identification
-
-### 2. Intelligent Responses
-- **RAG System**: Answers based on FAO manuals + Indian agricultural research
-- **Source Citations**: Every response includes references
-- **Multi-Language**: Responds in user's preferred language
-- **Voice Output**: Optional audio responses (Hindi, Marathi, English)
-
-### 3. Behavioral Nudges
-- **Weather-Based**: Spray reminders when conditions are optimal
-- **Closed-Loop**: Tracks completion with "हो गया" (done) responses
-- **Smart Reminders**: T+24h and T+48h follow-ups if not completed (**skipped** when profile **`demo_tier`** is **`public`**)
-- **Auto-Expiry**: T+72h auto-expiry if no response (EXPIRED status)
-- **Duplicate Prevention**: Max 1 nudge per activity per day
-
-### 4. Vision Analysis
-- **Pest Identification**: Bollworm, aphids, whitefly, etc.
-- **Disease Detection**: Leaf curl, wilt, blight, etc.
-- **Nutrient Deficiency**: Nitrogen, potassium deficiencies
-- **Actionable Advice**: Specific pesticides, dosages, timing, prevention
-
-### 5. Safety Features
-- **Domain Restrictions**: Only answers farming questions (no medical advice)
-- **Guardrails**: Blocks banned pesticides (optional)
-- **Error Handling**: Dialect-aware error messages via DLQ
-
 ---
 
 ## Quick start (deploy your own)
@@ -281,62 +250,14 @@ User: हो गया
 Bot: बढ़िया! आपने स्प्रे कर दिया। धन्यवाद!
 ```
 
-## Project Structure
+## Project Structure (quick pointers)
 
-```
-.
-├── template-week2.yaml              # SAM template (complete system)
-├── README.md                        # This file
-├── architecture.md                  # Full architecture document
-├── architecture/                    # Diagrams and quick reference
-│   ├── README.md
-│   └── diagrams.md                 # Mermaid: flows, webhook, nudge
-├── docs/
-│   ├── E2E-TEST-GUIDE.md           # End-to-end test guide (WhatsApp + integration)
-│   ├── CODE-WALKTHROUGH.md         # Component walkthrough
-│   └── operations/
-│       └── RUNBOOK-ALERTS.md       # CloudWatch alarms, DLQ, web abuse envelope
-├── E2E-TEST-CHECKLIST.md           # Pre-demo manual checklist + automated smoke pointer
-├── .github/workflows/
-│   ├── ci.yml                      # PR/push: fast pytest + sam validate
-│   └── aws-smoke.yml               # Optional: workflow_dispatch golden KB tests (secrets)
-├── scripts/
-│   ├── README.md                   # Which scripts are shared vs local
-│   ├── e2e-smoke.sh                # SAM validate + fast pytest + optional KB + web curl
-│   ├── reset-profile.sh            # Non-interactive DynamoDB user reset (wraps delete-user-data)
-│   ├── delete-user-data.sh         # Delete USER#* items for a phone (supports --yes)
-│   ├── clear-nudges.sh             # Clear NUDGE# rows for a user
-│   ├── reset-onboard-and-demo.sh   # Reset profile + optional webhook demo flow
-│   ├── demo-nudge-loop.sh          # Scripted nudge / reminder demo (uses demo.env)
-│   ├── test-complete-flow.sh       # Long synthetic webhook flow (voice/nudge/reminder)
-│   ├── deploy-web-demo.sh          # SAM deploy + notes for static demo hosting
-│   ├── push-to-public.sh           # Confirmation gate before git push public → open repo
-│   ├── create-bedrock-guardrail.sh
-│   └── … (other demo helpers; see scripts/README.md)
-├── src/
-│   ├── webhook/                    # WhatsApp webhook handler
-│   ├── web-chat/                   # Public browser API (Bedrock RAG, rate limits)
-│   ├── processor/                  # Message processor with RAG + voice + vision
-│   ├── voice/                      # Voice input (Transcribe)
-│   ├── dlq/                        # Dead letter queue handler
-│   ├── weather/                    # Weather poller
-│   └── nudge/                      # Nudge engine (sender, reminder, detector)
-├── statemachine/
-│   └── nudge-workflow.asl.json     # Step Functions workflow
-├── tests/
-│   ├── test_golden_questions.py    # RAG tests
-│   ├── test_voice_*.py             # Voice tests
-│   └── test_vision.py              # Vision tests
-└── data/
-    └── fao-pdfs/                    # Knowledge base sources
-        └── en/
-            ├── cotton-production.pdf
-            ├── ipm-guide.pdf
-            └── new-sources/         # Indian agricultural research
-                ├── icar-cicr-pest-disease-advisory-2024.pdf
-                ├── pau-package-of-practices-kharif-2024.pdf
-                └── ...
-```
+- **`template-week2.yaml`**: full SAM/IaC template
+- **`src/`**: Lambda handlers (webhook, processor, web-chat, voice, nudge, weather, DLQ, health)
+- **`docs/`**: E2E guide, walkthroughs, runbooks, monitoring/metrics
+- **`tests/`**: fast unit tests + optional integration tests
+
+For a deeper walkthrough, see [`docs/CODE-WALKTHROUGH.md`](docs/CODE-WALKTHROUGH.md).
 
 ## Testing
 
@@ -392,7 +313,8 @@ See [docs/E2E-TEST-GUIDE.md](docs/E2E-TEST-GUIDE.md) for testing onboarding, Q&A
 
 Then send a new language choice in WhatsApp to restart onboarding.
 
-## Architecture Details
+<details>
+<summary><strong>Architecture Details</strong></summary>
 
 ### Lambda Functions
 1. **WebhookHandler**: Validates signature, **per-user rate limit** (before enqueue), deduplicates, stores short-lived **`MSG#*`** rows for the response detector, routes **text/image** to the message queue and **audio** to the voice queue; for **audio**, sends localized **voice-received ACK** via WhatsApp (before enqueue) using the Common layer + secrets
@@ -434,6 +356,8 @@ Weather Poller → Step Functions → Nudge Sender → WhatsApp
                                 → EventBridge Scheduler (T+24h, T+48h)
                                 → Reminder Sender → WhatsApp
 ```
+
+</details>
 
 ## Cost Breakdown
 
