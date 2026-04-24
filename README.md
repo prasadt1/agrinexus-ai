@@ -103,12 +103,13 @@ AgriNexus is a working system with production observability — not a prototype.
 | Vision pipeline (Claude Vision) | ✅ pest/disease schema validated + non-agri gating |
 | Closed-loop behavioral nudges | ✅ T+24h/T+48h follow-ups + cancel-on-DONE |
 | Test-to-code ratio | **64%** |
-| Infrastructure-as-Code resources | **24** (SAM) |
+| Infrastructure-as-Code resources | **31** (SAM) |
 | Architecture Decision Records | **8** |
 | EARS requirements traced to code | **100+** |
 | CI/CD | ✅ GitHub Actions (`ci.yml` + `aws-smoke.yml`) |
 
 **Metrics & alarms:** full breakdown in [`docs/METRICS-AND-MONITORING.md`](docs/METRICS-AND-MONITORING.md) (7-day snapshot, 9 alarms, cost controls).
+**Metric audit:** see [`docs/ACCURATE-METRICS.md`](docs/ACCURATE-METRICS.md) for SAM resource counts and how to interpret the test-to-code ratio.
 
 **Judge note:** Live URLs are either directly linked above or exposed via CloudFormation outputs (`WebhookUrl`, `WebChatHealthUrl`) so reviewers can verify without us hardcoding stack-specific API ids in the README.
 
