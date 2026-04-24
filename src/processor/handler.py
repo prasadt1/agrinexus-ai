@@ -817,7 +817,8 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             if text:
                 # HELP must work even during onboarding (judges try it immediately).
                 if text.strip().upper() in ['HELP', 'मदद', 'मदत', 'సహాయం']:
-                    dialect = (profile or {}).get('dialect', 'hi')
+                    # During onboarding (before dialect is chosen) default HELP to English for demos.
+                    dialect = (profile or {}).get('dialect') or 'en'
                     _send_help(from_number, dialect)
                     continue
 
