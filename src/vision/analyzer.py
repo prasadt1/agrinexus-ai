@@ -7,6 +7,8 @@ import json
 import base64
 import os
 import io
+import struct
+import zlib
 from typing import Any, Dict, Optional
 
 bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
@@ -19,6 +21,11 @@ def _looks_like_logo_or_illustration(image_bytes: bytes) -> bool:
     try:
         from PIL import Image  # type: ignore
     except Exception:
+        try:
+            if image_bytes[:8] == b"\x89PNG\r\n\x1a\n":
+                return _png_looks_like_logo(image_bytes)
+        except Exception:
+            return False
         return False
     try:
         img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
@@ -43,6 +50,105 @@ def _looks_like_logo_or_illustration(image_bytes: bytes) -> bool:
         return False
     except Exception:
         return False
+
+
+def _png_looks_like_logo(png_bytes: bytes) -> bool:
+    # PNG signature already checked by caller.
+    pos = 8
+    width = height = None
+    bit_depth = color_type = None
+    idat = bytearray()
+    while pos + 8 <= len(png_bytes):
+        length = struct.unpack(">I", png_bytes[pos : pos + 4])[0]
+        ctype = png_bytes[pos + 4 : pos + 8]
+        pos += 8
+        if pos + length + 4 > len(png_bytes):
+            break
+        data = png_bytes[pos : pos + length]
+        pos += length + 4
+        if ctype == b"IHDR":
+            if length < 13:
+                return False
+            width = struct.unpack(">I", data[0:4])[0]
+            height = struct.unpack(">I", data[4:8])[0]
+            bit_depth = data[8]
+            color_type = data[9]
+        elif ctype == b"IDAT":
+            idat.extend(data)
+        elif ctype == b"IEND":
+            break
+
+    if not width or not height or bit_depth != 8 or color_type not in (2, 6):
+        return False
+    raw = zlib.decompress(bytes(idat))
+    bpp = 3 if color_type == 2 else 4
+    stride = width * bpp
+    expected = height * (1 + stride)
+    if len(raw) < expected:
+        return False
+
+    def paeth(a: int, b: int, c: int) -> int:
+        p = a + b - c
+        pa = abs(p - a)
+        pb = abs(p - b)
+        pc = abs(p - c)
+        if pa <= pb and pa <= pc:
+            return a
+        if pb <= pc:
+            return b
+        return c
+
+    pixels_sampled = 0
+    whiteish = 0
+    colors = set()
+    step = max(1, (width * height) // 5000)
+
+    prev = bytearray(stride)
+    idx = 0
+    px_index = 0
+    for _y in range(height):
+        f = raw[idx]
+        idx += 1
+        line = bytearray(raw[idx : idx + stride])
+        idx += stride
+
+        if f == 1:
+            for i in range(stride):
+                left = line[i - bpp] if i >= bpp else 0
+                line[i] = (line[i] + left) & 0xFF
+        elif f == 2:
+            for i in range(stride):
+                line[i] = (line[i] + prev[i]) & 0xFF
+        elif f == 3:
+            for i in range(stride):
+                left = line[i - bpp] if i >= bpp else 0
+                up = prev[i]
+                line[i] = (line[i] + ((left + up) // 2)) & 0xFF
+        elif f == 4:
+            for i in range(stride):
+                left = line[i - bpp] if i >= bpp else 0
+                up = prev[i]
+                up_left = prev[i - bpp] if i >= bpp else 0
+                line[i] = (line[i] + paeth(left, up, up_left)) & 0xFF
+
+        for x in range(0, stride, bpp):
+            if (px_index % step) == 0:
+                r = line[x]
+                g = line[x + 1]
+                b = line[x + 2]
+                pixels_sampled += 1
+                if r > 245 and g > 245 and b > 245:
+                    whiteish += 1
+                colors.add((r // 8, g // 8, b // 8))
+            px_index += 1
+
+        prev = line
+
+    if pixels_sampled <= 0:
+        return True
+    white_ratio = whiteish / pixels_sampled
+    approx_unique_colors = len(colors)
+    return white_ratio >= 0.70 and approx_unique_colors <= 180
 
 
 def _non_photo_message(dialect: str) -> str:
