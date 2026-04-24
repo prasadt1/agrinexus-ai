@@ -60,10 +60,10 @@ DISTRICT_COORDS = {
 # Onboarding messages by dialect
 ONBOARDING_MESSAGES = {
     'welcome': {
-        'hi': 'नमस्ते! AgriNexus AI में आपका स्वागत है।\n\nयह AWS 10,000 AIdeas प्रतियोगिता का डेमो है। Voice/Photo और Nudges allowlist पर हैं — और public demo में nudge follow-up reminders (T+24h/T+48h) सीमित हो सकते हैं। Full access के लिए GitHub issue खोलें।\n\nकृपया अपनी भाषा चुनें:',
-        'mr': 'नमस्कार! AgriNexus AI मध्ये आपले स्वागत आहे.\n\nहा AWS 10,000 AIdeas स्पर्धेसाठीचा डेमो आहे. Voice/Photo आणि Nudges allowlist वर आहेत — आणि public demo मध्ये nudge follow-up reminders (T+24h/T+48h) मर्यादित असू शकतात. Full access साठी GitHub issue उघडा.\n\nकृपया तुमची भाषा निवडा:',
-        'te': 'నమస్కారం! AgriNexus AI కి స్వాగతం.\n\nఇది AWS 10,000 AIdeas పోటీ కోసం డెమో. Voice/Photo మరియు Nudges allowlist లో ఉన్నాయి — అలాగే public demo లో nudge follow-up reminders (T+24h/T+48h) పరిమితం అయ్యే అవకాశం ఉంది. Full access కోసం GitHub issue పెట్టండి.\n\nదయచేసి మీ భాషను ఎంచుకోండి:',
-        'en': 'Welcome to AgriNexus AI!\n\nThis is a demo built for AWS 10,000 AIdeas. Voice/photo and nudges are allowlisted — and on the public demo, nudge follow-up reminders (T+24h/T+48h) may be limited. Request full access via a GitHub issue.\n\nPlease choose your language:'
+        'hi': 'नमस्ते! AgriNexus AI में आपका स्वागत है।\n\nयह AWS 10,000 AIdeas प्रतियोगिता का डेमो है। Voice/Photo और Nudges allowlist पर हैं — और public demo में nudge follow-up reminders (T+24h/T+48h) सीमित हो सकते हैं। Full access के लिए GitHub issue खोलें।\n\nटिप: सुविधाओं की सूची के लिए “HELP” भेजें।\n\nकृपया अपनी भाषा चुनें:',
+        'mr': 'नमस्कार! AgriNexus AI मध्ये आपले स्वागत आहे.\n\nहा AWS 10,000 AIdeas स्पर्धेसाठीचा डेमो आहे. Voice/Photo आणि Nudges allowlist वर आहेत — आणि public demo मध्ये nudge follow-up reminders (T+24h/T+48h) मर्यादित असू शकतात. Full access साठी GitHub issue उघडा.\n\nटिप: सुविधांची यादी पाहण्यासाठी “HELP” पाठवा.\n\nकृपया तुमची भाषा निवडा:',
+        'te': 'నమస్కారం! AgriNexus AI కి స్వాగతం.\n\nఇది AWS 10,000 AIdeas పోటీ కోసం డెమో. Voice/Photo మరియు Nudges allowlist లో ఉన్నాయి — అలాగే public demo లో nudge follow-up reminders (T+24h/T+48h) పరిమితం అయ్యే అవకాశం ఉంది. Full access కోసం GitHub issue పెట్టండి.\n\nటిప్: ఫీచర్ల జాబితా కోసం “HELP” పంపండి.\n\nదయచేసి మీ భాషను ఎంచుకోండి:',
+        'en': 'Welcome to AgriNexus AI!\n\nThis is a demo built for AWS 10,000 AIdeas. Voice/photo and nudges are allowlisted — and on the public demo, nudge follow-up reminders (T+24h/T+48h) may be limited. Request full access via a GitHub issue.\n\nTip: send “HELP” for the capability list.\n\nPlease choose your language:'
     },
     'ask_location': {
         'hi': 'बढ़िया! अब मुझे बताएं आप किस जिले में हैं?',
@@ -222,6 +222,8 @@ def handle_onboarding(phone_number: str, message_text: str, profile: Optional[Di
 
 Demo note: Built for AWS 10,000 AIdeas. Voice/photo and nudges are allowlisted (public demo may limit nudge follow-ups). Request full access via GitHub issues.
 
+Tip: Send HELP for the capability list.
+
 Please choose your language / कृपया अपनी भाषा चुनें:"""
         return {
             'type': 'list',
@@ -276,6 +278,8 @@ Please choose your language / कृपया अपनी भाषा चु�
 నమస్కారం! AgriNexus AI కి స్వాగతం.
 
 Demo note: Built for AWS 10,000 AIdeas. Voice/photo and nudges are allowlisted (public demo may limit nudge follow-ups). Request full access via GitHub issues.
+
+Tip: Send HELP for the capability list.
 
 Please choose your language / कृपया अपनी भाषा चुनें:"""
             return {
@@ -760,6 +764,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             # Check for HELP command
             if text.strip().upper() in ['HELP', 'मदद', 'मदत', 'సహాయం']:
+                request_url = "https://github.com/prasadt1/agrinexus-ai/issues/new?template=demo-request.md"
                 help_messages = {
                     'hi': '''🌾 AgriNexus AI - मदद
 
@@ -779,7 +784,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 • वॉइस नोट भेजें
 • मैं समझूंगा और जवाब दूंगा
 
-बस अपना सवाल टाइप करें या फोटो भेजें!''',
+बस अपना सवाल टाइप करें या फोटो भेजें!
+
+Full access (voice/photo/nudges): GitHub request → {request_url}''',
                     'mr': '''🌾 AgriNexus AI - मदत
 
 मी तुमच्या शेतीत मदत करू शकतो:
@@ -798,7 +805,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 • व्हॉइस नोट पाठवा
 • मी समजेन आणि उत्तर देईन
 
-फक्त तुमचा प्रश्न टाइप करा किंवा फोटो पाठवा!''',
+फक्त तुमचा प्रश्न टाइप करा किंवा फोटो पाठवा!
+
+Full access (voice/photo/nudges): GitHub request → {request_url}''',
                     'te': '''🌾 AgriNexus AI - సహాయం
 
 నేను మీ వ్యవసాయంలో సహాయం చేయగలను:
@@ -817,7 +826,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 • వాయిస్ నోట్ పంపండి
 • నేను అర్థం చేసుకుని సమాధానం ఇస్తాను
 
-మీ ప్రశ్న టైప్ చేయండి లేదా ఫోటో పంపండి!''',
+మీ ప్రశ్న టైప్ చేయండి లేదా ఫోటో పంపండి!
+
+Full access (voice/photo/nudges): GitHub request → {request_url}''',
                     'en': '''🌾 AgriNexus AI - Help
 
 I can help you with your farming:
@@ -836,9 +847,11 @@ I can help you with your farming:
 • Send voice note
 • I'll understand and respond
 
-Just type your question or send a photo!'''
+Just type your question or send a photo!
+
+Full access (voice/photo/nudges): GitHub request → {request_url}'''
                 }
-                send_whatsapp_message(from_number, help_messages.get(dialect, help_messages['hi']))
+                send_whatsapp_message(from_number, help_messages.get(dialect, help_messages['hi']).format(request_url=request_url))
                 continue
             
             # Check for DONE/NOT YET keywords (handled by response detector)
