@@ -17,6 +17,36 @@ secrets = boto3.client('secretsmanager', region_name='us-east-1')
 
 TEMP_BUCKET = os.environ.get('TEMP_AUDIO_BUCKET')
 
+def _looks_like_screenshot_or_ui(image_bytes: bytes) -> bool:
+    try:
+        from PIL import Image, ImageFilter  # type: ignore
+    except Exception:
+        return False
+    try:
+        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        w, h = img.size
+        if w < 96 or h < 96:
+            return False
+        target_w = 256
+        target_h = max(128, int(h * (target_w / float(w))))
+        small = img.resize((target_w, target_h))
+        gray = small.convert("L")
+        hist = gray.histogram()
+        total = float(sum(hist) or 1.0)
+        black_frac = sum(hist[0:20]) / total
+        white_frac = sum(hist[235:256]) / total
+        edges = gray.filter(ImageFilter.FIND_EDGES)
+        ehist = edges.histogram()
+        edge_total = float(sum(ehist) or 1.0)
+        edge_frac = sum(ehist[40:256]) / edge_total
+        if edge_frac > 0.16 and white_frac > 0.18 and black_frac > 0.008:
+            return True
+        if edge_frac > 0.22 and white_frac > 0.28:
+            return True
+        return False
+    except Exception:
+        return False
+
 def _looks_like_logo_or_illustration(image_bytes: bytes) -> bool:
     try:
         from PIL import Image  # type: ignore
@@ -308,7 +338,7 @@ def analyze_crop_image(
     language = language_map.get(dialect, "English")
     area = (district or "").strip() or "not specified"
 
-    if _looks_like_logo_or_illustration(image_bytes):
+    if _looks_like_screenshot_or_ui(image_bytes) or _looks_like_logo_or_illustration(image_bytes):
         msg = _non_photo_message(dialect)
         return {
             "diagnosis": "non_photo",
