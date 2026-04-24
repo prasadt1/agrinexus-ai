@@ -26,6 +26,10 @@ active farmers** on fully serverless AWS. Zero adoption friction:
 WhatsApp is installed on 500M+ Indian phones. Zero training: tap buttons 
 in your dialect, onboard in under 60 seconds.
 
+**Cost clarity:** the current pilot model is **~$53/month for 1,000 farmers**; 
+the headline **~$0.54/farmer/year** is the 10,000-farmer projection. 
+The detailed assumptions are in [Cost Breakdown](#cost-breakdown).
+
 **The differentiator:** The closed-loop nudge engine. Most agri-AI tools 
 stop at delivering advice. AgriNexus tracks whether the advice was acted 
 on — advice plus accountability, not just information.
@@ -65,12 +69,13 @@ on — advice plus accountability, not just information.
 ## Contents
 
 - [🏆 Finalist Quickstart](#-aws-builder-10000-aideas--top-50-finalist-emea--social-impact)
-- [Try It Yourself](#try-it-yourself)
 - [Production Evidence](#production-evidence)
+- [Try It Yourself](#try-it-yourself)
 - [Architecture](#architecture)
-- [Quick Start (Deploy)](#quick-start-deploy-your-own)
 - [Usage](#usage)
 - [Testing](#testing)
+- [Quick Start (Deploy)](#quick-start-deploy-your-own)
+- [Project Structure](#project-structure-quick-pointers)
 - [Cost Breakdown](#cost-breakdown)
 - [Honest Tradeoffs & Roadmap](#honest-tradeoffs--roadmap)
 - [Monitoring](#monitoring)
@@ -78,38 +83,10 @@ on — advice plus accountability, not just information.
 - [Development Workflow: Kiro AI](#development-workflow-kiro-ai)
 - [Documentation](#documentation)
 - [Beyond Agriculture: Productization Roadmap](#beyond-agriculture-productization-roadmap)
-- [License](#license)
 - [Acknowledgments](#acknowledgments)
+- [License](#license)
 
 ---
-
-## Try It Yourself
-
-Pick the web demo or WhatsApp experience.
-
-| **🌐 Web demo** | **💬 WhatsApp** |
-|--------------|--------------|
-| [Try web demo](https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html) (no phone number) | [Open WhatsApp (wa.me)](https://wa.me/4915120105731) |
-| **Includes:** Text Q&A (RAG), optional image | **Includes:** Onboarding + text (public); voice/photo/nudges (allowlisted) |
-| **Best for:** Instant tryout in a browser | **Best for:** Full channel UX (buttons, voice, nudges) |
-| **Privacy:** No login; anonymous `client_id` in browser storage for rate limits | **Privacy:** WhatsApp number required |
-| **Limits:** ~5 questions/hour per IP + client; API Gateway + WAF caps | **Limits:** Rich features are allowlisted |
-
-**WhatsApp access:** Text is open; voice/photo/nudges are available via the [demo request template](https://github.com/prasadt1/agrinexus-ai/issues/new?template=demo-request.md).
-
-**Phone format (international):** The `wa.me` link works globally in most regions. If it doesn’t open, save the number as `+49 151 2010 5731` and message “HELP”.
-
-**Data retention (summary):** Conversation rows written by the **processor** use a **90-day** TTL; short-lived **`MSG#*`** rows written by the **webhook** for the response detector use **7 days**; **WAMID** dedup keys use **24 hours**; **nudge** records use **180 days**. `demo_tier: public` limits **nudge follow-up scheduling**, not those TTLs. Details: [docs/testing/E2E-TEST-CHECKLIST.md](docs/testing/E2E-TEST-CHECKLIST.md) (section 6).
-
----
-
-## What it does (high level)
-
-- **Multi-modal input**: text, voice notes (Transcribe), crop images (Vision)
-- **Grounded answers**: Bedrock Knowledge Base RAG with citations (FAO + regional agronomy sources)
-- **Behavioral nudges**: weather-timed spray reminders + DONE/NOT YET loop with follow-ups (full tier)
-- **Multi-dialect**: Hindi, Marathi, Telugu, English
-- **Safety**: farming-domain guardrails, banned pesticide blocking (optional), abuse/cost controls
 
 ## Production Evidence
 
@@ -135,6 +112,26 @@ AgriNexus is a working system with production observability — not a prototype.
 
 **Judge note:** Live URLs are either directly linked above or exposed via CloudFormation outputs (`WebhookUrl`, `WebChatHealthUrl`) so reviewers can verify without us hardcoding stack-specific API ids in the README.
 
+---
+
+## Try It Yourself
+
+Pick the web demo or WhatsApp experience.
+
+| **🌐 Web demo** | **💬 WhatsApp** |
+|--------------|--------------|
+| [Try web demo](https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html) (no phone number) | [Open WhatsApp (wa.me)](https://wa.me/4915120105731) |
+| **Includes:** Text Q&A (RAG), optional image | **Includes:** Onboarding + text (public); voice/photo/nudges (allowlisted) |
+| **Best for:** Instant tryout in a browser | **Best for:** Full channel UX (buttons, voice, nudges) |
+| **Privacy:** No login; anonymous `client_id` in browser storage for rate limits | **Privacy:** WhatsApp number required |
+| **Limits:** ~5 questions/hour per IP + client; API Gateway + WAF caps | **Limits:** Rich features are allowlisted |
+
+**WhatsApp access:** Text is open; voice/photo/nudges are available via the [demo request template](https://github.com/prasadt1/agrinexus-ai/issues/new?template=demo-request.md).
+
+**Phone format (international):** The `wa.me` link works globally in most regions. If it doesn’t open, save the number as `+49 151 2010 5731` and message “HELP”.
+
+**Data retention (summary):** Conversation rows written by the **processor** use a **90-day** TTL; short-lived **`MSG#*`** rows written by the **webhook** for the response detector use **7 days**; **WAMID** dedup keys use **24 hours**; **nudge** records use **180 days**. `demo_tier: public` limits **nudge follow-up scheduling**, not those TTLs. Details: [docs/testing/E2E-TEST-CHECKLIST.md](docs/testing/E2E-TEST-CHECKLIST.md) (section 6).
+
 ## Architecture
 
 ![Architecture overview](docs/diagrams/builder-full-architecture.png)
@@ -151,7 +148,87 @@ AgriNexus is a working system with production observability — not a prototype.
 
 **Diagrams:** See [architecture/diagrams.md](architecture/diagrams.md) for Mermaid diagrams (high-level, webhook, text/voice/image flows, nudge flow). Full design: [docs/architecture.md](docs/architecture.md).
 
----
+## Usage
+
+### HELP Command
+Send `HELP` (or `मदद`, `मदत`, `సహాయం`) to see available features.
+
+### Text Questions
+```
+User: कपास में कीट कैसे नियंत्रित करें?
+Bot: कपास में कीटों को नियंत्रित करने के लिए...
+```
+
+### Voice Input
+Send a voice note asking your question - it will be transcribed and answered.
+
+### Image Analysis
+Send a photo of your crop - the bot will identify pests/diseases and provide recommendations.
+
+### Behavioral Nudges
+If you consent during onboarding, you'll receive weather-based spray reminders:
+```
+Bot: आज स्प्रे करने के लिए अच्छा मौसम है। हवा 8.5 km/h है और बारिश नहीं होगी। क्या आपने स्प्रे कर दिया?
+
+कृपया "हो गया" भेजें जब आप स्प्रे कर लें।
+
+User: हो गया
+Bot: बढ़िया! आपने स्प्रे कर दिया। धन्यवाद!
+```
+
+## Testing
+
+### CI (GitHub Actions)
+
+On every push/PR to `main`, **`.github/workflows/ci.yml`** runs fast unit tests (`tests/test_nudge_flow.py`, `tests/test_district_helplines.py`) and **`sam validate --lint`** on `template.yaml`. Optional **`aws-smoke.yml`** (`workflow_dispatch`) can run golden KB tests when repository secrets are configured.
+
+### One-command smoke (local or CI agent)
+
+From repo root:
+
+```bash
+./scripts/e2e-smoke.sh
+# Optional: export KNOWLEDGE_BASE_ID=... and WEB_CHAT_URL=https://...execute-api.../dev/chat
+```
+
+### Text RAG
+```bash
+# Integration tests call Bedrock; set a real KB ID or tests skip:
+export KNOWLEDGE_BASE_ID=YOUR_KB_ID
+pytest tests/test_golden_questions.py -v
+```
+Without **`KNOWLEDGE_BASE_ID`**, parametrized golden tests **skip** (see `tests/test_golden_questions.py`).
+
+### Voice Input
+```bash
+# Test with your own voice recording (language codes: hi-IN, mr-IN, te-IN, en-IN)
+python tests/test_voice_simple.py path/to/audio.mp3 hi-IN
+```
+
+### Vision Analysis
+```bash
+# Test with crop image
+python tests/test_vision.py path/to/image.jpg en cotton
+```
+
+### End-to-End Voice Round-Trip
+```bash
+# Voice in → Transcribe → RAG → Voice out
+python tests/test_voice_end_to_end.py
+```
+
+### End-to-End (All Features)
+
+See [docs/E2E-TEST-GUIDE.md](docs/E2E-TEST-GUIDE.md) for testing onboarding, Q&A, voice, vision, and nudges. For a **pre-demo pass/fail list**, use **[docs/testing/E2E-TEST-CHECKLIST.md](docs/testing/E2E-TEST-CHECKLIST.md)**.
+
+**Webhook scripts:** create **`scripts/demo.env`** (not committed) with at least **`WEBHOOK_URL`**, **`APP_SECRET`** (if signatures are on), and **`PHONE_NUMBER`**. Scripts such as **`reset-onboard-and-demo.sh`**, **`test-complete-flow.sh`**, and **`demo-nudge-loop.sh`** source it when present.
+
+### Reset profile / re-onboarding
+
+- **DynamoDB only (no Meta HTTP):** `./scripts/reset-profile.sh <your_e164_digits>` (digits only, no `+`; or set **`PHONE_NUMBER`** in `demo.env` and run with no args). Wraps **`delete-user-data.sh`** with confirmation skipped.
+- **Full scripted webhook flow:** `./scripts/reset-onboard-and-demo.sh --phone <digits>` (requires `WEBHOOK_URL`; see `usage()` in that script).
+
+Then send a new language choice in WhatsApp to restart onboarding.
 
 ## Quick start (deploy your own)
 
@@ -172,11 +249,11 @@ aws configure
 ### Deployment
 
 ```bash
-# 1. Deploy infrastructure (recommended: samconfig-week2.toml)
+# 1. Deploy infrastructure (recommended: samconfig.toml)
 sam build --template-file template.yaml
-sam deploy --config-file samconfig-week2.toml
+sam deploy --config-file samconfig.toml
 
-# Manual alternative (match parameters in samconfig-week2.toml, including TableStreamArn):
+# Manual alternative (match parameters in samconfig.toml, including TableStreamArn):
 # sam deploy --template-file .aws-sam/build/template.yaml \
 #   --stack-name agrinexus-week2 \
 #   --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
@@ -239,39 +316,10 @@ aws bedrock-agent start-ingestion-job \
 - **Webhook URL**: After deploy, use the stack output `WebhookUrl` (e.g. `https://<api-id>.execute-api.us-east-1.amazonaws.com/dev/webhook`). In Meta Developer Portal → WhatsApp → Configuration, set this as **Callback URL** and subscribe to **messages**.
 - **Verification (GET)**: Meta sends `hub.mode=subscribe`, `hub.verify_token`, `hub.challenge`. The webhook Lambda reads `agrinexus/whatsapp/verify-token` from Secrets Manager and returns `hub.challenge` if the token matches.
 - **Signatures (POST)**: Incoming message payloads are verified with `X-Hub-Signature-256` (HMAC-SHA256) using `agrinexus/whatsapp/app-secret`. Reject if invalid.
-
 - **Sending messages**: Webhook/processor/nudge Lambdas use Secrets Manager (`agrinexus/whatsapp/access-token`, `agrinexus/whatsapp/phone-number-id`) to call the WhatsApp Cloud API. The webhook sends a short “received / preparing reply” text quickly for inbound audio (before Transcribe).
-- **Deploy / test**: `sam build` / `sam deploy --config-file samconfig-week2.toml`, then run the E2E guide with `scripts/demo.env`.
+- **Deploy / test**: `sam build` / `sam deploy --config-file samconfig.toml`, then run the E2E guide with `scripts/demo.env`.
 
 Details (templates, cutover, troubleshooting): [docs/guides/WHATSAPP-SETUP-GUIDE.md](docs/guides/WHATSAPP-SETUP-GUIDE.md).
-
-## Usage
-
-### HELP Command
-Send `HELP` (or `मदद`, `मदत`, `సహాయం`) to see available features.
-
-### Text Questions
-```
-User: कपास में कीट कैसे नियंत्रित करें?
-Bot: कपास में कीटों को नियंत्रित करने के लिए...
-```
-
-### Voice Input
-Send a voice note asking your question - it will be transcribed and answered.
-
-### Image Analysis
-Send a photo of your crop - the bot will identify pests/diseases and provide recommendations.
-
-### Behavioral Nudges
-If you consent during onboarding, you'll receive weather-based spray reminders:
-```
-Bot: आज स्प्रे करने के लिए अच्छा मौसम है। हवा 8.5 km/h है और बारिश नहीं होगी। क्या आपने स्प्रे कर दिया?
-
-कृपया "हो गया" भेजें जब आप स्प्रे कर लें।
-
-User: हो गया
-Bot: बढ़िया! आपने स्प्रे कर दिया। धन्यवाद!
-```
 
 ## Project Structure (quick pointers)
 
@@ -281,60 +329,6 @@ Bot: बढ़िया! आपने स्प्रे कर दिया। 
 - **`tests/`**: fast unit tests + optional integration tests
 
 For a deeper walkthrough, see [`docs/CODE-WALKTHROUGH.md`](docs/CODE-WALKTHROUGH.md).
-
-## Testing
-
-### CI (GitHub Actions)
-
-On every push/PR to `main`, **`.github/workflows/ci.yml`** runs fast unit tests (`tests/test_nudge_flow.py`, `tests/test_district_helplines.py`) and **`sam validate --lint`** on `template.yaml`. Optional **`aws-smoke.yml`** (`workflow_dispatch`) can run golden KB tests when repository secrets are configured.
-
-### One-command smoke (local or CI agent)
-
-From repo root:
-
-```bash
-./scripts/e2e-smoke.sh
-# Optional: export KNOWLEDGE_BASE_ID=... and WEB_CHAT_URL=https://...execute-api.../dev/chat
-```
-
-### Text RAG
-```bash
-# Integration tests call Bedrock; set a real KB ID or tests skip:
-export KNOWLEDGE_BASE_ID=YOUR_KB_ID
-pytest tests/test_golden_questions.py -v
-```
-Without **`KNOWLEDGE_BASE_ID`**, parametrized golden tests **skip** (see `tests/test_golden_questions.py`).
-
-### Voice Input
-```bash
-# Test with your own voice recording (language codes: hi-IN, mr-IN, te-IN, en-IN)
-python tests/test_voice_simple.py path/to/audio.mp3 hi-IN
-```
-
-### Vision Analysis
-```bash
-# Test with crop image
-python tests/test_vision.py path/to/image.jpg en cotton
-```
-
-### End-to-End Voice Round-Trip
-```bash
-# Voice in → Transcribe → RAG → Voice out
-python tests/test_voice_end_to_end.py
-```
-
-### End-to-End (All Features)
-
-See [docs/E2E-TEST-GUIDE.md](docs/E2E-TEST-GUIDE.md) for testing onboarding, Q&A, voice, vision, and nudges. For a **pre-demo pass/fail list**, use **[docs/testing/E2E-TEST-CHECKLIST.md](docs/testing/E2E-TEST-CHECKLIST.md)**.
-
-**Webhook scripts:** create **`scripts/demo.env`** (not committed) with at least **`WEBHOOK_URL`**, **`APP_SECRET`** (if signatures are on), and **`PHONE_NUMBER`**. Scripts such as **`reset-onboard-and-demo.sh`**, **`test-complete-flow.sh`**, and **`demo-nudge-loop.sh`** source it when present.
-
-### Reset profile / re-onboarding
-
-- **DynamoDB only (no Meta HTTP):** `./scripts/reset-profile.sh <your_e164_digits>` (digits only, no `+`; or set **`PHONE_NUMBER`** in `demo.env` and run with no args). Wraps **`delete-user-data.sh`** with confirmation skipped.
-- **Full scripted webhook flow:** `./scripts/reset-onboard-and-demo.sh --phone <digits>` (requires `WEBHOOK_URL`; see `usage()` in that script).
-
-Then send a new language choice in WhatsApp to restart onboarding.
 
 <details>
 <summary><strong>Architecture Details</strong></summary>
@@ -611,7 +605,7 @@ See the [LICENSE](LICENSE) file for full details.
 
 - **Do not commit** API keys, tokens, app secrets, or real phone numbers. `scripts/demo.env` and `.aws-sam/` should stay gitignored.
 - **Webhook:** Meta **`X-Hub-Signature-256`** verification; **per-user message rate limit** before enqueueing work (see `template.yaml` **`RATE_LIMIT_*`**). **Web chat:** separate rate limits + API Gateway + WAF (see template and runbook).
-- Set **KnowledgeBaseId** (and related stack params) in **`samconfig-week2.toml`** or **`--parameter-overrides`** when deploying. Processor Lambdas receive **`KNOWLEDGE_BASE_ID`** from the template.
+- Set **KnowledgeBaseId** (and related stack params) in **`samconfig.toml`** or **`--parameter-overrides`** when deploying. Processor Lambdas receive **`KNOWLEDGE_BASE_ID`** from the template.
 - For **vision / voice** integration tests, set **`TEMP_AUDIO_BUCKET`** (and any other required env vars) as documented in the test files.
 
 ## Support
