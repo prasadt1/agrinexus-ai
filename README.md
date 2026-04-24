@@ -78,18 +78,6 @@ Pick the web demo or WhatsApp experience.
 
 **Data retention (summary):** Conversation rows written by the **processor** use a **90-day** TTL; short-lived **`MSG#*`** rows written by the **webhook** for the response detector use **7 days**; **WAMID** dedup keys use **24 hours**; **nudge** records use **180 days**. `demo_tier: public` limits **nudge follow-up scheduling**, not those TTLs. Details: [E2E-TEST-CHECKLIST.md](E2E-TEST-CHECKLIST.md) (section 6).
 
-### YouTube demo
-
-Full walkthrough (voice, RAG, nudges, and how the pieces fit):
-
-[![Watch on YouTube](https://img.shields.io/badge/YouTube-Watch%20walkthrough-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=Hr9EcblzkwI)
-
-[![Video preview — opens on YouTube](https://img.youtube.com/vi/Hr9EcblzkwI/hqdefault.jpg)](https://www.youtube.com/watch?v=Hr9EcblzkwI)
-
-Direct link: [https://www.youtube.com/watch?v=Hr9EcblzkwI](https://www.youtube.com/watch?v=Hr9EcblzkwI)
-
-**Competition / article:** [AWS 10,000 AIdeas — AgriNexus finalist story on AWS Builder](https://builder.aws.com/content/3C8hBRTcsRuQrHzE3Pq243yhXTF/aideas-finalist-agrinexus-ai) (external).
-
 ---
 
 ## What it does (high level)
@@ -108,8 +96,6 @@ AgriNexus is a working system with full production observability — not a proto
 
 | Endpoint | Status | URL |
 | --- | --- | --- |
-| WhatsApp Business number | ✅ Live | [wa.me/4915120105731](https://wa.me/4915120105731) |
-| Web demo (public) | ✅ Live | [demo.agrinexus-ai.farm](https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html) |
 | Webhook API (Meta verified) | ✅ Live | API Gateway + WAF |
 | Weather API integration | ✅ Live | OpenWeatherMap via Secrets Manager |
 
