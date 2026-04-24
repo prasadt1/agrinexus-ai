@@ -26,6 +26,9 @@ docs/diagrams/d2/out/
 # Kiro/agent specs (internal planning; keep local for public repo)
 .kiro/
 
+# Local scratch (never commit)
+.local-untracked/
+
 # Python cache
 __pycache__/
 *.pyc
@@ -71,6 +74,12 @@ PRE-COMMIT-*.md
 ROUND-3-*.md
 AGENTS.md
 design.md.bak
+
+# Session / one-off reports (keep local)
+NUDGE-*-REPORT.md
+VISION-QUALITY-GATE-ANALYSIS.md
+README-GAP-ANALYSIS.md
+README-POLISH-COMPLETE.md
 
 # Old/unused templates and configs
 template-simple.yaml
