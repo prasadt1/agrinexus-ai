@@ -1,4 +1,4 @@
-![AgriNexus AI — system overview](docs/diagrams/builder-full-architecture.png)
+![AgriNexus AI — From advice to action on WhatsApp](docs/visuals/hero-banner.png)
 
 # AgriNexus AI – WhatsApp Agricultural Advisory
 
@@ -212,6 +212,8 @@ These are real numbers from the running production stack — not projections.
 > All numbers above are **verifiable in the repository and live CloudWatch dashboards** — see [SAM template](template-week2.yaml), [ADRs](docs/adr), [EARS requirements](requirements.md), [CI workflows](.github/workflows), and the [full metrics report](docs/METRICS-AND-MONITORING.md). Cost figures at scale (about $0.54/farmer/year at 10K) are **modeled**; current production costs (about $1.70/day, about $53/month) are **real** — see [finops-public.md](docs/finops-public.md).
 
 ## Architecture
+
+![Architecture overview](docs/diagrams/builder-full-architecture.png)
 
 - **Onboarding**: language → district (**Latur**, **Jalna**, **Nagpur**) → crop → nudge consent (`src/processor/handler.py`).
 - **Serverless**: Lambda, DynamoDB, SQS, EventBridge Scheduler, Step Functions
