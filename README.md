@@ -127,7 +127,7 @@ AgriNexus is a working system with production observability — not a prototype.
 | Closed-loop behavioral nudges | ✅ T+24h/T+48h follow-ups + cancel-on-DONE |
 | Test-to-code ratio | **64%** ([metrics](docs/IMPLEMENTATION-QUALITY-METRICS.md#1-test-coverage)) |
 | Infrastructure-as-Code resources | **34** ([SAM template](template-week2.yaml)) |
-| Architecture Decision Records | **8** ([docs/adr/](docs/adr/)) |
+| Architecture Decision Records | **9** ([docs/adr/](docs/adr/)) |
 | EARS requirements traced to code | **144** ([docs/requirements.md](docs/requirements.md)) |
 | CI/CD | ✅ GitHub Actions ([`.github/workflows/`](.github/workflows/)) |
 
