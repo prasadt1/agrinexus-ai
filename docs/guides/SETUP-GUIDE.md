@@ -1,6 +1,6 @@
 # Complete Setup Guide - Step by Step
 
-For **WhatsApp + nudges + voice** deployment, prefer **`README.md`**, **`CLAUDE.md`**, and **`template-week2.yaml`**. This guide mixes general tooling setup with older stack references—verify any Bedrock/OpenSearch cost lines against **`README.md`**.
+For **WhatsApp + nudges + voice** deployment, prefer **`README.md`**, **`CLAUDE.md`**, and **`template.yaml`**. This guide mixes general tooling setup with older stack references—verify any Bedrock/OpenSearch cost lines against **`README.md`**.
 
 ## Step 1: Install Homebrew (if needed)
 
@@ -354,7 +354,7 @@ Use **`dashboards/cloudwatch-dashboard.json`** from the CloudWatch console (**Da
 To enable real weather:
 
 1. Create an OpenWeatherMap API key.
-2. Deploy or update the Weather poller with `WEATHER_API_KEY` and `MOCK_WEATHER=false` (see `template-week2.yaml`).
+2. Deploy or update the Weather poller with `WEATHER_API_KEY` and `MOCK_WEATHER=false` (see `template.yaml`).
 
 **Note:** Use `MOCK_WEATHER=true` only for deterministic spray nudge demos.
 

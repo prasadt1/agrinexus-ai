@@ -118,7 +118,7 @@ pytest tests/test_nudge_flow.py -v
 
 ### CloudFormation/SAM Template Quality
 
-**File**: `template-week2.yaml` (722 lines)
+**File**: `template.yaml` (722 lines)
 
 #### 2.1 Resources Defined
 - **24 AWS Resources** (CloudFormation types)
@@ -206,7 +206,7 @@ Amazon States Language (ASL) definition:
 
 **Deployment Commands**:
 ```bash
-sam build --template template-week2.yaml
+sam build --template template.yaml
 sam deploy --config-file samconfig-week2.toml
 ```
 
@@ -226,7 +226,7 @@ sam deploy --config-file samconfig-week2.toml
 
 **1. Build Phase**:
 ```bash
-sam build --template template-week2.yaml
+sam build --template template.yaml
 # - Validates CloudFormation syntax
 # - Packages Lambda functions
 # - Installs dependencies from requirements.txt
@@ -235,7 +235,7 @@ sam build --template template-week2.yaml
 
 **2. Validation Phase**:
 ```bash
-sam validate --template template-week2.yaml
+sam validate --template template.yaml
 # - Checks CloudFormation schema
 # - Validates resource references
 # - Ensures IAM policies are well-formed
@@ -359,7 +359,7 @@ agrinexus-ai/
 │   ├── demo-nudge-loop.sh        # Nudge testing
 │   └── clear-nudges.sh           # Cleanup
 ├── dashboards/                   # CloudWatch dashboard JSON
-├── template-week2.yaml           # SAM/CloudFormation (722 lines)
+├── template.yaml           # SAM/CloudFormation (722 lines)
 ├── samconfig-week2.toml          # Deployment config
 ├── docs/requirements.md               # EARS requirements (100+)
 ├── docs/architecture.md               # Full architecture doc
@@ -380,7 +380,7 @@ agrinexus-ai/
 - `nudge/`: Nudge logic separated into sender, reminder, detector
 
 **3. Configuration Management**:
-- Environment variables in `template-week2.yaml`
+- Environment variables in `template.yaml`
 - Secrets in AWS Secrets Manager (never committed)
 - Feature flags: `USE_NUDGE_TEMPLATE`, `MOCK_WEATHER`, `APPEND_DISTRICT_HELPLINE`
 
@@ -393,7 +393,7 @@ agrinexus-ai/
 
 | File | Purpose | Lines | Quality Indicator |
 |------|---------|-------|-------------------|
-| `template-week2.yaml` | Infrastructure definition | 722 | 24 AWS resources, parameterized |
+| `template.yaml` | Infrastructure definition | 722 | 24 AWS resources, parameterized |
 | `docs/requirements.md` | EARS requirements | 2,500+ | 100+ requirements, traceable |
 | `docs/architecture.md` | System design | 3,000+ | Complete architecture doc |
 | `README.md` | Project overview | 800+ | Quick start, features, cost breakdown |
@@ -654,7 +654,7 @@ https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html
 | **Test Coverage** | Test categories | 5/5 | RAG, Voice, Vision, Nudge, Integration |
 | **Test Coverage** | Parametrized tests | ✅ | 50+ golden questions |
 | **IaC Quality** | Resources defined | 24 | CloudFormation template |
-| **IaC Quality** | Lines of IaC | 794 | template-week2.yaml + ASL |
+| **IaC Quality** | Lines of IaC | 794 | template.yaml + ASL |
 | **IaC Quality** | Best practices | ✅ | Parameterized, least privilege, monitoring |
 | **CI/CD** | Deployment automation | SAM CLI | Manual but production-grade |
 | **CI/CD** | Validation | ✅ | sam validate, CloudFormation change sets |
@@ -683,7 +683,7 @@ https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html
    - Evidence: `tests/test_golden_questions.py` line 360
 
 3. **"Infrastructure as Code with 24 AWS resources"**
-   - Evidence: `template-week2.yaml` (722 lines)
+   - Evidence: `template.yaml` (722 lines)
 
 4. **"CloudWatch Dashboard with 9 widgets and custom metrics"**
    - Evidence: `aws cloudwatch list-dashboards` → AgriNexus-Operations-dev
@@ -695,7 +695,7 @@ https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html
    - Evidence: `find docs -name "*.md" | wc -l`
 
 7. **"X-Ray distributed tracing enabled"**
-   - Evidence: `template-week2.yaml` line 43 (`Tracing: Active`)
+   - Evidence: `template.yaml` line 43 (`Tracing: Active`)
 
 8. **"Production-grade deployment with SAM CLI"**
    - Evidence: `samconfig-week2.toml`, CloudFormation change sets

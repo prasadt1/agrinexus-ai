@@ -310,7 +310,7 @@ For the full production evidence summary, see [README — Production Evidence](.
 
 ### SAM resources (Infrastructure-as-Code)
 
-Counted from `template-week2.yaml` as **non-`String`** entries under `Resources`.
+Counted from `template.yaml` as **non-`String`** entries under `Resources`.
 
 **Total:** **31** resources
 

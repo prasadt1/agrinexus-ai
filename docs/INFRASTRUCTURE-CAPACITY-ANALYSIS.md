@@ -18,7 +18,7 @@ The AgriNexus AI infrastructure is **ready to handle public demo traffic** with 
 ## 1. Current Rate Limits
 
 ### 1.1 WhatsApp Webhook
-**Configuration** (`template-week2.yaml`):
+**Configuration** (`template.yaml`):
 ```yaml
 RATE_LIMIT_MESSAGES: "10"  # Max messages per user per hour
 RATE_LIMIT_WINDOW_SECONDS: "3600"  # 1 hour window
@@ -43,7 +43,7 @@ WEB_RATE_LIMIT_WINDOW: "3600"  # 1 hour
 - Uses DynamoDB with atomic increments
 - Pre-checks both identifiers before incrementing (prevents partial increments)
 
-**Edge Protection** (`template-week2.yaml`):
+**Edge Protection** (`template.yaml`):
 ```yaml
 # API Gateway throttling
 ThrottlingRateLimit: 2  # 2 req/sec
@@ -207,7 +207,7 @@ Limit: 300  # 300 requests / 5 minutes per IP
 ## 6. Monitoring & Alerts
 
 ### 6.1 Existing Alarms
-**Cost Alarm** (`template-week2.yaml`):
+**Cost Alarm** (`template.yaml`):
 ```yaml
 CostAlarm:
   Threshold: 20  # Alert if daily cost >= $20

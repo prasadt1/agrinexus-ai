@@ -89,7 +89,7 @@ This file tracks notable issues encountered while building and deploying AgriNex
 ### 2026-03-05 — VoiceProcessor Lambda timeout
 
 - **Symptom**: 60-second polling loop vs 30-second Lambda timeout - voice transcription would timeout before completion.
-- **Fix**: Increased VoiceProcessor timeout to 90 seconds in template-week2.yaml.
+- **Fix**: Increased VoiceProcessor timeout to 90 seconds in template.yaml.
 - **Impact**: Voice messages now process successfully without timeout errors.
 
 ### 2026-03-05 — Image format detection

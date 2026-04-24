@@ -23,7 +23,7 @@ Add **edge-layer controls** in infrastructure:
   - Limit: **300 requests / 5 minutes**
   - Scoped down to requests whose `UriPath` ends with `/chat`
 
-These controls are implemented in `template-week2.yaml` and deployed with the existing SAM stack.
+These controls are implemented in `template.yaml` and deployed with the existing SAM stack.
 
 ### Consequences
 - **Pros**

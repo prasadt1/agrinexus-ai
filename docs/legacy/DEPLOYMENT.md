@@ -1,6 +1,6 @@
 # AgriNexus AI - Week 1 Deployment Guide
 
-> **2026 note:** Active production and WhatsApp demos use **`template-week2.yaml`**, **`samconfig-week2.toml`**, and the flow in **`README.md`** / **`CLAUDE.md`**. This file is the **legacy Week 1** stack (`setup-week1.sh`, `agrinexus-dev`). Use it only if you are reproducing the original DynamoDB+KB bootstrap; otherwise deploy Week 2.
+> **2026 note:** Active production and WhatsApp demos use **`template.yaml`**, **`samconfig.toml`**, and the flow in **`README.md`** / **`CLAUDE.md`**. This file is the **legacy Week 1** stack (`setup-week1.sh`, `agrinexus-dev`). Use it only if you are reproducing the original DynamoDB+KB bootstrap; otherwise deploy Week 2.
 
 ## Quick Start
 

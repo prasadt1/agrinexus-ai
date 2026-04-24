@@ -21,7 +21,7 @@ After AWS GenAI Competition finalist announcement, implemented critical fixes fo
 #### Optional Bedrock scout line for nudge hints
 - **What**: When `NUDGE_BEDROCK_LINER` is `true`, `invoke_nudge_focus_line()` calls Amazon Bedrock Runtime (Claude 3 Haiku by default) to produce a single seasonal scouting sentence; system prompt disallows product/chemical names and doses and allows KVK/dealer-style wording. If the call fails or the flag is off or unset, the static `context_hint` from `nudge_copy` is used unchanged.
 - **Files**: `src/nudge/bedrock_liner.py`; `src/nudge/nudge_copy.py` — `build_nudge_message(..., context_hint_override=None)`; `src/nudge/sender.py` — attempts Bedrock override only when the flag is enabled, then passes `context_hint_override` into `build_nudge_message`.
-- **Infrastructure** (`template-week2.yaml`): `NUDGE_BEDROCK_LINER` (default `false`), `NUDGE_LINER_MODEL_ID` (default Haiku inference profile ID); IAM `bedrock:InvokeModel` on `arn:aws:bedrock:${Region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`; `NudgeSender` **Timeout** set to **60s** to accommodate Bedrock latency.
+- **Infrastructure** (`template.yaml`): `NUDGE_BEDROCK_LINER` (default `false`), `NUDGE_LINER_MODEL_ID` (default Haiku inference profile ID); IAM `bedrock:InvokeModel` on `arn:aws:bedrock:${Region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0`; `NudgeSender` **Timeout** set to **60s** to accommodate Bedrock latency.
 - **Operations**: Deploy as usual; leave `NUDGE_BEDROCK_LINER=false` for static hints only. Set to `true` to enable generated one-liners after verifying Haiku access in the account/region.
 
 ### S3 Vector Store Migration (April 4, 2026)
@@ -52,7 +52,7 @@ After AWS GenAI Competition finalist announcement, implemented critical fixes fo
 ### Voice ACK Latency Optimization - Webhook Path (April 5, 2026)
 - **Issue**: Voice ACK message ("We received your message...") took 5-6 seconds to arrive because it was sent from VoiceProcessor Lambda after SQS delivery, cold start, media download, S3 upload, and Transcribe job start.
 - **Fix**: Moved ACK to webhook handler immediately after deduplication check (before SQS enqueue). Added `VOICE_RECEIVED_ACK` to `common/whatsapp.py`. Webhook now sends ACK for audio messages before any processing. Added CommonLayer to webhook Lambda for WhatsApp API access. VoiceProcessor no longer sends ACK.
-- **Files**: `src/webhook/handler.py`, `src/common/whatsapp.py`, `template-week2.yaml`, `src/webhook/requirements.txt`
+- **Files**: `src/webhook/handler.py`, `src/common/whatsapp.py`, `template.yaml`, `src/webhook/requirements.txt`
 - **Impact**: ACK latency reduced from 5-6s to 1-2s (webhook runtime + DynamoDB GetItem + WhatsApp API). Users get immediate feedback. Total voice round-trip still 30-35s (batch Transcribe + RAG + Polly).
 - **Date**: April 5, 2026
 
@@ -82,7 +82,7 @@ After AWS GenAI Competition finalist announcement, implemented critical fixes fo
 ### Nudge Lambda Deployment (April 5, 2026)
 - **Issue**: Only nudge-sender Lambda was deployed. Reminder and response-detector Lambdas were defined in template but never deployed.
 - **Fix**: Ran full SAM build and deploy to create all three nudge Lambda functions (sender, reminder, detector) and wire up DynamoDB Streams event source mapping.
-- **Files**: `template-week2.yaml`
+- **Files**: `template.yaml`
 - **Impact**: Complete nudge system now operational with all three Lambda functions deployed and connected.
 - **Date**: April 5, 2026
 
@@ -104,7 +104,7 @@ Received AWS Free Tier alert (SQS at 85% of 1M limit). Performed comprehensive c
 ### Optimization #1: SQS Long Polling
 - **Issue**: SQS queues using short polling, generating excessive API calls even when idle
 - **Fix**: Added `ReceiveMessageWaitTimeSeconds: 20` to MessageQueue, VoiceQueue, MessageDLQ
-- **Files**: `template-week2.yaml`
+- **Files**: `template.yaml`
 - **Impact**: ~70-80% reduction in SQS API calls, stay within Free Tier
 
 ### Optimization #2: Secrets Manager Caching (MessageProcessor)
@@ -122,7 +122,7 @@ Received AWS Free Tier alert (SQS at 85% of 1M limit). Performed comprehensive c
 ### Optimization #4: Lambda Memory Right-Sizing
 - **Issue**: All functions defaulted to 512MB, some only need 256MB
 - **Fix**: Reduced WebhookHandler and WeatherPoller to 256MB
-- **Files**: `template-week2.yaml`
+- **Files**: `template.yaml`
 - **Impact**: ~50% cost reduction for these functions
 
 ### Optimization #5: DynamoDB Query Optimization
@@ -146,7 +146,7 @@ Received AWS Free Tier alert (SQS at 85% of 1M limit). Performed comprehensive c
 ### Optimization #8: S3 Lifecycle for Images
 - **Issue**: Analyzed images stored indefinitely in S3
 - **Fix**: Added 7-day lifecycle rule for images/ prefix
-- **Files**: `template-week2.yaml`
+- **Files**: `template.yaml`
 - **Impact**: Prevents unbounded storage growth
 
 ### Emergency Action #9: OpenSearch Serverless Deletion
@@ -213,7 +213,7 @@ Received AWS Free Tier alert (SQS at 85% of 1M limit). Performed comprehensive c
 
 #### Fix #12: Model ARN Environment Variable
 - **Issue**: Model ARN hardcoded in processor/handler.py - must update code manually for model upgrades
-- **Fix**: Moved to MODEL_ARN environment variable in template-week2.yaml. Updated `query_bedrock()` to read from env var with fallback to Claude 3 Sonnet
+- **Fix**: Moved to MODEL_ARN environment variable in template.yaml. Updated `query_bedrock()` to read from env var with fallback to Claude 3 Sonnet
 - **Impact**: Easy model upgrades without code changes, just update environment variable
 - **Date**: March 5, 2026
 
@@ -221,13 +221,13 @@ Received AWS Free Tier alert (SQS at 85% of 1M limit). Performed comprehensive c
 
 #### Fix #1: VoiceProcessor Lambda Timeout
 - **Issue**: 60-second polling loop vs 30-second Lambda timeout - voice transcription would timeout before completion
-- **Fix**: Increased VoiceProcessor timeout to 90 seconds in template-week2.yaml. VoiceQueue VisibilityTimeout already set to 180s (correctly greater than Lambda timeout)
+- **Fix**: Increased VoiceProcessor timeout to 90 seconds in template.yaml. VoiceQueue VisibilityTimeout already set to 180s (correctly greater than Lambda timeout)
 - **Impact**: Voice messages now process successfully without timeout errors
 - **Date**: March 5, 2026
 
 #### Fix #2: MOCK_WEATHER Default
 - **Issue**: Defaulted to 'true', would send fake weather to real farmers in production
-- **Fix**: Changed default from 'true' to 'false' in src/weather/handler.py:23 and template-week2.yaml:308
+- **Fix**: Changed default from 'true' to 'false' in src/weather/handler.py:23 and template.yaml:308
 - **Impact**: Weather API will be called by default instead of returning mock data
 - **Date**: March 5, 2026
 

@@ -27,7 +27,7 @@ If that’s your use-case, email **prasad@prasadtilloo.com**.
 
 ```bash
 python3 -m pytest tests/test_nudge_flow.py tests/test_district_helplines.py tests/test_e2e_happy_path_mocked.py -q
-sam validate --template-file template-week2.yaml --lint
+sam validate --template-file template.yaml --lint
 ```
 
 4. Submit a PR with:

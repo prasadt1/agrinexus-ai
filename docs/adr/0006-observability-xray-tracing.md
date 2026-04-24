@@ -46,7 +46,7 @@ This provides:
   - Trace retention: 30 days (sufficient for debugging and optimization)
 
 ### Implementation pointers
-- Configuration: `template-week2.yaml` (Globals.Function.Tracing: Active)
+- Configuration: `template.yaml` (Globals.Function.Tracing: Active)
 - Verification: All 9 Lambda functions show `TracingConfig.Mode: Active`
 - Viewing traces: AWS X-Ray Console → Service Map / Traces
 - Cost: Within free tier (100K traces/month)

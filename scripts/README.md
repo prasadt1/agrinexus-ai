@@ -9,7 +9,7 @@ Scripts actually present in this repo (others may live under `scripts/local/` on
 - `e2e-smoke.sh` — SAM validate + fast pytest + optional KB + web chat curl (see script header)
 - `reset-profile.sh` / `delete-user-data.sh` — Non-interactive or interactive DynamoDB user reset
 
-**Deploy:** use the SAM CLI from the repo root (see **README.md**): `sam build --template-file template-week2.yaml` then `sam deploy --config-file samconfig-week2.toml`.
+**Deploy:** use the SAM CLI from the repo root (see **README.md**): `sam build --template-file template.yaml` then `sam deploy --config-file samconfig-week2.toml`.
 
 ## Personal Scripts (Keep Local)
 

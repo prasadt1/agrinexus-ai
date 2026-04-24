@@ -27,4 +27,4 @@ jobs:
         run: pip install aws-sam-cli
 
       - name: Validate SAM template
-        run: sam validate --template-file template-week2.yaml --lint
+        run: sam validate --template-file template.yaml --lint

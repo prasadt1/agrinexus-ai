@@ -1,6 +1,6 @@
 # Operations runbook — alerts and demos
 
-This runbook matches CloudWatch alarms defined in [template-week2.yaml](../../template-week2.yaml) and the SNS topic **`agrinexus-alerts-${Environment}`**.
+This runbook matches CloudWatch alarms defined in [template.yaml](../../template.yaml) and the SNS topic **`agrinexus-alerts-${Environment}`**.
 
 ## Subscribe to alerts
 

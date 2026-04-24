@@ -119,14 +119,14 @@ AgriNexus is a working system with production observability — not a prototype.
 |---|---|
 | Production WhatsApp number live | ✅ [wa.me/4915120105731](https://wa.me/4915120105731) |
 | Public web demo live | ✅ [demo.agrinexus-ai.farm](https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html) |
-| Health endpoint (liveness) | ✅ Stack output `WebChatHealthUrl` (from [`template-week2.yaml`](template-week2.yaml)) |
+| Health endpoint (liveness) | ✅ Stack output `WebChatHealthUrl` (from [`template.yaml`](template.yaml)) |
 | Webhook API (Meta verified) | ✅ Stack output `WebhookUrl` (Meta Developer Portal callback) |
 | Real weather data integration | ✅ [OpenWeatherMap](https://openweathermap.org/api) via Secrets Manager |
 | End-to-end voice round-trip | ✅ ~20–34s (batch [Transcribe](https://aws.amazon.com/transcribe/)) |
 | Vision pipeline (Claude Vision) | ✅ pest/disease schema validated + non-agri gating |
 | Closed-loop behavioral nudges | ✅ T+24h/T+48h follow-ups + cancel-on-DONE |
 | Test-to-code ratio | **64%** ([metrics](docs/IMPLEMENTATION-QUALITY-METRICS.md#1-test-coverage)) |
-| Infrastructure-as-Code resources | **34** ([SAM template](template-week2.yaml)) |
+| Infrastructure-as-Code resources | **34** ([SAM template](template.yaml)) |
 | Architecture Decision Records | **9** ([docs/adr/](docs/adr/)) |
 | EARS requirements traced to code | **144** ([docs/requirements.md](docs/requirements.md)) |
 | CI/CD | ✅ GitHub Actions ([`.github/workflows/`](.github/workflows/)) |
@@ -145,7 +145,7 @@ AgriNexus is a working system with production observability — not a prototype.
 - **Messaging**: WhatsApp Business Platform (Cloud API)
 - **Storage**: DynamoDB single-table design, S3 for knowledge base sources + temp audio/images
 - **Abuse / cost controls**:
-  - WhatsApp **webhook**: Meta signature verification + per-user message rate limits (defaults in `template-week2.yaml`)
+  - WhatsApp **webhook**: Meta signature verification + per-user message rate limits (defaults in `template.yaml`)
   - Public **web chat**: per-IP + per-client caps + API Gateway throttling + WAF on `/chat`
 - **Cost**: modeled **~$53/month for 1,000 farmers** (pay-per-use). See [Cost breakdown](#cost-breakdown)
 
@@ -173,7 +173,7 @@ aws configure
 
 ```bash
 # 1. Deploy infrastructure (recommended: samconfig-week2.toml)
-sam build --template-file template-week2.yaml
+sam build --template-file template.yaml
 sam deploy --config-file samconfig-week2.toml
 
 # Manual alternative (match parameters in samconfig-week2.toml, including TableStreamArn):
@@ -275,7 +275,7 @@ Bot: बढ़िया! आपने स्प्रे कर दिया। 
 
 ## Project Structure (quick pointers)
 
-- **`template-week2.yaml`**: full SAM/IaC template
+- **`template.yaml`**: full SAM/IaC template
 - **`src/`**: Lambda handlers (webhook, processor, web-chat, voice, nudge, weather, DLQ, health)
 - **`docs/`**: E2E guide, walkthroughs, runbooks, monitoring/metrics
 - **`tests/`**: fast unit tests + optional integration tests
@@ -286,7 +286,7 @@ For a deeper walkthrough, see [`docs/CODE-WALKTHROUGH.md`](docs/CODE-WALKTHROUGH
 
 ### CI (GitHub Actions)
 
-On every push/PR to `main`, **`.github/workflows/ci.yml`** runs fast unit tests (`tests/test_nudge_flow.py`, `tests/test_district_helplines.py`) and **`sam validate --lint`** on `template-week2.yaml`. Optional **`aws-smoke.yml`** (`workflow_dispatch`) can run golden KB tests when repository secrets are configured.
+On every push/PR to `main`, **`.github/workflows/ci.yml`** runs fast unit tests (`tests/test_nudge_flow.py`, `tests/test_district_helplines.py`) and **`sam validate --lint`** on `template.yaml`. Optional **`aws-smoke.yml`** (`workflow_dispatch`) can run golden KB tests when repository secrets are configured.
 
 ### One-command smoke (local or CI agent)
 
@@ -454,7 +454,7 @@ aws lambda invoke --function-name agrinexus-weather-dev --payload '{}' /tmp/resp
 
 **"No module named 'output'" error:**
 - Ensure `src/processor/output.py` and `src/processor/analyzer.py` exist
-- Rebuild: `sam build --template template-week2.yaml`
+- Rebuild: `sam build --template template.yaml`
 
 **"Invalid guardrail identifier" error:**
 - Set GuardrailId to empty string in deployment
@@ -610,7 +610,7 @@ See the [LICENSE](LICENSE) file for full details.
 ## Security
 
 - **Do not commit** API keys, tokens, app secrets, or real phone numbers. `scripts/demo.env` and `.aws-sam/` should stay gitignored.
-- **Webhook:** Meta **`X-Hub-Signature-256`** verification; **per-user message rate limit** before enqueueing work (see `template-week2.yaml` **`RATE_LIMIT_*`**). **Web chat:** separate rate limits + API Gateway + WAF (see template and runbook).
+- **Webhook:** Meta **`X-Hub-Signature-256`** verification; **per-user message rate limit** before enqueueing work (see `template.yaml` **`RATE_LIMIT_*`**). **Web chat:** separate rate limits + API Gateway + WAF (see template and runbook).
 - Set **KnowledgeBaseId** (and related stack params) in **`samconfig-week2.toml`** or **`--parameter-overrides`** when deploying. Processor Lambdas receive **`KNOWLEDGE_BASE_ID`** from the template.
 - For **vision / voice** integration tests, set **`TEMP_AUDIO_BUCKET`** (and any other required env vars) as documented in the test files.
 
