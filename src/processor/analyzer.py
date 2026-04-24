@@ -143,6 +143,10 @@ def _looks_like_screenshot_or_ui(image_bytes: bytes) -> bool:
             return True
         if edge_frac > 0.22 and white_frac > 0.28:
             return True
+        # White-dominant web/article screenshots (WhatsApp compression can reduce near-black pixels).
+        # Still: lots of white + edges + near-zero green.
+        if edge_frac > 0.14 and white_frac > 0.55 and green_frac < 0.03:
+            return True
         # Dark-mode chat/app screenshots: lots of near-black pixels + moderate edges.
         # This is uncommon for real crop photos (which typically have mid/high luminance greens).
         if black_frac > 0.22 and edge_frac > 0.085:

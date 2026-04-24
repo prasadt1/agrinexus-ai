@@ -12,6 +12,22 @@ def _make_jpeg_bytes(w: int, h: int) -> bytes:
     img.save(buf, format="JPEG", quality=25)
     return buf.getvalue()
 
+def _make_white_dominant_ui_like_jpeg() -> bytes:
+    from PIL import Image, ImageDraw
+
+    img = Image.new("RGB", (1280, 900), color=(250, 250, 250))
+    d = ImageDraw.Draw(img)
+    # Simulate a web page: a sidebar + header + text lines (edges), very little green.
+    d.rectangle([0, 0, 260, 900], fill=(235, 235, 235))
+    d.rectangle([260, 0, 1280, 120], fill=(245, 245, 245))
+    for y in range(160, 820, 22):
+        d.line([300, y, 1180, y], fill=(120, 120, 120), width=2)
+    # A small photo placeholder
+    d.rectangle([300, 140, 720, 420], outline=(80, 80, 80), width=3)
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=35)
+    return buf.getvalue()
+
 
 def test_quality_gate_blocks_tiny_images_before_model(monkeypatch):
     os.environ["VISION_QUALITY_GATE_ENABLED"] = "true"
@@ -60,5 +76,13 @@ def test_ui_screenshot_is_rejected_before_model(monkeypatch):
 
     out = analyzer.analyze_crop_image(img_bytes, "hi", "Wheat", district="Latur")
     assert isinstance(out, dict)
+    assert out.get("diagnosis") == "non_photo"
+
+
+def test_white_dominant_ui_like_image_is_rejected(monkeypatch):
+    from src.processor import analyzer
+
+    img_bytes = _make_white_dominant_ui_like_jpeg()
+    out = analyzer.analyze_crop_image(img_bytes, "en", "Wheat", district="Latur")
     assert out.get("diagnosis") == "non_photo"
 

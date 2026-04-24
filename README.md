@@ -62,6 +62,27 @@ on — advice plus accountability, not just information.
 
 ---
 
+## Contents
+
+- [🏆 Finalist Quickstart](#-aws-builder-10000-aideas--top-50-finalist-emea--social-impact)
+- [Try It Yourself](#try-it-yourself)
+- [Production Evidence](#production-evidence)
+- [Architecture](#architecture)
+- [Quick Start (Deploy)](#quick-start-deploy-your-own)
+- [Usage](#usage)
+- [Testing](#testing)
+- [Cost Breakdown](#cost-breakdown)
+- [Honest Tradeoffs & Roadmap](#honest-tradeoffs--roadmap)
+- [Monitoring](#monitoring)
+- [Requirements Methodology: EARS](#requirements-methodology-ears)
+- [Development Workflow: Kiro AI](#development-workflow-kiro-ai)
+- [Documentation](#documentation)
+- [Beyond Agriculture: Productization Roadmap](#beyond-agriculture-productization-roadmap)
+- [License](#license)
+- [Acknowledgments](#acknowledgments)
+
+---
+
 ## Try It Yourself
 
 Pick the web demo or WhatsApp experience.
@@ -392,12 +413,19 @@ The **$0.54** figure is **not** a separate measurement—it is **($450 × 12) ÷
 - **Before April 4, 2026**: OpenSearch Serverless **~$174/month fixed** (plus variable services → **~$214/month** all-in)
 - **After April 4, 2026**: S3 Vectors + pay-per-use stack → **~$53/month** modeled @ 1K farmers (**~75%** reduction vs the old **~$214** all-in figure)
 
-## Known Limitations
+## Honest Tradeoffs & Roadmap
 
-1. **Voice round-trip latency**: Typically **~30–40s** end-to-end (batch **Transcribe** ~15–30s + **Bedrock RAG** ~5–15s + **Polly** + WhatsApp media). The **voice-received** text line is sent from the **webhook** as soon as possible after dedup (often **~1–3s**; **cold start** on first request can add more).
-2. **Telugu Voice Output**: No native Telugu voice in Polly. Text-only responses for Telugu users.
-3. **WhatsApp Test Numbers**: Don't support media (voice/images). Requires real WhatsApp Business number for end-to-end testing.
-4. **Weather Data**: Real OpenWeatherMap API integrated. Set MOCK_WEATHER=true for demo reliability.
+The production build made deliberate tradeoffs for pilot sustainability. Calling them out explicitly:
+
+1. **Voice latency ~20-34s (batch Transcribe)**: The tradeoff was cost vs. latency. Batch Transcribe at current volumes costs ~$12/month; streaming STT would be 3-5× that. For farmers sending a voice note and continuing fieldwork, the async delay is acceptable. The **voice-received** acknowledgment is sent from the webhook immediately (often ~1-3s; cold start can add more). Streaming STT is on the roadmap for Phase 2.
+
+2. **Telugu voice output unavailable**: Amazon Polly doesn't currently offer a native Telugu neural voice. Text-only responses are returned for Telugu users; escalation path documented in [docs/architecture.md](docs/architecture.md).
+
+3. **Single-region deployment**: Multi-region is architected but deployed single-region (us-east-1) for cost efficiency during pilot. Failover and multi-region deployment patterns are documented in the architecture.
+
+4. **Weather API with demo fallback**: Production uses OpenWeatherMap via Secrets Manager. The `MOCK_WEATHER=true` flag exists for demo reliability and is explicitly logged so test traffic is never confused with production readings.
+
+5. **WhatsApp Test Numbers**: Meta's test numbers don't support media (voice/images). End-to-end testing requires a real WhatsApp Business number with production API access.
 
 ## Troubleshooting
 
@@ -492,7 +520,7 @@ This project was developed using **Kiro AI**, which enabled requirements-driven 
 
 **Key metrics:**
 - 100+ EARS requirements in [docs/requirements.md](docs/requirements.md)
-- ~3,000 lines of Python across 8 Lambda functions
+- ~3,000 lines of Python across 9 Lambda functions
 - Full test coverage: voice, vision, RAG, nudges
 
 ## Documentation
@@ -542,6 +570,18 @@ AgriNexus is built as an **accountability engine** where only the trigger and co
 | Analytics | CloudWatch + custom metrics | Farmer cohort analytics | Per-partner dashboards |
 
 **Commercial licensing:** see [License](#license) — source available for review; commercial use via [prasad@prasadtilloo.com](mailto:prasad@prasadtilloo.com).
+
+## Acknowledgments
+
+This project stands on the shoulders of many:
+
+- **AWS Builder Center team** for the 10,000 AIdeas platform and the opportunity to showcase production-grade serverless AI
+- **Kiro team** for the spec-driven development workflow that enabled requirements-to-code traceability
+- **Frankfurt AWS User Group** and **Frankfurt AI Meetup** community for early feedback and encouragement
+- **Early testers** who shaped the action-first prompt style and helped refine the closed-loop nudge engine
+- **ICAR-CICR** (Indian Council of Agricultural Research - Central Institute for Cotton Research) and **FAO** (Food and Agriculture Organization) for the open agricultural knowledge that grounds this project's recommendations
+
+Special thanks to the smallholder farmers whose real-world challenges inspired this work — and whose feedback continues to shape it.
 
 ## License
 
