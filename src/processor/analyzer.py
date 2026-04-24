@@ -475,6 +475,9 @@ OUTPUT:
 Return ONLY one JSON object (no prose, no markdown) with keys:
 - is_real_crop_photo: boolean
 - non_photo_reason: string
+- photo_kind: one of ["leaf_symptom","pest_macro","field_view","unknown"]
+- inferred_crop: one of ["Cotton","Wheat","Soybean","Maize","unknown"]
+- crop_confidence: one of ["low","medium","high"]
 - insect_color: one of ["black","white","green","brown","mixed","unknown"]
 - severity: one of ["low","medium","high","unknown"]
 - confidence: one of ["low","medium","high"]
@@ -535,15 +538,26 @@ If is_real_crop_photo is false:
                     "severity": "unknown",
                     "recommendations": msg,
                     "confidence": "low",
+                    "photo_kind": "unknown",
+                    "inferred_crop": "unknown",
+                    "crop_confidence": "low",
                     "raw_analysis": analysis,
                 }
+            photo_kind = str(obj.get("photo_kind") or "unknown")
+            inferred_crop = str(obj.get("inferred_crop") or "unknown")
+            crop_confidence = str(obj.get("crop_confidence") or "low")
             severity = str(obj.get("severity") or "unknown")
             confidence = str(obj.get("confidence") or "medium")
+            needs_confirm = (crop_confidence == "high" and inferred_crop in ("Cotton", "Wheat", "Soybean", "Maize") and inferred_crop != crop)
             return {
                 "diagnosis": "Unknown",
                 "severity": severity,
                 "recommendations": obj["final_message"],
                 "confidence": confidence,
+                "photo_kind": photo_kind,
+                "inferred_crop": inferred_crop,
+                "crop_confidence": crop_confidence,
+                "needs_crop_confirm": needs_confirm,
                 "raw_analysis": analysis,
             }
 
@@ -554,6 +568,9 @@ If is_real_crop_photo is false:
             "severity": "unknown",
             "recommendations": msg,
             "confidence": "low",
+            "photo_kind": "unknown",
+            "inferred_crop": "unknown",
+            "crop_confidence": "low",
             "raw_analysis": analysis,
         }
         
@@ -577,7 +594,7 @@ If is_real_crop_photo is false:
         }
 
 
-def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any]) -> str:
+def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any]) -> Any:
     """
     Process WhatsApp image message
     
@@ -619,8 +636,28 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         # Analyze image
         district = user_profile.get("district") or user_profile.get("location")
         result = analyze_crop_image(image_bytes, dialect, crop, district=district)
-        
-        return result['recommendations']
+
+        if result.get("needs_crop_confirm") and isinstance(result.get("inferred_crop"), str):
+            inferred = str(result.get("inferred_crop") or "").strip()
+            profile_crop = str(crop or "").strip() or "unknown"
+            if inferred and inferred != profile_crop:
+                confirm_msgs = {
+                    "hi": f"आपके प्रोफ़ाइल में फसल **{profile_crop}** है, लेकिन यह फोटो **{inferred}** जैसी लग रही है।\n\n{inferred} के रूप में विश्लेषण करने के लिए `YES` भेजें, या प्रोफ़ाइल वाली फसल के लिए `{profile_crop.upper()}` भेजें।",
+                    "mr": f"तुमच्या प्रोफाईलमध्ये पीक **{profile_crop}** आहे, पण हा फोटो **{inferred}** सारखा दिसतो.\n\n{inferred} म्हणून विश्लेषणासाठी `YES` पाठवा, किंवा प्रोफाईल पिकासाठी `{profile_crop.upper()}` पाठवा.",
+                    "te": f"మీ ప్రొఫైల్‌లో పంట **{profile_crop}** ఉంది, కానీ ఈ ఫోటో **{inferred}** లాగా కనిపిస్తోంది.\n\n{inferred} గా విశ్లేషించడానికి `YES` పంపండి, లేదా ప్రొఫైల్ పంట కోసం `{profile_crop.upper()}` పంపండి.",
+                    "en": f"Your profile crop is **{profile_crop}**, but this photo looks like **{inferred}**.\n\nReply `YES` to analyze as {inferred}, or reply `{profile_crop.upper()}` to analyze using your profile crop.",
+                }
+                return {
+                    "text": confirm_msgs.get(dialect, confirm_msgs["en"]),
+                    "pending_crop_confirm": {
+                        "bucket": TEMP_BUCKET,
+                        "key": s3_key,
+                        "profile_crop": profile_crop,
+                        "inferred_crop": inferred,
+                    },
+                }
+
+        return result["recommendations"]
         
     except Exception as e:
         print(f"Error processing image message: {e}")

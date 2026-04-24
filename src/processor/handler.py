@@ -14,7 +14,7 @@ from decimal import Decimal
 from output import text_to_speech, truncate_for_voice, voice_truncation_prefix
 
 # Import vision module
-from analyzer import process_image_message
+import analyzer
 
 # Import WhatsApp utilities from common layer (with Secrets Manager caching)
 from common.whatsapp import send_whatsapp_message, send_whatsapp_list
@@ -36,6 +36,7 @@ def send_whatsapp_buttons(phone_number: str, body_text: str, buttons: list):
 
 dynamodb = boto3.resource('dynamodb')
 bedrock_agent = boto3.client('bedrock-agent-runtime')
+s3 = boto3.client("s3")
 
 TABLE_NAME = os.environ['TABLE_NAME']
 KB_ID = os.environ['KNOWLEDGE_BASE_ID']
@@ -43,6 +44,66 @@ GUARDRAIL_ID = os.environ['GUARDRAIL_ID']
 GUARDRAIL_VERSION = os.environ['GUARDRAIL_VERSION']
 
 table = dynamodb.Table(TABLE_NAME)
+
+_PENDING_CROP_CONFIRM_SK = "PENDING#CROP_CONFIRM"
+_PENDING_TTL_SECONDS = int(os.environ.get("PENDING_CROP_CONFIRM_TTL_SECONDS", "600"))
+
+
+def _get_pending_crop_confirm(phone_number: str) -> Optional[Dict[str, Any]]:
+    resp = table.get_item(Key={"PK": f"USER#{phone_number}", "SK": _PENDING_CROP_CONFIRM_SK})
+    return resp.get("Item")
+
+
+def _put_pending_crop_confirm(phone_number: str, pending: Dict[str, Any]):
+    import time
+
+    ttl = int(time.time()) + _PENDING_TTL_SECONDS
+    item = {
+        "PK": f"USER#{phone_number}",
+        "SK": _PENDING_CROP_CONFIRM_SK,
+        "ttl": ttl,
+        **pending,
+    }
+    table.put_item(Item=item)
+
+
+def _delete_pending_crop_confirm(phone_number: str):
+    table.delete_item(Key={"PK": f"USER#{phone_number}", "SK": _PENDING_CROP_CONFIRM_SK})
+
+
+def _parse_crop_confirm_reply(text: str, inferred_crop: str, profile_crop: str) -> Optional[str]:
+    """
+    Returns chosen crop string, or None if the reply isn't a crop-confirm response.
+    """
+    t = (text or "").strip().lower()
+    if not t:
+        return None
+
+    yes = {"y", "yes", "ok", "okay", "haan", "han", "हाँ", "हां", "हो", "ठीक", "theek"}
+    no = {"n", "no", "nah", "nope", "नहीं", "नहि", "na", "नाही", "కాదు"}
+
+    if t in yes:
+        return inferred_crop
+    if t in no:
+        return profile_crop
+
+    # Allow explicit crop names (English). Keep it minimal for judge demos.
+    crop_words = {
+        "wheat": "Wheat",
+        "cotton": "Cotton",
+        "soybean": "Soybean",
+        "maize": "Maize",
+    }
+    if t in crop_words:
+        return crop_words[t]
+
+    # Also accept sending the exact inferred crop or profile crop.
+    if t == (inferred_crop or "").strip().lower():
+        return inferred_crop
+    if t == (profile_crop or "").strip().lower():
+        return profile_crop
+
+    return None
 
 # Onboarding configuration
 VALID_DISTRICTS = ['Latur', 'Jalna', 'Nagpur']
@@ -870,6 +931,32 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
         # Process based on message type
         if message_type == 'text':
             text = message.get('text', {}).get('body', '')
+
+            # If we are waiting for crop confirmation from a previous photo, intercept first.
+            pending = _get_pending_crop_confirm(from_number)
+            if pending:
+                chosen = _parse_crop_confirm_reply(
+                    text,
+                    inferred_crop=str(pending.get("inferred_crop") or ""),
+                    profile_crop=str(pending.get("profile_crop") or profile.get("crop") or ""),
+                )
+                if chosen:
+                    bucket = pending.get("bucket") or os.environ.get("TEMP_AUDIO_BUCKET")
+                    key = pending.get("key")
+                    if bucket and key:
+                        try:
+                            obj = s3.get_object(Bucket=bucket, Key=key)
+                            image_bytes = obj["Body"].read()
+                            district = profile.get("district") or profile.get("location")
+                            result = analyzer.analyze_crop_image(image_bytes, dialect, chosen, district=district)
+                            reply_text = str(result.get("recommendations") or "")
+                            save_message(from_number, wamid, message, reply_text, "vision_reprocess")
+                            send_whatsapp_message(from_number, reply_text)
+                        finally:
+                            _delete_pending_crop_confirm(from_number)
+                        continue
+
+                # Not a crop-confirm response; fall through to normal handling.
             
             # Check for DONE/NOT YET keywords - these are handled by response detector
             done_keywords = ['हो गया', 'कर दिया', 'हो गया है', 'कर लिया', 'done', 'completed',
@@ -992,7 +1079,22 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             send_whatsapp_message(from_number, ack_messages.get(dialect, ack_messages['hi']))
             
             # Analyze image
-            analysis = process_image_message(message, profile)
+            analysis = analyzer.process_image_message(message, profile)
+
+            # If vision asks for a crop override confirmation, store pending state and ask user.
+            if isinstance(analysis, dict) and analysis.get("pending_crop_confirm"):
+                pending = dict(analysis["pending_crop_confirm"])
+                pending.setdefault("dialect", dialect)
+                pending.setdefault("profile_crop", profile.get("crop"))
+                _put_pending_crop_confirm(from_number, pending)
+                text_out = str(analysis.get("text") or "")
+                save_message(from_number, wamid, message, text_out, "vision_crop_confirm")
+                send_whatsapp_message(from_number, text_out)
+                continue
+
+            # Backward compatible (string return)
+            if isinstance(analysis, dict):
+                analysis = str(analysis.get("text") or analysis.get("recommendations") or "")
             
             # Save to DynamoDB
             save_message(from_number, wamid, message, analysis, 'vision_analysis')
