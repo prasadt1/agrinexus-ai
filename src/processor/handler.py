@@ -687,6 +687,99 @@ REMEMBER: If the Context above does not contain information to answer the Questi
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """Process messages from SQS"""
+    def _send_help(from_number: str, dialect: str):
+        request_url = "https://github.com/prasadt1/agrinexus-ai/issues/new?template=demo-request.md"
+        help_messages = {
+            'hi': '''🌾 AgriNexus AI - मदद
+
+मैं आपकी खेती में मदद कर सकता हूं:
+
+📝 सवाल पूछें:
+• "कपास में कीट कैसे नियंत्रित करें?"
+• "गेहूं में खाद कब डालें?"
+• "मौसम के अनुसार क्या करें?"
+
+📸 फोटो भेजें:
+• पत्तियों की फोटो
+• कीट/रोग की फोटो
+• मैं पहचान करूंगा और सलाह दूंगा
+
+🎤 आवाज़ में पूछें:
+• वॉइस नोट भेजें
+• मैं समझूंगा और जवाब दूंगा
+
+बस अपना सवाल टाइप करें या फोटो भेजें!
+
+Full access (voice/photo/nudges): GitHub request → {request_url}''',
+            'mr': '''🌾 AgriNexus AI - मदत
+
+मी तुमच्या शेतीत मदत करू शकतो:
+
+📝 प्रश्न विचारा:
+• "कापसात किडे कसे नियंत्रित करावे?"
+• "गहूमध्ये खत कधी घालावे?"
+• "हवामानानुसार काय करावे?"
+
+📸 फोटो पाठवा:
+• पानांचा फोटो
+• किडे/रोगाचा फोटो
+• मी ओळखेन आणि सल्ला देईन
+
+🎤 आवाजात विचारा:
+• व्हॉइस नोट पाठवा
+• मी समजेन आणि उत्तर देईन
+
+फक्त तुमचा प्रश्न टाइप करा किंवा फोटो पाठवा!
+
+Full access (voice/photo/nudges): GitHub request → {request_url}''',
+            'te': '''🌾 AgriNexus AI - సహాయం
+
+నేను మీ వ్యవసాయంలో సహాయం చేయగలను:
+
+📝 ప్రశ్నలు అడగండి:
+• "పత్తిలో పురుగులను ఎలా నియంత్రించాలి?"
+• "గోధుమలో ఎరువులు ఎప్పుడు వేయాలి?"
+• "వాతావరణం ప్రకారం ఏమి చేయాలి?"
+
+📸 ఫోటో పంపండి:
+• ఆకుల ఫోటో
+• పురుగు/వ్యాధి ఫోటో
+• నేను గుర్తించి సలహా ఇస్తాను
+
+🎤 వాయిస్‌లో అడగండి:
+• వాయిస్ నోట్ పంపండి
+• నేను అర్థం చేసుకుని సమాధానం ఇస్తాను
+
+మీ ప్రశ్న టైప్ చేయండి లేదా ఫోటో పంపండి!
+
+Full access (voice/photo/nudges): GitHub request → {request_url}''',
+            'en': '''🌾 AgriNexus AI - Help
+
+I can help you with your farming:
+
+📝 Ask Questions:
+• "How to control cotton pests?"
+• "When to apply fertilizer to wheat?"
+• "What to do based on weather?"
+
+📸 Send Photos:
+• Leaf photos
+• Pest/disease photos
+• I'll identify and advise
+
+🎤 Ask by Voice:
+• Send voice note
+• I'll understand and respond
+
+Just type your question or send a photo!
+
+Full access (voice/photo/nudges): GitHub request → {request_url}'''
+        }
+        send_whatsapp_message(
+            from_number,
+            help_messages.get(dialect, help_messages['hi']).format(request_url=request_url)
+        )
+
     for record in event['Records']:
         body = json.loads(record['body'])
         
@@ -722,6 +815,12 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     text = ''
             
             if text:
+                # HELP must work even during onboarding (judges try it immediately).
+                if text.strip().upper() in ['HELP', 'मदद', 'मदत', 'సహాయం']:
+                    dialect = (profile or {}).get('dialect', 'hi')
+                    _send_help(from_number, dialect)
+                    continue
+
                 onboarding_response = handle_onboarding(from_number, text, profile, is_interactive=(message_type == 'interactive'))
                 
                 # Send appropriate message type (text, buttons, or list)
@@ -764,94 +863,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             # Check for HELP command
             if text.strip().upper() in ['HELP', 'मदद', 'मदत', 'సహాయం']:
-                request_url = "https://github.com/prasadt1/agrinexus-ai/issues/new?template=demo-request.md"
-                help_messages = {
-                    'hi': '''🌾 AgriNexus AI - मदद
-
-मैं आपकी खेती में मदद कर सकता हूं:
-
-📝 सवाल पूछें:
-• "कपास में कीट कैसे नियंत्रित करें?"
-• "गेहूं में खाद कब डालें?"
-• "मौसम के अनुसार क्या करें?"
-
-📸 फोटो भेजें:
-• पत्तियों की फोटो
-• कीट/रोग की फोटो
-• मैं पहचान करूंगा और सलाह दूंगा
-
-🎤 आवाज़ में पूछें:
-• वॉइस नोट भेजें
-• मैं समझूंगा और जवाब दूंगा
-
-बस अपना सवाल टाइप करें या फोटो भेजें!
-
-Full access (voice/photo/nudges): GitHub request → {request_url}''',
-                    'mr': '''🌾 AgriNexus AI - मदत
-
-मी तुमच्या शेतीत मदत करू शकतो:
-
-📝 प्रश्न विचारा:
-• "कापसात किडे कसे नियंत्रित करावे?"
-• "गहूमध्ये खत कधी घालावे?"
-• "हवामानानुसार काय करावे?"
-
-📸 फोटो पाठवा:
-• पानांचा फोटो
-• किडे/रोगाचा फोटो
-• मी ओळखेन आणि सल्ला देईन
-
-🎤 आवाजात विचारा:
-• व्हॉइस नोट पाठवा
-• मी समजेन आणि उत्तर देईन
-
-फक्त तुमचा प्रश्न टाइप करा किंवा फोटो पाठवा!
-
-Full access (voice/photo/nudges): GitHub request → {request_url}''',
-                    'te': '''🌾 AgriNexus AI - సహాయం
-
-నేను మీ వ్యవసాయంలో సహాయం చేయగలను:
-
-📝 ప్రశ్నలు అడగండి:
-• "పత్తిలో పురుగులను ఎలా నియంత్రించాలి?"
-• "గోధుమలో ఎరువులు ఎప్పుడు వేయాలి?"
-• "వాతావరణం ప్రకారం ఏమి చేయాలి?"
-
-📸 ఫోటో పంపండి:
-• ఆకుల ఫోటో
-• పురుగు/వ్యాధి ఫోటో
-• నేను గుర్తించి సలహా ఇస్తాను
-
-🎤 వాయిస్‌లో అడగండి:
-• వాయిస్ నోట్ పంపండి
-• నేను అర్థం చేసుకుని సమాధానం ఇస్తాను
-
-మీ ప్రశ్న టైప్ చేయండి లేదా ఫోటో పంపండి!
-
-Full access (voice/photo/nudges): GitHub request → {request_url}''',
-                    'en': '''🌾 AgriNexus AI - Help
-
-I can help you with your farming:
-
-📝 Ask Questions:
-• "How to control cotton pests?"
-• "When to apply fertilizer to wheat?"
-• "What to do based on weather?"
-
-📸 Send Photos:
-• Leaf photos
-• Pest/disease photos
-• I'll identify and advise
-
-🎤 Ask by Voice:
-• Send voice note
-• I'll understand and respond
-
-Just type your question or send a photo!
-
-Full access (voice/photo/nudges): GitHub request → {request_url}'''
-                }
-                send_whatsapp_message(from_number, help_messages.get(dialect, help_messages['hi']).format(request_url=request_url))
+                _send_help(from_number, dialect)
                 continue
             
             # Check for DONE/NOT YET keywords (handled by response detector)
