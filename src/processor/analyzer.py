@@ -71,6 +71,29 @@ def _non_photo_message(dialect: str) -> str:
     }
     return msgs.get(dialect, msgs["en"])
 
+def _extract_json_object(text: str) -> Optional[Dict[str, Any]]:
+    """Extract first top-level JSON object from model output."""
+    if not text:
+        return None
+    start = text.find("{")
+    if start < 0:
+        return None
+    depth = 0
+    for i in range(start, len(text)):
+        ch = text[i]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                snippet = text[start : i + 1]
+                try:
+                    obj = json.loads(snippet)
+                    return obj if isinstance(obj, dict) else None
+                except Exception:
+                    return None
+    return None
+
 
 def download_whatsapp_image(media_id: str) -> bytes:
     """Download image from WhatsApp"""
@@ -156,6 +179,7 @@ def analyze_crop_image(
         }
 
     # Profile-first prompt: avoids false "not your crop" / "not infected" denials on noisy field photos.
+    # Force JSON so we can deterministically block non-photos.
     prompt = f"""You are an agricultural extension agent helping smallholder farmers in India.
 
 CONTEXT (use unless the image gives *unmistakable* proof this is a different crop type, e.g. banana plantation vs wheat):
@@ -174,11 +198,21 @@ RULES:
 6. **Tone**: Support the farmer. Avoid harsh denials unless the in-focus plant structure **clearly** rules out **{crop}**.
 7. **Consistency**: Use the same four numbered headings below every time so answers feel stable across retries.
 
-OUTPUT in **{language}**, simple practical wording, with sections:
-1. **Diagnosis** (framed for their **{crop}**)
-2. **Severity** (low / medium / high, or "cannot assess from this photo alone")
-3. **Recommendations** (immediate actions, timing, cultural practices; mention consulting local agri officer for product choice where rules vary)
-4. **Confidence** (how sure you are)
+OUTPUT:
+Return ONLY one JSON object (no prose, no markdown) with keys:
+- is_real_crop_photo: boolean
+- non_photo_reason: string
+- insect_color: one of ["black","white","green","brown","mixed","unknown"]
+- severity: one of ["low","medium","high","unknown"]
+- confidence: one of ["low","medium","high"]
+- final_message: string in **{language}** with exactly these 4 sections:
+  1. **Diagnosis**
+  2. **Severity**
+  3. **Recommendations**
+  4. **Confidence**
+
+If is_real_crop_photo is false:
+- final_message must ask for a real crop/leaf close-up photo and must NOT mention pests/diseases.
 """
     
     # Call Claude 3 Sonnet Vision
@@ -216,33 +250,38 @@ OUTPUT in **{language}**, simple practical wording, with sections:
         # Parse response
         response_body = json.loads(response['body'].read())
         analysis = response_body['content'][0]['text']
-        
+
         print(f"Vision analysis complete: {len(analysis)} characters")
-        
-        # Extract structured data (simple parsing)
-        diagnosis = "Unknown"
-        severity = "medium"
-        recommendations = analysis
-        confidence = "medium"
-        
-        # Try to extract severity
-        if 'high' in analysis.lower() or 'गंभीर' in analysis or 'severe' in analysis.lower():
-            severity = 'high'
-        elif 'low' in analysis.lower() or 'कम' in analysis or 'mild' in analysis.lower():
-            severity = 'low'
-        
-        # Try to extract confidence
-        if 'high confidence' in analysis.lower() or 'निश्चित' in analysis:
-            confidence = 'high'
-        elif 'low confidence' in analysis.lower() or 'अनिश्चित' in analysis:
-            confidence = 'low'
-        
+
+        obj = _extract_json_object(analysis)
+        if obj and isinstance(obj.get("final_message"), str):
+            if obj.get("is_real_crop_photo") is False:
+                msg = _non_photo_message(dialect)
+                return {
+                    "diagnosis": "non_photo",
+                    "severity": "unknown",
+                    "recommendations": msg,
+                    "confidence": "low",
+                    "raw_analysis": analysis,
+                }
+            severity = str(obj.get("severity") or "unknown")
+            confidence = str(obj.get("confidence") or "medium")
+            return {
+                "diagnosis": "Unknown",
+                "severity": severity,
+                "recommendations": obj["final_message"],
+                "confidence": confidence,
+                "raw_analysis": analysis,
+            }
+
+        # Fail-safe: if parsing fails, don't guess—ask for a clearer crop/leaf photo.
+        msg = _non_photo_message(dialect)
         return {
-            'diagnosis': diagnosis,
-            'severity': severity,
-            'recommendations': analysis,  # Full response
-            'confidence': confidence,
-            'raw_analysis': analysis
+            "diagnosis": "unknown",
+            "severity": "unknown",
+            "recommendations": msg,
+            "confidence": "low",
+            "raw_analysis": analysis,
         }
         
     except Exception as e:
