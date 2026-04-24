@@ -75,6 +75,22 @@ def _insufficient_quality_message(dialect: str, reason: str) -> str:
     _ = reason  # reserved for future per-reason messaging
     return msgs.get(dialect, msgs["en"])
 
+
+def _normalize_vision_metadata(photo_kind: str, inferred_crop: str, crop_confidence: str) -> Dict[str, str]:
+    """
+    Enforce conservative crop inference for cases where crop context is usually absent.
+    In particular, pest macro photos commonly lack crop identifiers (leaf/field context).
+    """
+    pk = (photo_kind or "unknown").strip() or "unknown"
+    ic = (inferred_crop or "unknown").strip() or "unknown"
+    cc = (crop_confidence or "low").strip() or "low"
+
+    if pk == "pest_macro":
+        return {"photo_kind": pk, "inferred_crop": "unknown", "crop_confidence": "low"}
+
+    return {"photo_kind": pk, "inferred_crop": ic, "crop_confidence": cc}
+
+
 def _looks_like_screenshot_or_ui(image_bytes: bytes) -> bool:
     """
     Deterministic rejection for screenshots / UI captures that often trigger hallucinations.
@@ -454,25 +470,20 @@ def analyze_crop_image(
             'confidence': str  # high, medium, low
         }
     """
-    # If this looks like a UI/screenshot, try to crop first; only proceed if the cropped
-    # result no longer looks like a screenshot/UI.
-    maybe_ui = _looks_like_screenshot_or_ui(image_bytes)
-    if maybe_ui:
-        cropped = _extract_primary_frame(image_bytes)
-        if cropped != image_bytes:
-            image_bytes = cropped
-        if _looks_like_screenshot_or_ui(image_bytes):
-            msg = _non_photo_message(dialect)
-            return {
-                "diagnosis": "non_photo",
-                "severity": "unknown",
-                "recommendations": msg,
-                "confidence": "low",
-                "raw_analysis": msg,
-            }
-    else:
-        # If the user sent a screenshot with an embedded photo, this may isolate it.
-        image_bytes = _extract_primary_frame(image_bytes)
+    # If this looks like a UI/screenshot, do NOT attempt to crop/guess: reject.
+    # (Cropping an embedded picture from a UI screenshot often creates false positives.)
+    if _looks_like_screenshot_or_ui(image_bytes):
+        msg = _non_photo_message(dialect)
+        return {
+            "diagnosis": "non_photo",
+            "severity": "unknown",
+            "recommendations": msg,
+            "confidence": "low",
+            "raw_analysis": msg,
+        }
+
+    # If the user sent a screenshot with an embedded photo, this may isolate it.
+    image_bytes = _extract_primary_frame(image_bytes)
 
     # Detect image format from magic bytes
     media_type = "image/jpeg"  # default
@@ -602,6 +613,10 @@ If is_real_crop_photo is false:
             photo_kind = str(obj.get("photo_kind") or "unknown")
             inferred_crop = str(obj.get("inferred_crop") or "unknown")
             crop_confidence = str(obj.get("crop_confidence") or "low")
+            norm = _normalize_vision_metadata(photo_kind, inferred_crop, crop_confidence)
+            photo_kind = norm["photo_kind"]
+            inferred_crop = norm["inferred_crop"]
+            crop_confidence = norm["crop_confidence"]
             severity = str(obj.get("severity") or "unknown")
             confidence = str(obj.get("confidence") or "medium")
             needs_confirm = (crop_confidence == "high" and inferred_crop in ("Cotton", "Wheat", "Soybean", "Maize") and inferred_crop != crop)

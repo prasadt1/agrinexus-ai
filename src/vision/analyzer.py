@@ -17,6 +17,14 @@ secrets = boto3.client('secretsmanager', region_name='us-east-1')
 
 TEMP_BUCKET = os.environ.get('TEMP_AUDIO_BUCKET')
 
+def _normalize_vision_metadata(photo_kind: str, inferred_crop: str, crop_confidence: str) -> Dict[str, str]:
+    pk = (photo_kind or "unknown").strip() or "unknown"
+    ic = (inferred_crop or "unknown").strip() or "unknown"
+    cc = (crop_confidence or "low").strip() or "low"
+    if pk == "pest_macro":
+        return {"photo_kind": pk, "inferred_crop": "unknown", "crop_confidence": "low"}
+    return {"photo_kind": pk, "inferred_crop": ic, "crop_confidence": cc}
+
 def _quality_gate_enabled() -> bool:
     return (os.environ.get("VISION_QUALITY_GATE_ENABLED") or "").strip().lower() in ("1", "true", "yes", "on")
 
@@ -364,22 +372,18 @@ def analyze_crop_image(
             'confidence': str  # high, medium, low
         }
     """
-    maybe_ui = _looks_like_screenshot_or_ui(image_bytes)
-    if maybe_ui:
-        cropped = _extract_primary_frame(image_bytes)
-        if cropped != image_bytes:
-            image_bytes = cropped
-        if _looks_like_screenshot_or_ui(image_bytes):
-            msg = _non_photo_message(dialect)
-            return {
-                "diagnosis": "non_photo",
-                "severity": "unknown",
-                "recommendations": msg,
-                "confidence": "low",
-                "raw_analysis": msg,
-            }
-    else:
-        image_bytes = _extract_primary_frame(image_bytes)
+    # If this looks like a UI/screenshot, reject (cropping embedded content creates false positives).
+    if _looks_like_screenshot_or_ui(image_bytes):
+        msg = _non_photo_message(dialect)
+        return {
+            "diagnosis": "non_photo",
+            "severity": "unknown",
+            "recommendations": msg,
+            "confidence": "low",
+            "raw_analysis": msg,
+        }
+
+    image_bytes = _extract_primary_frame(image_bytes)
 
     # Detect image format from magic bytes
     media_type = "image/jpeg"  # default
@@ -506,6 +510,10 @@ If is_real_crop_photo is false:
             photo_kind = str(obj.get("photo_kind") or "unknown")
             inferred_crop = str(obj.get("inferred_crop") or "unknown")
             crop_confidence = str(obj.get("crop_confidence") or "low")
+            norm = _normalize_vision_metadata(photo_kind, inferred_crop, crop_confidence)
+            photo_kind = norm["photo_kind"]
+            inferred_crop = norm["inferred_crop"]
+            crop_confidence = norm["crop_confidence"]
             severity = str(obj.get("severity") or "unknown")
             confidence = str(obj.get("confidence") or "medium")
             needs_confirm = (crop_confidence == "high" and inferred_crop in ("Cotton", "Wheat", "Soybean", "Maize") and inferred_crop != crop)

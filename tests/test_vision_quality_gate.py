@@ -43,3 +43,22 @@ def test_quality_gate_blocks_tiny_images_before_model(monkeypatch):
     assert out.get("s3", {}).get("bucket") == "bucket"
     assert out.get("s3", {}).get("key", "").startswith("images/")
 
+
+def test_ui_screenshot_is_rejected_before_model(monkeypatch):
+    # This is a real WhatsApp UI screenshot from the repo assets.
+    p = "/Users/prasadt1/.cursor/projects/Users-prasadt1-projects-AgriNexus-ai-push/assets/image-ec057046-890e-4dfd-a00b-3af1ebc7e182.png"
+    img_bytes = open(p, "rb").read()
+
+    from src.processor import analyzer
+
+    monkeypatch.setattr(analyzer, "bedrock", object(), raising=False)
+    # If bedrock invocation happens, something went wrong (it should reject earlier).
+    def _boom(*args, **kwargs):
+        raise RuntimeError("should_not_call_model")
+    monkeypatch.setattr(analyzer, "_looks_like_logo_or_illustration", lambda b: False, raising=False)
+    monkeypatch.setattr(analyzer, "bedrock", type("B", (), {"invoke_model": _boom})(), raising=False)
+
+    out = analyzer.analyze_crop_image(img_bytes, "hi", "Wheat", district="Latur")
+    assert isinstance(out, dict)
+    assert out.get("diagnosis") == "non_photo"
+
