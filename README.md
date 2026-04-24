@@ -90,113 +90,27 @@ Pick the web demo or WhatsApp experience.
 
 ## Production Evidence
 
-AgriNexus is a working system with full production observability — not a prototype. Evidence of production readiness:
+AgriNexus is a working system with production observability — not a prototype.
 
-### Live Endpoints
-
-| Endpoint | Status | URL |
-| --- | --- | --- |
-| Webhook API (Meta verified) | ✅ Live | API Gateway + WAF |
-| Weather API integration | ✅ Live | OpenWeatherMap via Secrets Manager |
-| Health endpoint | ✅ Live | `GET https://<api-id>.execute-api.<region>.amazonaws.com/<env>/health` (stack output: `WebChatHealthUrl`) |
-
-### Engineering Quality
-
-| Metric | Value |
-| --- | --- |
+| What | Status |
+|---|---|
+| Production WhatsApp number live | ✅ [wa.me/4915120105731](https://wa.me/4915120105731) |
+| Public web demo live | ✅ [demo.agrinexus-ai.farm](https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html) |
+| Health endpoint (liveness) | ✅ Stack output `WebChatHealthUrl` (from `template-week2.yaml`) |
+| Webhook API (Meta verified) | ✅ Stack output `WebhookUrl` (Meta Developer Portal callback) |
+| Real weather data integration | ✅ OpenWeatherMap via Secrets Manager |
+| End-to-end voice round-trip | ✅ ~20–34s (batch Transcribe) |
+| Vision pipeline (Claude Vision) | ✅ pest/disease schema validated + non-agri gating |
+| Closed-loop behavioral nudges | ✅ T+24h/T+48h follow-ups + cancel-on-DONE |
 | Test-to-code ratio | **64%** |
-| Infrastructure-as-Code resources (SAM) | **24** |
-| Architecture Decision Records (ADRs) | **8** |
+| Infrastructure-as-Code resources | **24** (SAM) |
+| Architecture Decision Records | **8** |
 | EARS requirements traced to code | **100+** |
-| Lambda functions deployed | **9** |
-| CI/CD workflows | **2** (fast unit tests + optional AWS smoke) |
-| Lines of Python | **~3,000** across 9 services |
+| CI/CD | ✅ GitHub Actions (`ci.yml` + `aws-smoke.yml`) |
 
-### Live Production Metrics (rolling 7-day snapshot)
+**Metrics & alarms:** full breakdown in [`docs/METRICS-AND-MONITORING.md`](docs/METRICS-AND-MONITORING.md) (7-day snapshot, 9 alarms, cost controls).
 
-These are real numbers from the running production stack — not projections.
-
-**Reliability**
-
-| Metric | Value | Status |
-| --- | --- | --- |
-| System uptime (7d) | **100%** | ✅ |
-| Error rate | **0%** | ✅ |
-| DLQ messages | **0** | ✅ |
-| Lambda errors (last 3 days) | **0** | ✅ |
-| DynamoDB throttles | **0** | ✅ |
-| Step Functions failures | **0** | ✅ |
-
-**Performance**
-
-| Metric | p95 | Target | Status |
-| --- | --- | --- | --- |
-| Webhook latency | **<500ms** | <1s | ✅ |
-| Processor latency | **<3s** | <5s | ✅ |
-| Voice latency (end-to-end) | **~20–34s** | <60s | ✅ |
-| Queue processing time | **<1s** | <5s | ✅ |
-
-**Throughput**
-
-| Metric | Value |
-| --- | --- |
-| Lambda invocations | ~**724/week** |
-| WhatsApp messages processed | ~**115/week** |
-| Web demo requests | ~**50/week** |
-| Weather polls | **28/week** (4×/day) |
-
-**Cost (actuals, not projections)**
-
-| Metric | Value |
-| --- | --- |
-| Daily cost (current) | **~$1.70/day** |
-| Monthly cost (current) | **~$53/month** |
-| Cost alarm threshold | $5/day (never tripped) |
-| Cost at 10K farmers (modeled) | **~$0.54/farmer/year** |
-| Savings vs. Step Functions Wait State approach | **~67× cheaper** |
-
-### Observability & Alarms
-
-**Active alarms (9 total) — all publishing to SNS topic `agrinexus-alerts-{env}`:**
-
-| Alarm | Threshold | Status |
-| --- | --- | --- |
-| Nudge workflow failures | >0 failures | ✅ Armed |
-| Cost alert | >$5/day | ✅ Armed |
-| Webhook / Processor / Voice / Web Chat errors | >5 in 5min | ✅ Armed (4 alarms) |
-| SQS queue backlog | Age >300s | ✅ Armed |
-| DLQ depth (messages + voice) | >5 messages | ✅ Armed (2 alarms) |
-
-**CloudWatch Dashboard:** 9 widgets covering Lambda, SQS, API Gateway, DynamoDB, Step Functions, and custom business metrics (nudges sent vs. completed). Template: [`dashboards/cloudwatch-dashboard.json`](dashboards/cloudwatch-dashboard.json).
-
-**Full metrics & monitoring breakdown:** [`docs/METRICS-AND-MONITORING.md`](docs/METRICS-AND-MONITORING.md) (business KPIs, operational metrics, cost breakdown, security metrics, reliability metrics, observability gaps, and roadmap).
-
-### Capability Coverage
-
-| Pipeline | Production status |
-| --- | --- |
-| 📝 Text RAG (Hindi/Marathi/Telugu/English) | ✅ End-to-end |
-| 🎙️ Voice round-trip (Transcribe + RAG + Polly) | ✅ End-to-end, ~20–34s |
-| 📷 Vision (Claude Vision, structured schema) | ✅ End-to-end |
-| 🔔 Weather-gated nudges + closed loop | ✅ End-to-end, T+24h/T+48h/T+72h expiry |
-| 🔒 Security (Meta HMAC-SHA256, secrets in Secrets Manager, PII redaction) | ✅ Enforced |
-| 📊 Observability (CloudWatch + X-Ray + custom metrics) | ✅ Enforced |
-
-### Security & Compliance
-
-| Control | Status | Evidence |
-| --- | --- | --- |
-| Meta HMAC-SHA256 signature verification | ✅ Always on | No bypass possible |
-| Per-user rate limiting | ✅ Active | 10 msgs/hour |
-| PII redaction in logs | ✅ Active | Phone numbers shown as `491***` |
-| IAM least-privilege | ✅ Enforced | DynamoDB / S3 / Bedrock resource-scoped |
-| Encryption at rest | ✅ Active | DynamoDB default encryption |
-| Encryption in transit | ✅ Active | HTTPS only |
-| Data retention TTL | ✅ Active | Conversations 90d / MSG rows 7d / Nudges 180d / WAMID dedup 24h |
-
-### Judge Note
-
-> All numbers above are **verifiable in the repository and live CloudWatch dashboards** — see [SAM template](template-week2.yaml), [ADRs](docs/adr), [EARS requirements](requirements.md), [CI workflows](.github/workflows), and the [full metrics report](docs/METRICS-AND-MONITORING.md). Cost figures at scale (about $0.54/farmer/year at 10K) are **modeled**; current production costs (about $1.70/day, about $53/month) are **real** — see [finops-public.md](docs/finops-public.md).
+**Judge note:** Live URLs are either directly linked above or exposed via CloudFormation outputs (`WebhookUrl`, `WebChatHealthUrl`) so reviewers can verify without us hardcoding stack-specific API ids in the README.
 
 ## Architecture
 
