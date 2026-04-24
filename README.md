@@ -2,31 +2,53 @@
 
 # AgriNexus AI – WhatsApp Agricultural Advisory
 
-**Closing the last mile in agricultural extension.** AI-powered agronomic advice and weather-timed nudges for smallholder farmers — in their language, on WhatsApp. Built on **AWS Serverless** + **Amazon Bedrock** with a requirements-driven workflow (**Kiro** + **EARS**).
+**From advice to action on WhatsApp.** AI-powered agronomic 
+advice and weather-timed nudges for smallholder farmers — in their 
+language, on WhatsApp. Built on **AWS Serverless** + **Amazon Bedrock** 
+with a requirements-driven workflow (**Kiro** + **EARS**).
 
 ---
 
-**Why it matters.** India has ~126 million smallholder farmers. They don't lose crops because advice doesn't exist — they lose crops because advice arrives after the spray window closes. Extension officers are stretched 1:5,000 against a guideline norm of 1:750. The knowledge is there; the follow-through isn't.
+**Why it matters.** India has ~126 million smallholder farmers. They don't 
+lose crops because advice doesn't exist — they lose crops because advice 
+arrives after the spray window closes. Extension officers are stretched 
+1:5,000 against a guideline norm of 1:750. The knowledge is there; the 
+follow-through isn't.
 
-**What we built.** A 1:1 advisor in every farmer's pocket — accessible on the WhatsApp they already use, no app install, grounded in ICAR + FAO research, responsive in Hindi / Marathi / Telugu / English, and most importantly — a closed accountability loop that follows up until the farmer confirms "हो गया" (done) or opts out.
+**What we built.** A 1:1 advisor on every farmer's phone — accessible 
+on the WhatsApp they already use, no app install, grounded in ICAR + FAO 
+research, responsive in Hindi / Marathi / Telugu / English, and most 
+importantly — a closed accountability loop that follows up until the 
+farmer confirms "हो गया" (done) or opts out.
 
-**Designed for scale.** Modeled at **~$0.54 per farmer per year at 10,000 active farmers** on fully serverless AWS. Zero adoption friction: WhatsApp is installed on 500M+ Indian phones. Zero training: tap buttons in your dialect, onboard in under 60 seconds.
+**Designed for scale.** Modeled at **~$0.54 per farmer per year at 10,000 
+active farmers** on fully serverless AWS. Zero adoption friction: 
+WhatsApp is installed on 500M+ Indian phones. Zero training: tap buttons 
+in your dialect, onboard in under 60 seconds.
 
-**The differentiator:** The closed-loop nudge engine. Most agri-AI tools stop at delivering advice. AgriNexus tracks whether the advice was acted on — advice plus accountability, not just information.
+**The differentiator:** The closed-loop nudge engine. Most agri-AI tools 
+stop at delivering advice. AgriNexus tracks whether the advice was acted 
+on — advice plus accountability, not just information.
 
 ---
 
 > ### 🏆 AWS Builder 10,000 AIdeas — Top 50 Finalist (EMEA · Social Impact)
->
+> 
 > **For judges, reviewers, and fellow builders — three fastest paths in:**
->
+> 
 > | Path | Link | Time |
 > | --- | --- | --- |
-> | 🎥 **Watch the demo** | [youtu.be/Hr9EcblzkwI](https://youtu.be/Hr9EcblzkwI) | 2:55 |
-> | 💬 **Try on WhatsApp** | [wa.me/4915120105731](https://wa.me/4915120105731) | 30 sec |
+> | 🎥 **Watch the demo** | [youtu.be/Hr9EcblzkwI](https://youtu.be/Hr9EcblzkwI) | 2:55 min |
+> | 💬 **Try on WhatsApp** | [wa.me/4915120105731](https://wa.me/4915120105731) | 1 min |
 > | 📖 **Read the finalist article** | [AWS Builder Center](https://builder.aws.com/content/3C8hBRTcsRuQrHzE3Pq243yhXTF/aideas-finalist-agrinexus-ai) | 8 min |
->
-> **TL;DR:** AgriNexus is the only closed-loop agricultural advisor in the finalist pool. Weather-gated reminders that follow up at T+24h and T+48h, cancelled instantly when the farmer confirms action. 100% serverless. ~$0.54/farmer/year at 10K scale.
+> 
+> **TL;DR:** The closed-loop nudge engine is the core differentiator against 
+> named peers (Farmer.Chat, iSDA, AgriChat.AI, Weather Impact). 
+> Weather-gated reminders that follow up at T+24h and T+48h, cancelled 
+> instantly when the farmer confirms action. 100% serverless. 
+> ~$0.54/farmer/year at 10K scale.
+
+---
 
 [![AWS Serverless](https://img.shields.io/badge/AWS-Serverless-232F3E?logo=amazonaws&logoColor=white)](https://aws.amazon.com/serverless/)
 [![Amazon Bedrock](https://img.shields.io/badge/Amazon%20Bedrock-Claude%203%20Sonnet-FF9900?logo=amazonaws&logoColor=white)](https://aws.amazon.com/bedrock/)
