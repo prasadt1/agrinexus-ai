@@ -258,3 +258,9 @@ verify-rate-limiting.sh
 check-latest-nudge.sh
 check-user-nudges.sh
 
+# Personal workflow helpers (keep local)
+scripts/push-to-public.sh
+scripts/allowlist-user.py
+scripts/demo-video-nudge-triggers.sh
+scripts/deploy-web-demo.sh
+
