@@ -28,6 +28,36 @@ def _make_screenshot_like_bytes():
     img.save(buf, format="PNG")
     return buf.getvalue()
 
+def _make_darkmode_chat_screenshot_like_bytes():
+    PIL = pytest.importorskip("PIL")
+    from PIL import Image, ImageDraw, ImageFont  # type: ignore
+
+    img = Image.new("RGB", (900, 600), (18, 18, 18))
+    draw = ImageDraw.Draw(img)
+
+    # Dark header + lighter content blocks (mimics chat UI on dark mode).
+    draw.rectangle([0, 0, 900, 90], fill=(10, 10, 10))
+    draw.rectangle([40, 120, 860, 540], fill=(35, 35, 35))
+    # Add multiple light "cards" with crisp borders to create edges.
+    for i in range(5):
+        top = 150 + i * 75
+        draw.rectangle([70, top, 830, top + 55], fill=(235, 235, 235), outline=(255, 255, 255), width=2)
+
+    try:
+        font = ImageFont.load_default()
+    except Exception:
+        font = None
+
+    # Dense text lines (high-frequency edges) inside the dark area.
+    y = 110
+    for _ in range(18):
+        draw.text((60, y), "UI SCREENSHOT TEXT 12345 | not a crop photo", fill=(230, 230, 230), font=font)
+        y += 18
+
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=88)
+    return buf.getvalue()
+
 
 def test_processor_screenshot_heuristic_blocks_before_model(monkeypatch):
     from src.processor import analyzer as proc_analyzer
@@ -43,6 +73,27 @@ def test_processor_screenshot_heuristic_blocks_before_model(monkeypatch):
 
     image_bytes = _make_screenshot_like_bytes()
 
+    result = proc_analyzer.analyze_crop_image(image_bytes=image_bytes, dialect="en", crop="wheat")
+    assert result["diagnosis"] == "non_photo"
+    assert called["bedrock"] is False
+
+
+def test_processor_darkmode_screenshot_heuristic_blocks_before_model(monkeypatch):
+    from src.processor import analyzer as proc_analyzer
+
+    called = {"bedrock": False}
+
+    class _DummyBedrock:
+        def invoke_model(self, *args, **kwargs):
+            called["bedrock"] = True
+            raise AssertionError("bedrock.invoke_model should not be called for dark UI screenshot-like inputs")
+
+    monkeypatch.setattr(proc_analyzer, "bedrock", _DummyBedrock())
+    # Make this test independent of the screenshot-cropper.
+    monkeypatch.setattr(proc_analyzer, "_extract_primary_frame", lambda b: b)
+
+    image_bytes = _make_darkmode_chat_screenshot_like_bytes()
+    assert proc_analyzer._looks_like_screenshot_or_ui(image_bytes) is True
     result = proc_analyzer.analyze_crop_image(image_bytes=image_bytes, dialect="en", crop="wheat")
     assert result["diagnosis"] == "non_photo"
     assert called["bedrock"] is False

@@ -58,6 +58,10 @@ def _looks_like_screenshot_or_ui(image_bytes: bytes) -> bool:
             return True
         if edge_frac > 0.22 and white_frac > 0.28:
             return True
+        # Dark-mode chat/app screenshots: lots of near-black pixels + moderate edges.
+        # This is uncommon for real crop photos (which typically have mid/high luminance greens).
+        if black_frac > 0.22 and edge_frac > 0.085:
+            return True
         return False
     except Exception:
         return False
@@ -373,8 +377,25 @@ def analyze_crop_image(
             'confidence': str  # high, medium, low
         }
     """
-    # If the user sent a screenshot, crop to the actual image frame first.
-    image_bytes = _extract_primary_frame(image_bytes)
+    # If this looks like a UI/screenshot, try to crop first; only proceed if the cropped
+    # result no longer looks like a screenshot/UI.
+    maybe_ui = _looks_like_screenshot_or_ui(image_bytes)
+    if maybe_ui:
+        cropped = _extract_primary_frame(image_bytes)
+        if cropped != image_bytes:
+            image_bytes = cropped
+        if _looks_like_screenshot_or_ui(image_bytes):
+            msg = _non_photo_message(dialect)
+            return {
+                "diagnosis": "non_photo",
+                "severity": "unknown",
+                "recommendations": msg,
+                "confidence": "low",
+                "raw_analysis": msg,
+            }
+    else:
+        # If the user sent a screenshot with an embedded photo, this may isolate it.
+        image_bytes = _extract_primary_frame(image_bytes)
 
     # Detect image format from magic bytes
     media_type = "image/jpeg"  # default
@@ -399,7 +420,7 @@ def analyze_crop_image(
     area = (district or "").strip() or "not specified"
 
     # Reject obvious non-photo inputs early (prevents confident hallucinations on logos/icons).
-    if _looks_like_screenshot_or_ui(image_bytes) or _looks_like_logo_or_illustration(image_bytes):
+    if _looks_like_logo_or_illustration(image_bytes):
         msg = _non_photo_message(dialect)
         return {
             "diagnosis": "non_photo",

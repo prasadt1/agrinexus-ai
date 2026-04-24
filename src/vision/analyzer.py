@@ -43,6 +43,8 @@ def _looks_like_screenshot_or_ui(image_bytes: bytes) -> bool:
             return True
         if edge_frac > 0.22 and white_frac > 0.28:
             return True
+        if black_frac > 0.22 and edge_frac > 0.085:
+            return True
         return False
     except Exception:
         return False
@@ -314,7 +316,22 @@ def analyze_crop_image(
             'confidence': str  # high, medium, low
         }
     """
-    image_bytes = _extract_primary_frame(image_bytes)
+    maybe_ui = _looks_like_screenshot_or_ui(image_bytes)
+    if maybe_ui:
+        cropped = _extract_primary_frame(image_bytes)
+        if cropped != image_bytes:
+            image_bytes = cropped
+        if _looks_like_screenshot_or_ui(image_bytes):
+            msg = _non_photo_message(dialect)
+            return {
+                "diagnosis": "non_photo",
+                "severity": "unknown",
+                "recommendations": msg,
+                "confidence": "low",
+                "raw_analysis": msg,
+            }
+    else:
+        image_bytes = _extract_primary_frame(image_bytes)
 
     # Detect image format from magic bytes
     media_type = "image/jpeg"  # default
@@ -338,7 +355,7 @@ def analyze_crop_image(
     language = language_map.get(dialect, "English")
     area = (district or "").strip() or "not specified"
 
-    if _looks_like_screenshot_or_ui(image_bytes) or _looks_like_logo_or_illustration(image_bytes):
+    if _looks_like_logo_or_illustration(image_bytes):
         msg = _non_photo_message(dialect)
         return {
             "diagnosis": "non_photo",
