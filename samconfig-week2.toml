@@ -19,8 +19,8 @@ parameter_overrides = [
     # Guardrail disabled: Bedrock Guardrails add per-request cost at scale; re-enable with GuardrailId=\"YOUR_ID\" when budget allows.
     "GuardrailId=\"\"",
     "GuardrailVersion=1",
-    # Optional: comma-separated digits (no +) exempt from webhook MSG rate limit for pilot demos. Leave empty in public clones.
-    "RateLimitBypassPhones=\"\"",
+    # Comma-separated digits (no +) exempt from per-user webhook rate limit. Owner pilot number.
+    "RateLimitBypassPhones=\"4917647009148\"",
     "RateLimitDisabled=false"
 ]
 

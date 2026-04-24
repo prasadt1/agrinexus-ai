@@ -594,6 +594,8 @@ def is_rag_refusal_response(text: str) -> bool:
     low = text.lower()
     if "don't have information" in low or "do not have information" in low:
         return True
+    if "i don't have" in low and "information" in low:
+        return True
     if "no information" in low and "knowledge base" in low:
         return True
     if "i can only help with farming" in low:
@@ -601,9 +603,27 @@ def is_rag_refusal_response(text: str) -> bool:
     # Hindi (model paraphrases the English refusal)
     if "जानकारी संग्रह" in text:
         return True
+    if "मेरे पास" in text and "जानकारी नहीं" in text:
+        return True
+    if "दिए गए संदर्भ" in text and (
+        "विशिष्ट जानकारी नहीं" in text or "जानकारी नहीं दी गई" in text
+    ):
+        return True
     if "ज्ञानकोषात" in text and ("माहिती नाही" in text or "नाही" in text):
         return True
+    if "माझ्याकडे" in text and "माहिती नाही" in text:
+        return True
     return False
+
+
+def strip_llm_xml_citation_tags(text: str) -> str:
+    """Remove inline XML-style citation leaks (e.g. <source>2</source>) from model output."""
+    if not text:
+        return text
+    text = re.sub(r"(?is)<\s*source\b[^>]*>.*?</\s*source\s*>", "", text)
+    text = re.sub(r"(?is)<\s*sources\b[^>]*>.*?</\s*sources\s*>", "", text)
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    return text
 
 
 def strip_llm_numeric_source_footer(text: str, source_keyword: str) -> str:
@@ -1077,8 +1097,14 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                 }
                 send_whatsapp_message(from_number, ack_messages.get(dialect, ack_messages['hi']))
             
-            # Query Bedrock with session ID for conversation context (this takes ~13 seconds)
-            result = query_bedrock(text, dialect, session_id=from_number)
+            # Voice: skip Bedrock session so retrieve+generate is not skewed by prior turns;
+            # STT text also differs from typed queries.
+            rag_session = (
+                None
+                if voice_source in ("voice", "voice_test")
+                else from_number
+            )
+            result = query_bedrock(text, dialect, session_id=rag_session)
             
             # Extract source citation from response or add generic attribution
             response_text = result["text"]
@@ -1090,7 +1116,8 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             }
             source_keyword = source_keywords.get(dialect, 'Source:')
             
-            # Strip LLM "स्रोत: 1" / "स्रोत: 3, 4, 5" placeholders; append doc names or generic line
+            # Strip LLM citation artifacts; append doc names or generic line
+            response_text = strip_llm_xml_citation_tags(response_text)
             response_text = strip_all_numeric_source_footers(response_text)
             has_source = source_keyword in response_text
 

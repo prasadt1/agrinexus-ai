@@ -68,7 +68,7 @@ Globals:
         KNOWLEDGE_BASE_ID: !Ref KnowledgeBaseId
         GUARDRAIL_ID: !Ref GuardrailId
         GUARDRAIL_VERSION: !Ref GuardrailVersion
-        RATE_LIMIT_MESSAGES: "10"  # Max messages per user per hour
+        RATE_LIMIT_MESSAGES: "25"  # Max inbound WhatsApp messages per user per hour (see webhook FilterExpression)
         RATE_LIMIT_WINDOW_SECONDS: "3600"  # 1 hour window
 
 Resources:

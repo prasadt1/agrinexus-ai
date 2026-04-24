@@ -76,6 +76,7 @@ def _looks_like_screenshot_or_ui(image_bytes: bytes) -> bool:
         hist = gray.histogram()
         total = float(sum(hist) or 1.0)
         black_frac = sum(hist[0:20]) / total
+        dark_frac = sum(hist[0:56]) / total
         white_frac = sum(hist[235:256]) / total
         edges = gray.filter(ImageFilter.FIND_EDGES)
         ehist = edges.histogram()
@@ -99,6 +100,12 @@ def _looks_like_screenshot_or_ui(image_bytes: bytes) -> bool:
         if edge_frac > 0.14 and white_frac > 0.55 and green_frac < 0.03:
             return True
         if black_frac > 0.22 and edge_frac > 0.085:
+            return True
+        if dark_frac > 0.30 and edge_frac > 0.052 and green_frac < 0.12:
+            return True
+        if dark_frac > 0.24 and edge_frac > 0.068 and green_frac < 0.085 and approx_unique_colors16 <= 140:
+            return True
+        if dark_frac > 0.72 and edge_frac > 0.034 and green_frac < 0.05 and approx_unique_colors16 <= 110:
             return True
         if (min(w, h) <= 320) and (green_frac < 0.12) and (white_frac > 0.60 or black_frac > 0.18):
             return True
@@ -390,6 +397,18 @@ def analyze_crop_image(
         }
 
     image_bytes = _extract_primary_frame(image_bytes)
+    if _looks_like_screenshot_or_ui(image_bytes):
+        msg = _non_photo_message(dialect)
+        return {
+            "diagnosis": "non_photo",
+            "severity": "unknown",
+            "recommendations": msg,
+            "confidence": "low",
+            "photo_kind": "unknown",
+            "inferred_crop": "unknown",
+            "crop_confidence": "low",
+            "raw_analysis": msg,
+        }
 
     # Detect image format from magic bytes
     media_type = "image/jpeg"  # default
@@ -432,7 +451,7 @@ CONTEXT (use unless the image gives *unmistakable* proof this is a different cro
 TASK: Look at the photo for pests, diseases, nutrient stress, or other visible problems — assuming this is their **{crop}** field unless proven otherwise.
 
 RULES:
-0. **Non-photo guardrail (be conservative)**: If the image is a logo, illustration, screenshot/UI, document, meme, diagram, or you are not clearly seeing a real plant/leaf captured by a camera, set `is_real_crop_photo=false`. Examples: a stylized leaf icon with clean lines on a white background; app/file browser screenshots; graphics with flat colors. Do not invent pests/diseases.
+0. **Non-photo guardrail (be conservative)**: If the image is a logo, illustration, screenshot/UI, document, meme, diagram, or you are not clearly seeing a real plant/leaf captured by a camera, set `is_real_crop_photo=false`. Examples: a stylized leaf icon with clean lines on a white background; app/file browser screenshots; **GitHub/repo/code listings, IDE panels, or folder trees** (thin colored text on dark backgrounds); graphics with flat colors. Do not invent pests/diseases. **Never** call something a wheat/cotton/soy field from these UI images.
 1. **Profile-first**: If the picture is partly blurry, backlit, or just "green vegetation", do **not** relabel it as sugarcane, rice, etc. Say visibility is limited and give guidance for **{crop}**.
 2. **Foreground first**: Base the diagnosis on the **sharp, main subject** (e.g. hand-held leaf, insects on that leaf). Out-of-focus yellow flowers or other plants in the **background** are often weeds or intercrop—mention in **at most one short phrase**, not as the headline. **Do not** use background color alone to reject **{crop}**.
 3. **Visual fidelity**: Describe what you can actually see (including insect color if visible). Do not contradict obvious colors (e.g., don't call black insects “white”). If color is unclear, say “color not clear in this photo”.

@@ -73,6 +73,33 @@ def _make_small_blurry_ui_thumbnail_bytes():
     img.save(buf, format="JPEG", quality=35)
     return buf.getvalue()
 
+def _make_github_dark_repo_tree_like_bytes():
+    """Dark IDE / GitHub file tree: lots of dark grey (not pure black) + thin UI edges, little foliage green."""
+    PIL = pytest.importorskip("PIL")
+    from PIL import Image, ImageDraw, ImageFont  # type: ignore
+
+    bg = (13, 17, 23)  # near GitHub dark canvas
+    img = Image.new("RGB", (720, 900), bg)
+    draw = ImageDraw.Draw(img)
+    try:
+        font = ImageFont.load_default()
+    except Exception:
+        font = None
+    # Fake folder rows + file names (high edge density, low green).
+    y = 40
+    for i in range(28):
+        indent = 24 + (i % 4) * 16
+        draw.text((indent, y), f"src  scripts  README.md  allowlist-user.py  {i}", fill=(201, 209, 217), font=font)
+        y += 28
+    # Occasional accent (orange "folder" dot) — still low foliage green overall.
+    for j in range(0, 720, 120):
+        draw.ellipse([j + 8, 200, j + 18, 210], fill=(218, 138, 76))
+
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=82)
+    return buf.getvalue()
+
+
 def _make_limited_palette_ui_bytes():
     PIL = pytest.importorskip("PIL")
     from PIL import Image, ImageDraw  # type: ignore
@@ -145,6 +172,26 @@ def test_processor_small_blurry_ui_thumbnail_blocks(monkeypatch):
     image_bytes = _make_small_blurry_ui_thumbnail_bytes()
     assert proc_analyzer._looks_like_screenshot_or_ui(image_bytes) is True
     result = proc_analyzer.analyze_crop_image(image_bytes=image_bytes, dialect="en", crop="wheat")
+    assert result["diagnosis"] == "non_photo"
+    assert called["bedrock"] is False
+
+
+def test_processor_github_dark_repo_tree_blocks_before_model(monkeypatch):
+    from src.processor import analyzer as proc_analyzer
+
+    called = {"bedrock": False}
+
+    class _DummyBedrock:
+        def invoke_model(self, *args, **kwargs):
+            called["bedrock"] = True
+            raise AssertionError("bedrock.invoke_model should not run for GitHub/IDE-style repo screenshots")
+
+    monkeypatch.setattr(proc_analyzer, "bedrock", _DummyBedrock())
+    monkeypatch.setattr(proc_analyzer, "_extract_primary_frame", lambda b: b)
+
+    image_bytes = _make_github_dark_repo_tree_like_bytes()
+    assert proc_analyzer._looks_like_screenshot_or_ui(image_bytes) is True
+    result = proc_analyzer.analyze_crop_image(image_bytes=image_bytes, dialect="hi", crop="wheat")
     assert result["diagnosis"] == "non_photo"
     assert called["bedrock"] is False
 

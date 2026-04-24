@@ -77,7 +77,12 @@ def _select_queue_url(from_number: str) -> str:
 
 
 def check_rate_limit(phone_number: str) -> bool:
-    """Count only MSG# items in the time window (excludes NUDGE#, PROFILE, etc.)."""
+    """Count inbound user messages only in the time window.
+
+    Processor `save_message` also writes `SK` under `MSG#...` but includes a `response`
+    field; those must not count toward the limit or users hit the cap in ~half as many
+    turns as intended.
+    """
     if _rate_limit_globally_disabled():
         return True
     norm = (phone_number or "").strip().lstrip("+")
@@ -92,6 +97,9 @@ def check_rate_limit(phone_number: str) -> bool:
         message_count = 0
         query_kwargs: Dict[str, Any] = {
             'KeyConditionExpression': 'PK = :pk AND SK BETWEEN :lo AND :hi',
+            # Webhook stream rows have no `response`; assistant saves do.
+            'FilterExpression': 'attribute_not_exists(#resp)',
+            'ExpressionAttributeNames': {'#resp': 'response'},
             'ExpressionAttributeValues': {
                 ':pk': f'USER#{phone_number}',
                 ':lo': f'MSG#{start_iso}',
