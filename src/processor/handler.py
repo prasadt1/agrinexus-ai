@@ -720,6 +720,35 @@ def query_bedrock(query: str, dialect: str = 'hi', session_id: Optional[str] = N
     }
     
     language_instruction = language_instructions.get(dialect, language_instructions['hi'])
+
+    # For non-English queries, append English keywords to improve KB vector
+    # retrieval (documents are primarily in English).  The generation prompt
+    # still instructs the model to respond in the user's language.
+    retrieval_query = query
+    if dialect != 'en':
+        _keyword_hints = {
+            'कपास': 'cotton', 'कापूस': 'cotton', 'పత్తి': 'cotton',
+            'गेहूं': 'wheat', 'गहू': 'wheat', 'గోధుమ': 'wheat',
+            'सोयाबीन': 'soybean', 'సోయాబీన్': 'soybean',
+            'मक्का': 'maize', 'मका': 'maize', 'మొక్కజొన్న': 'maize',
+            'धान': 'rice', 'भात': 'rice', 'వరి': 'rice',
+            'कीट': 'pest', 'कीड': 'pest', 'పురుగు': 'pest',
+            'रोग': 'disease', 'వ్యాధి': 'disease',
+            'स्प्रे': 'spray', 'फवारणी': 'spray', 'స్ప్రే': 'spray',
+            'खाद': 'fertilizer', 'खत': 'fertilizer', 'ఎరువు': 'fertilizer',
+            'पाने': 'leaves', 'पान': 'leaves', 'ఆకులు': 'leaves',
+            'पीले': 'yellow', 'पिवळी': 'yellow', 'పసుపు': 'yellow',
+            'सिंचाई': 'irrigation', 'पाणी': 'water irrigation', 'నీరు': 'water irrigation',
+            'बीज': 'seed', 'बियाणे': 'seed', 'విత్తనం': 'seed',
+            'मिट्टी': 'soil', 'माती': 'soil', 'నేల': 'soil',
+            'उपज': 'yield', 'उत्पादन': 'yield production', 'దిగుబడి': 'yield',
+        }
+        hints = []
+        for local_word, eng_word in _keyword_hints.items():
+            if local_word in query:
+                hints.append(eng_word)
+        if hints:
+            retrieval_query = f"{query} ({' '.join(dict.fromkeys(hints))})"
     
     # Build generation configuration
     generation_config = {
@@ -784,7 +813,7 @@ REMEMBER: If the Context above does not contain information to answer the Questi
     
     # Build request parameters
     request_params = {
-        'input': {'text': query},
+        'input': {'text': retrieval_query},
         'retrieveAndGenerateConfiguration': rag_config
     }
     
