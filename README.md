@@ -9,10 +9,10 @@ with a requirements-driven workflow (**Kiro** + **EARS**).
 
 ---
 
-**Why it matters.** India has ~126 million smallholder farmers. They don't 
+**Why it matters.** India has [~126 million](https://www.fao.org/fileadmin/templates/ess/ess_test_folder/World_Census_Agriculture/WCA_2020/WCA_2020_new_doc/IND_REP_ENG_2015_2016.pdf) smallholder farmers. They don't 
 lose crops because advice doesn't exist — they lose crops because advice 
 arrives after the spray window closes. Extension officers are stretched 
-1:5,000 against a guideline norm of 1:750. The knowledge is there; the 
+[1:5,000](https://m.thewire.in/article/agriculture/from-data-to-decisions-what-bharat-vistaar-needs-to-transform-indian-agriculture) against a guideline norm of 1:750. The knowledge is there; the 
 follow-through isn't.
 
 **What we built.** A 1:1 advisor on every farmer's phone — accessible 
