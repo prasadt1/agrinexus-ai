@@ -98,6 +98,7 @@ AgriNexus is a working system with full production observability — not a proto
 | --- | --- | --- |
 | Webhook API (Meta verified) | ✅ Live | API Gateway + WAF |
 | Weather API integration | ✅ Live | OpenWeatherMap via Secrets Manager |
+| Health endpoint | ✅ Live | `GET https://<api-id>.execute-api.<region>.amazonaws.com/<env>/health` (stack output: `WebChatHealthUrl`) |
 
 ### Engineering Quality
 

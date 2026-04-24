@@ -318,6 +318,29 @@ Resources:
             Method: OPTIONS
 
   # ============================================================================
+  # Lambda: Health Check (Judge-friendly liveness endpoint)
+  # ============================================================================
+  HealthHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-health-${Environment}
+      CodeUri: src/health/
+      Handler: handler.lambda_handler
+      Description: Simple liveness endpoint for API verification
+      MemorySize: 128
+      Timeout: 5
+      Environment:
+        Variables:
+          APP_VERSION: "1.0.0"
+      Events:
+        HealthGet:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebChatApi
+            Path: /health
+            Method: GET
+
+  # ============================================================================
   # Lambda: Message Processor
   # ============================================================================
   MessageProcessor:
@@ -835,6 +858,10 @@ Outputs:
   WebChatApiUrl:
     Description: Web chat API endpoint (for public demo)
     Value: !Sub https://${WebChatApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/chat
+
+  WebChatHealthUrl:
+    Description: Health endpoint (liveness check)
+    Value: !Sub https://${WebChatApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/health
 
   MessageQueueUrl:
     Description: SQS queue URL for message processing

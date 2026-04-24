@@ -17,11 +17,11 @@ jobs:
           python-version: "3.11"
 
       - name: Install pytest
-        run: pip install pytest
+        run: pip install pytest boto3
 
       - name: Fast tests (no live AWS Bedrock)
         run: |
-          python3 -m pytest tests/test_nudge_flow.py tests/test_district_helplines.py -v
+          python3 -m pytest tests/test_nudge_flow.py tests/test_district_helplines.py tests/test_e2e_happy_path_mocked.py -v
 
       - name: Install SAM CLI
         run: pip install aws-sam-cli
