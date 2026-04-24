@@ -160,6 +160,60 @@ def _non_photo_message(dialect: str) -> str:
     }
     return msgs.get(dialect, msgs["en"])
 
+def _extract_primary_frame(image_bytes: bytes) -> bytes:
+    try:
+        from PIL import Image  # type: ignore
+    except Exception:
+        return image_bytes
+    try:
+        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        w, h = img.size
+        if w < 200 or h < 200:
+            return image_bytes
+
+        small_w = 220
+        small_h = max(220, int(h * (small_w / w)))
+        small = img.resize((small_w, small_h))
+        px = small.load()
+
+        min_x, min_y = small_w, small_h
+        max_x, max_y = -1, -1
+        for y in range(small_h):
+            for x in range(small_w):
+                r, g, b = px[x, y]
+                if r > 220 and g > 220 and b > 220:
+                    if x < min_x: min_x = x
+                    if y < min_y: min_y = y
+                    if x > max_x: max_x = x
+                    if y > max_y: max_y = y
+
+        if max_x < 0:
+            return image_bytes
+
+        bbox_w = (max_x - min_x + 1)
+        bbox_h = (max_y - min_y + 1)
+        area_ratio = (bbox_w * bbox_h) / float(small_w * small_h)
+        if area_ratio < 0.18:
+            return image_bytes
+
+        scale_x = w / float(small_w)
+        scale_y = h / float(small_h)
+        pad = 12
+        left = max(0, int(min_x * scale_x) - pad)
+        upper = max(0, int(min_y * scale_y) - pad)
+        right = min(w, int((max_x + 1) * scale_x) + pad)
+        lower = min(h, int((max_y + 1) * scale_y) + pad)
+        crop = img.crop((left, upper, right, lower))
+        cw, ch = crop.size
+        if (cw * ch) / float(w * h) > 0.92:
+            return image_bytes
+
+        out = io.BytesIO()
+        crop.save(out, format="JPEG", quality=92, optimize=True)
+        return out.getvalue()
+    except Exception:
+        return image_bytes
+
 def _extract_json_object(text: str) -> Optional[Dict[str, Any]]:
     if not text:
         return None
@@ -230,6 +284,8 @@ def analyze_crop_image(
             'confidence': str  # high, medium, low
         }
     """
+    image_bytes = _extract_primary_frame(image_bytes)
+
     # Detect image format from magic bytes
     media_type = "image/jpeg"  # default
     if image_bytes[:2] == b'\xff\xd8':
