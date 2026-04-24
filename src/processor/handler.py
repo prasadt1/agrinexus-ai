@@ -1012,5 +1012,30 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                 send_whatsapp_message(from_number, gate_msg.get(dialect, gate_msg['en']))
                 continue
             print(f"Audio message - should be handled by VoiceProcessor")
+
+        elif message_type == 'document':
+            # WhatsApp document uploads (e.g. .xlsx). We don't support parsing files in the demo.
+            doc = (message or {}).get('document', {}) if isinstance(message, dict) else {}
+            filename = (doc.get('filename') or '').strip()
+            suffix = f" ({filename})" if filename else ""
+            msg = {
+                'hi': f'यह फ़ाइल{suffix} अभी पढ़ी नहीं जा सकती। कृपया टेक्स्ट में प्रश्न लिखें या फसल/पत्ते की फोटो भेजें।',
+                'mr': f'ही फाईल{suffix} सध्या वाचता येत नाही. कृपया प्रश्न टेक्स्टमध्ये लिहा किंवा पिक/पानाचा फोटो पाठवा.',
+                'te': f'ఈ ఫైల్{suffix} ప్రస్తుతం చదవలేము. దయచేసి ప్రశ్నను టెక్స్ట్‌లో పంపండి లేదా పంట/ఆకు ఫోటో పంపండి.',
+                'en': f'I can’t read files{suffix} yet. Please paste the key text or ask your question in chat, or send a crop/leaf photo.'
+            }
+            send_whatsapp_message(from_number, msg.get(dialect, msg['en']))
+            continue
+
+        else:
+            # Unknown/unsupported message types: fail closed with a helpful reply.
+            msg = {
+                'hi': 'यह अटैचमेंट/फॉर्मेट अभी समर्थित नहीं है। कृपया टेक्स्ट भेजें या फसल/पत्ते की फोटो भेजें।',
+                'mr': 'हा अटॅचमेंट/फॉरमॅट सध्या समर्थित नाही. कृपया टेक्स्ट पाठवा किंवा पिक/पानाचा फोटो पाठवा.',
+                'te': 'ఈ అటాచ్‌మెంట్/ఫార్మాట్ ప్రస్తుతం సపోర్ట్ కాదు. దయచేసి టెక్స్ట్ పంపండి లేదా పంట/ఆకు ఫోటో పంపండి.',
+                'en': 'That attachment type isn’t supported yet. Please send text or a crop/leaf photo.'
+            }
+            send_whatsapp_message(from_number, msg.get(dialect, msg['en']))
+            continue
     
     return {'statusCode': 200}
