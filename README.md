@@ -527,6 +527,7 @@ This project was developed using **Kiro AI**, which enabled requirements-driven 
 - [data/fao-pdfs/README.md](data/fao-pdfs/README.md) — knowledge-base PDF sources, S3 sync, and **URL manifests / batch download** (`kb_url_manifest_*.csv`, `scripts/download_kb_from_manifest.py`)
 - [docs/requirements.md](docs/requirements.md) — EARS requirements specification
 - [docs/ISSUES-LOG.md](docs/ISSUES-LOG.md) — troubleshooting history (resolved issues)
+- [docs/competitive-evidence-notes.md](docs/competitive-evidence-notes.md) — competitive landscape analysis (public sources)
 
 <details>
 <summary><strong>Maintainers (internal / non-public)</strong></summary>
