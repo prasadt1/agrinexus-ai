@@ -454,7 +454,7 @@ PROFILE CONTEXT (farmer's registered crop, NOT visual evidence):
 - District: {area}
 
 JSON OUTPUT (all fields required):
-{{
+{% raw %}{{
     "is_real_crop_photo": true | false,
     "non_photo_reason": "screenshot" | "logo" | "document" | "too_blurry" | null,
     "inferred_crop": "Cotton" | "Wheat" | "Soybean" | "Rice" | "Sugarcane" | "Maize" | "unknown",
@@ -462,7 +462,7 @@ JSON OUTPUT (all fields required):
     "visible_problem": true | false,
     "severity": "high" | "medium" | "low" | "none" | "unknown",
     "recommendations": "<2-4 sentences in {language}>"
-}}
+}}{% endraw %}
 
 3-TIER CROP IDENTIFICATION (CRITICAL):
 
