@@ -442,6 +442,13 @@ Weather Poller → Step Functions → Nudge Sender → WhatsApp
 
 ## Cost Breakdown
 
+> **Three numbers, one hierarchy:**
+> - **~$1.70/day** = current real production cost (low utilization)
+> - **~$53/month at 1K farmers** = modeled cost at pilot scale (~$0.64/farmer/year)
+> - **~$0.54/farmer/year at 10K farmers** = projected cost at scale (modest economies of scale)
+>
+> All three appear elsewhere in this README — they're consistent, just at different scales.
+
 **All pay-per-use, no fixed costs** (migrated from OpenSearch Serverless to S3 vectors on April 4, 2026)
 
 ### Variable Costs (~3K queries + 500 voice min/month for 1K farmers)
@@ -484,6 +491,7 @@ The production build made deliberate tradeoffs for pilot sustainability. Calling
 3. **Single-region deployment**: Multi-region is architected but deployed single-region (us-east-1) for cost efficiency during pilot. Failover and multi-region deployment patterns are documented in [docs/architecture.md](docs/architecture.md).
 
 4. **Weather API with demo fallback**: Production uses OpenWeatherMap via Secrets Manager. The `MOCK_WEATHER=true` flag exists for demo reliability and is explicitly logged so test traffic is never confused with production readings.
+   - **Setup**: Store the OpenWeatherMap API key in Secrets Manager (`WEATHER_API_KEY_SECRET`, e.g. `agrinexus/weather/api-key`) — never in `samconfig` or git. Set `MOCK_WEATHER=true` on the Weather Lambda only for deterministic demo weather. See [docs/guides/WEATHER-API-SETUP.md](docs/guides/WEATHER-API-SETUP.md).
 
 ## Troubleshooting
 
@@ -535,10 +543,6 @@ Use the [CloudWatch console](https://console.aws.amazon.com/cloudwatch/) for Lam
 **Custom metrics** (application code, if enabled in your deployment): `AgriNexus/NudgesSent`, `AgriNexus/NudgesCompleted`. You can build a CloudWatch dashboard (e.g. `AgriNexus-Operations-dev`) on top of these and standard Lambda/SQS metrics.
 
 **Traffic visibility vs. browser analytics:** **Web demo** and **WhatsApp** traffic are understood through **AWS**—CloudWatch metrics and logs (API Gateway and `agrinexus-web-chat` for the public `/chat` path; webhook, processor, queues, and DLQ for WhatsApp), optional **WAF** metrics and sampled requests on `/chat`, and the nudge custom metrics above. The **[`dashboards/cloudwatch-dashboard.json`](dashboards/cloudwatch-dashboard.json)** template includes **web demo** API and Lambda widgets plus an on-dashboard pointer to **CloudWatch RUM** for optional **page-view** telemetry. **Optional RUM** (off by default) is configured in **`docs/web-demo/assets/rum-config.js`**; there is no third-party page analytics (e.g. Google Analytics). Details: **[docs/web-demo/README.md#traffic-visibility-vs-browser-analytics](docs/web-demo/README.md#traffic-visibility-vs-browser-analytics)**.
-
-## Real Weather API (Optional)
-
-Production uses **OpenWeatherMap** when `MOCK_WEATHER` is false and the API key is available from **Secrets Manager** (`WEATHER_API_KEY_SECRET` on the Weather Lambda, e.g. `agrinexus/weather/api-key`). Store the key in Secrets Manager—do not put it in `samconfig` or git. Set `MOCK_WEATHER=true` on the Weather poller only for deterministic demo weather. See [docs/guides/WEATHER-API-SETUP.md](docs/guides/WEATHER-API-SETUP.md).
 
 ## Requirements Methodology: EARS
 
@@ -602,7 +606,7 @@ The roadmap isn’t just “more nudges”—it’s **smarter triggers + smarter
 - **Escalation logic**: if repeated “NOT YET” or no response, switch to a different ask (photo request, short checklist, or human extension escalation path).
 
 
-### Current Productization Thinking
+### Layered productization model
 
 | Layer | Now | Next 6 months | Commercial model |
 |---|---|---|---|
@@ -640,22 +644,27 @@ Special thanks to the smallholder farmers whose real-world challenges inspired t
 
 ## Documentation
 
+### For evaluators
 - [Architecture](docs/architecture.md) — full system design
-- [Diagrams](architecture/diagrams.md) — Mermaid flow diagrams
-- [E2E Test Checklist](docs/testing/E2E-TEST-CHECKLIST.md) — pre-demo checklist (manual + automated smoke pointer)
-- [E2E Test Guide](docs/E2E-TEST-GUIDE.md) — end-to-end test walkthrough
-- [Code Walkthrough](docs/CODE-WALKTHROUGH.md) — component-by-component guide
+- [Requirements (EARS)](docs/requirements.md) — 144 requirements specification
 - [Implementation Quality Metrics](docs/IMPLEMENTATION-QUALITY-METRICS.md) — test coverage, code quality, traceability
-- [Infrastructure Capacity Analysis](docs/INFRASTRUCTURE-CAPACITY-ANALYSIS.md) — capacity planning, load testing, scaling
-- [RAG Flow Explained](docs/product/RAG-FLOW-EXPLAINED.md) — how the RAG pipeline works
-- [Nudge Behavior Guide](docs/product/NUDGE-BEHAVIOR-GUIDE.md) — nudge system behavior and templates
-- [Vision Reliability Report](docs/reports/VISION-RELIABILITY-REPORT.md) — vision pipeline reliability analysis
 - [Cost & FinOps](docs/finops-public.md) — cost modeling and FinOps breakdown
-- [Knowledge Base Sources](data/fao-pdfs/README.md) — PDF sources, S3 sync, and **URL manifests / batch download** (`kb_url_manifest_*.csv`, `scripts/download_kb_from_manifest.py`)
-- [Requirements (EARS)](docs/requirements.md) — EARS requirements specification (144 requirements)
-- [Issues Log](docs/ISSUES-LOG.md) — troubleshooting history (resolved issues)
-- [Competitive Evidence Notes](docs/competitive-evidence-notes.md) — competitive landscape analysis (public sources)
-- [Install Prerequisites](docs/guides/INSTALL-PREREQUISITES.md) — setup prerequisites (SAM, AWS CLI, Python)
+- [Competitive Evidence Notes](docs/competitive-evidence-notes.md) — competitive landscape analysis
+
+### For developers / deploying
+- [Code Walkthrough](docs/CODE-WALKTHROUGH.md) — component-by-component guide
+- [E2E Test Guide](docs/E2E-TEST-GUIDE.md) — end-to-end test walkthrough
+- [E2E Test Checklist](docs/testing/E2E-TEST-CHECKLIST.md) — pre-demo checklist
+- [Install Prerequisites](docs/guides/INSTALL-PREREQUISITES.md) — setup prerequisites
+- [Knowledge Base Sources](data/fao-pdfs/README.md) — PDF sources, S3 sync, URL manifests
+
+### Deep-dive reports
+- [Diagrams](architecture/diagrams.md) — Mermaid flow diagrams
+- [Infrastructure Capacity Analysis](docs/INFRASTRUCTURE-CAPACITY-ANALYSIS.md) — capacity & scaling
+- [RAG Flow Explained](docs/product/RAG-FLOW-EXPLAINED.md) — pipeline internals
+- [Nudge Behavior Guide](docs/product/NUDGE-BEHAVIOR-GUIDE.md) — nudge templates
+- [Vision Reliability Report](docs/reports/VISION-RELIABILITY-REPORT.md) — vision pipeline analysis
+- [Issues Log](docs/ISSUES-LOG.md) — troubleshooting history
 
 <details>
 <summary><strong>Maintainers (internal / non-public)</strong></summary>
@@ -665,14 +674,6 @@ Some documents are intentionally **not** part of the public “judge quickstart�
 - `docs/operations/RUNBOOK-ALERTS.md` — alarms, DLQ, abuse envelope, rate limits
 
 </details>
-
-## Resources
-
-- [AWS SAM Documentation](https://docs.aws.amazon.com/serverless-application-model/)
-- [Bedrock Knowledge Bases](https://docs.aws.amazon.com/bedrock/latest/userguide/knowledge-base.html)
-- [Amazon Transcribe](https://docs.aws.amazon.com/transcribe/)
-- [Amazon Polly](https://docs.aws.amazon.com/polly/)
-- [WhatsApp Business API](https://developers.facebook.com/docs/whatsapp)
 
 ## License
 
