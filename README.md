@@ -80,7 +80,7 @@ AgriNexus is a working system with full production observability — not a proto
 | --- | --- |
 | Test-to-code ratio | **80%** ([metrics](docs/IMPLEMENTATION-QUALITY-METRICS.md) · [how I got there](docs/IMPLEMENTATION-QUALITY-METRICS.md#14-test-coverage-improvement-journey)) |
 | Infrastructure-as-Code resources (SAM) | **34** ([template.yaml](template.yaml)) |
-| Architecture Decision Records (ADRs) | **9** ([docs/adr/](docs/adr/)) |
+| Architecture Decision Records (ADRs) | **10** ([docs/adr/](docs/adr/)) |
 | EARS requirements traced to code | **144** ([docs/requirements.md](docs/requirements.md)) |
 | Lambda functions deployed | **11** |
 | CI/CD workflows | **2** ([ci.yml](.github/workflows/ci.yml) + [aws-smoke.yml](.github/workflows/aws-smoke.yml)) |
