@@ -636,22 +636,22 @@ Special thanks to the smallholder farmers whose real-world challenges inspired t
 
 ## Documentation
 
-- [docs/architecture.md](docs/architecture.md) — full system design
-- [architecture/diagrams.md](architecture/diagrams.md) — Mermaid flow diagrams
-- [docs/testing/E2E-TEST-CHECKLIST.md](docs/testing/E2E-TEST-CHECKLIST.md) — pre-demo checklist (manual + automated smoke pointer)
-- [docs/E2E-TEST-GUIDE.md](docs/E2E-TEST-GUIDE.md) — end-to-end test walkthrough
-- [docs/CODE-WALKTHROUGH.md](docs/CODE-WALKTHROUGH.md) — component-by-component guide
-- [docs/IMPLEMENTATION-QUALITY-METRICS.md](docs/IMPLEMENTATION-QUALITY-METRICS.md) — test coverage, code quality, traceability
-- [docs/INFRASTRUCTURE-CAPACITY-ANALYSIS.md](docs/INFRASTRUCTURE-CAPACITY-ANALYSIS.md) — capacity planning, load testing, scaling
-- [docs/product/RAG-FLOW-EXPLAINED.md](docs/product/RAG-FLOW-EXPLAINED.md) — how the RAG pipeline works
-- [docs/product/NUDGE-BEHAVIOR-GUIDE.md](docs/product/NUDGE-BEHAVIOR-GUIDE.md) — nudge system behavior and templates
-- [docs/reports/VISION-RELIABILITY-REPORT.md](docs/reports/VISION-RELIABILITY-REPORT.md) — vision pipeline reliability analysis
-- [docs/finops-public.md](docs/finops-public.md) — cost modeling and FinOps breakdown
-- [data/fao-pdfs/README.md](data/fao-pdfs/README.md) — knowledge-base PDF sources, S3 sync, and **URL manifests / batch download** (`kb_url_manifest_*.csv`, `scripts/download_kb_from_manifest.py`)
-- [docs/requirements.md](docs/requirements.md) — EARS requirements specification (144 requirements)
-- [docs/ISSUES-LOG.md](docs/ISSUES-LOG.md) — troubleshooting history (resolved issues)
-- [docs/competitive-evidence-notes.md](docs/competitive-evidence-notes.md) — competitive landscape analysis (public sources)
-- [docs/guides/INSTALL-PREREQUISITES.md](docs/guides/INSTALL-PREREQUISITES.md) — setup prerequisites (SAM, AWS CLI, Python)
+- [Architecture](docs/architecture.md) — full system design
+- [Diagrams](architecture/diagrams.md) — Mermaid flow diagrams
+- [E2E Test Checklist](docs/testing/E2E-TEST-CHECKLIST.md) — pre-demo checklist (manual + automated smoke pointer)
+- [E2E Test Guide](docs/E2E-TEST-GUIDE.md) — end-to-end test walkthrough
+- [Code Walkthrough](docs/CODE-WALKTHROUGH.md) — component-by-component guide
+- [Implementation Quality Metrics](docs/IMPLEMENTATION-QUALITY-METRICS.md) — test coverage, code quality, traceability
+- [Infrastructure Capacity Analysis](docs/INFRASTRUCTURE-CAPACITY-ANALYSIS.md) — capacity planning, load testing, scaling
+- [RAG Flow Explained](docs/product/RAG-FLOW-EXPLAINED.md) — how the RAG pipeline works
+- [Nudge Behavior Guide](docs/product/NUDGE-BEHAVIOR-GUIDE.md) — nudge system behavior and templates
+- [Vision Reliability Report](docs/reports/VISION-RELIABILITY-REPORT.md) — vision pipeline reliability analysis
+- [Cost & FinOps](docs/finops-public.md) — cost modeling and FinOps breakdown
+- [Knowledge Base Sources](data/fao-pdfs/README.md) — PDF sources, S3 sync, and **URL manifests / batch download** (`kb_url_manifest_*.csv`, `scripts/download_kb_from_manifest.py`)
+- [Requirements (EARS)](docs/requirements.md) — EARS requirements specification (144 requirements)
+- [Issues Log](docs/ISSUES-LOG.md) — troubleshooting history (resolved issues)
+- [Competitive Evidence Notes](docs/competitive-evidence-notes.md) — competitive landscape analysis (public sources)
+- [Install Prerequisites](docs/guides/INSTALL-PREREQUISITES.md) — setup prerequisites (SAM, AWS CLI, Python)
 
 <details>
 <summary><strong>Maintainers (internal / non-public)</strong></summary>
