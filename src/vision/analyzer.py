@@ -46,6 +46,14 @@ def validate_vision_schema(vision: Dict[str, Any]) -> None:
     if vision['severity'] not in ['high', 'medium', 'low', 'none', 'unknown']:
         raise ValueError(f"Invalid severity: {vision['severity']}")
 
+    # Validate non_photo_reason enum (if present)
+    if vision.get('non_photo_reason') and vision['non_photo_reason'] not in ['screenshot', 'logo', 'document', 'too_blurry']:
+        raise ValueError(f"Invalid non_photo_reason: {vision['non_photo_reason']}")
+
+    # Validate inferred_crop enum
+    if vision['inferred_crop'] not in ['Cotton', 'Wheat', 'Soybean', 'Rice', 'Sugarcane', 'Maize', 'unknown']:
+        raise ValueError(f"Invalid inferred_crop: {vision['inferred_crop']}")
+
 
 def _normalize_vision_metadata(photo_kind: str, inferred_crop: str, crop_confidence: str) -> Dict[str, str]:
     pk = (photo_kind or "unknown").strip() or "unknown"
@@ -604,8 +612,7 @@ REMEMBER:
             'crop_confidence': 'low',
             'visible_problem': False,
             'severity': 'unknown',
-            'recommendations': error_messages.get(dialect, error_messages['en']),
-            'error': str(e)
+            'recommendations': error_messages.get(dialect, error_messages['en'])
         }
 
 
