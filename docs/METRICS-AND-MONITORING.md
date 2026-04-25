@@ -167,7 +167,7 @@
 | Metric | Status | Details |
 |--------|--------|---------|
 | Signature Verification | ✅ Always On | Meta HMAC-SHA256, no bypass possible |
-| Rate Limiting | ✅ Active | 10 msgs/hour per user |
+| Rate Limiting | ✅ Active | 25 msgs/hour per user |
 | Allowlist Gating | ✅ Active | Nudges/voice gated |
 | PII Redaction | ✅ Active | All phone numbers redacted in logs |
 

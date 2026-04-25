@@ -26,6 +26,7 @@ The nudge system sends weather-based reminders to farmers and follows up if they
 - Creates nudge record with status: SENT
 - Schedules T+24h reminder
 - Schedules T+48h reminder
+- Schedules T+72h expiry (auto-close if no response after final reminder)
 
 ---
 
@@ -44,7 +45,7 @@ The nudge system sends weather-based reminders to farmers and follows up if they
 - **Response**: "बहुत अच्छा! आपका काम पूरा हो गया। धन्यवाद! 🎉"
 - **System Action**:
   - Updates status to DONE
-  - Cancels T+48h reminder
+  - Cancels all scheduled reminders/expiry (T+24h, T+48h, T+72h)
   - Emits NudgesCompleted metric
   - Flow ends
 
@@ -86,13 +87,15 @@ The nudge system sends weather-based reminders to farmers and follows up if they
   - Translation: "No problem. Do it when you're ready. Next time the weather is good, I'll remind you again."
 - **System Action**:
   - No more reminders for this nudge
+  - Marks status as EXPIRED (closed loop completed without confirmation)
+  - Cancels any remaining schedules (including the T+72h expiry schedule)
   - Flow ends gracefully
   - User will get a fresh nudge next time weather is favorable
 
 #### Option C: No reply
 - **System Action**:
-  - No more reminders for this nudge
-  - Flow ends
+  - T+72h expiry auto-closes the nudge (status → EXPIRED) if there is still no response
+  - User will get a fresh nudge next time weather is favorable
   - User will get a fresh nudge next time weather is favorable
 
 ---
@@ -100,7 +103,7 @@ The nudge system sends weather-based reminders to farmers and follows up if they
 ## Key Behaviors
 
 ### Duplicate Prevention
-- **Rule**: Max 1 nudge per activity per day
+- **Rule**: Max 1 nudge per activity per day (evaluated in IST day boundary)
 - **Check**: Before creating new nudge, system checks for existing pending nudges
 - **Result**: Farmers won't get spammed with multiple nudges on the same day
 
@@ -119,16 +122,16 @@ The nudge system sends weather-based reminders to farmers and follows up if they
 ### Status Transitions
 ```
 SENT → REMINDED → DONE
-  ↓       ↓         ↑
-  └───────┴─────────┘
-   (user replies "हो गया")
+  ↓       ↓
+  └───────┴──────→ EXPIRED
+    (final NOT YET or T+72h expiry)
 ```
 
 ### Weather Polling
 - **Frequency**: Every 6 hours (configurable via EventBridge)
-- **Mode**: Mock mode (default) or Real weather API
-- **Mock Mode**: Always returns favorable conditions for Latur, Jalna, Nagpur
-- **Real Mode**: Calls OpenWeather API with actual conditions
+- **Mode**: Real weather API by default (SAM sets `MOCK_WEATHER=false`); mock mode is optional for deterministic demos
+- **Mock Mode**: Returns favorable conditions for configured districts (use only for demos)
+- **Real Mode**: Calls OpenWeatherMap API with actual conditions
 
 ---
 

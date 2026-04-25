@@ -164,11 +164,11 @@ Use a **golden-style** question so the KB is likely to return grounded text (sam
 ## 4. Rate Limiting Tests
 
 ### 4.1 WhatsApp Rate Limit
-- [ ] ⏳ Send 10 messages in 1 hour → All succeed
-- [ ] ⏳ Send 11th message → Receive rate limit error
+- [ ] ⏳ Send 25 messages in 1 hour → All succeed
+- [ ] ⏳ Send 26th message → Receive rate limit error
 - [ ] ⏳ Wait 1 hour → Rate limit resets
 
-**Expected:** 10 messages/hour per user  
+**Expected:** 25 messages/hour per user  
 **Critical:** Prevent abuse
 
 ### 4.2 Web Demo Rate Limit

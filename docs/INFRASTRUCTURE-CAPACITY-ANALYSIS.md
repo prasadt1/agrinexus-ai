@@ -7,7 +7,7 @@
 
 The AgriNexus AI infrastructure is **ready to handle public demo traffic** with current configurations. The system uses serverless AWS services that auto-scale, combined with multi-layer rate limiting to prevent abuse. Key findings:
 
-- ✅ **Rate limits**: Adequate protection at webhook (10 msg/hour/user) and web demo (5 queries/hour/IP)
+- ✅ **Rate limits**: Adequate protection at webhook (25 msg/hour/user) and web demo (5 queries/hour/IP)
 - ✅ **Lambda concurrency**: Default 1000 concurrent executions per region (sufficient for demo)
 - ✅ **DynamoDB**: On-demand capacity auto-scales
 - ✅ **Bedrock**: Throttling limits are service-managed
@@ -20,7 +20,7 @@ The AgriNexus AI infrastructure is **ready to handle public demo traffic** with 
 ### 1.1 WhatsApp Webhook
 **Configuration** (`template.yaml`):
 ```yaml
-RATE_LIMIT_MESSAGES: "10"  # Max messages per user per hour
+RATE_LIMIT_MESSAGES: "25"  # Max messages per user per hour
 RATE_LIMIT_WINDOW_SECONDS: "3600"  # 1 hour window
 ```
 
@@ -29,7 +29,7 @@ RATE_LIMIT_WINDOW_SECONDS: "3600"  # 1 hour window
 - Enforces limit before SQS enqueue (prevents wasted processing)
 - Returns 429 status when limit exceeded
 
-**Capacity**: Can handle **unlimited concurrent users**, each limited to 10 messages/hour
+**Capacity**: Can handle **unlimited concurrent users**, each limited to 25 messages/hour
 
 ### 1.2 Web Demo API
 **Configuration** (`src/web-chat/handler.py`):
@@ -65,7 +65,7 @@ Limit: 300  # 300 requests / 5 minutes per IP
 ### 2.1 Concurrency Limits
 **AWS Default**: 1,000 concurrent executions per region (us-east-1)
 
-**Current Functions** (9 total):
+**Current Functions** (11 total):
 | Function | Timeout | Memory | Trigger | Expected Concurrency |
 |----------|---------|--------|---------|---------------------|
 | WebhookHandler | 30s | 256MB | API Gateway | Low (fast validation) |
@@ -152,7 +152,7 @@ Limit: 300  # 300 requests / 5 minutes per IP
 
 **Demo Rate Limits**:
 - Web demo: 5 queries/hour per IP
-- WhatsApp: 10 messages/hour per user
+- WhatsApp: 25 messages/hour per user
 - Even with 1,000 concurrent users, rate limits prevent Bedrock throttling
 
 **Recommendation**: Monitor Bedrock throttling metrics. Request quota increase if needed (typically approved within 24 hours).
