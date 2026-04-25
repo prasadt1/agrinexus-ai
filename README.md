@@ -613,12 +613,23 @@ Some documents are intentionally **not** part of the public “judge quickstart�
 
 ## Beyond Agriculture: Productization Roadmap
 
-AgriNexus is built as an **accountability engine** where only the trigger and copy change. The closed-loop architecture applies beyond farming:
+AgriNexus is built as an **accountability engine**. The **trigger → confirm → follow-up** structure is domain-agnostic: only the trigger and message copy change; the accountability loop stays the same.
+
+The same loop can be reused beyond farming:
 
 - **Irrigation scheduling** — reservoir level triggers, district-scoped reminders
 - **Medication adherence** — rural health worker follow-ups
 - **Micro-savings nudges** — financial literacy programs
 - **Vaccine schedule reminders** — maternal health networks
+
+### Nudge intelligence (next)
+
+The roadmap isn’t just “more nudges”—it’s **smarter triggers + smarter follow-ups**:
+
+- **Market-aware nudges (mandi prices)**: price-change triggers, sell-window reminders, and location-aware price context (APMC/mandi-level where available).
+- **Risk-aware nudges**: combine weather + crop stage + known pest windows to time scouting reminders (not just spray “do/don’t”).
+- **Personalization**: adapt frequency and wording based on farmer responses (DONE/NOT YET), past follow-through, and preferred time windows.
+- **Escalation logic**: if repeated “NOT YET” or no response, switch to a different ask (photo request, short checklist, or human extension escalation path).
 
 ### Current Productization Thinking
 
