@@ -52,10 +52,10 @@
 - [Honest Tradeoffs](#honest-tradeoffs)
 - [Monitoring](#monitoring)
 - [Requirements Methodology: EARS](#requirements-methodology-ears)
-- [Documentation](#documentation)
 - [Productization Roadmap](#productization-roadmap)
 - [Partnerships & commercialization](#partnerships--commercialization)
 - [Acknowledgments](#acknowledgments)
+- [Documentation](#documentation)
 - [License](#license)
 
 ---
