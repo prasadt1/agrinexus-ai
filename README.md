@@ -8,7 +8,7 @@
 
 **Why it matters.** India has ~126 million smallholder farmers. They don't lose crops because advice doesn't exist — they lose crops because advice arrives after the spray window closes. Extension officers are stretched 1:5,000 against a guideline norm of 1:750. The knowledge is there; the follow-through isn't.
 
-**What we built.** A 1:1 advisor on every farmer's phone — accessible on the WhatsApp they already use, no app install, grounded in ICAR + FAO research, responsive in Hindi / Marathi / Telugu / English, and most importantly — a closed accountability loop that follows up until the farmer confirms "हो गया" (done) or opts out.
+**What I built.** A 1:1 advisor on every farmer's phone — accessible on the WhatsApp they already use, no app install, grounded in ICAR + FAO research, responsive in Hindi / Marathi / Telugu / English, and most importantly — a closed accountability loop that follows up until the farmer confirms "हो गया" (done) or opts out.
 
 **Designed for scale.** Modeled at **~$0.54 per farmer per year at 10,000 active farmers** on fully serverless AWS. Currently running production at **~$53/month / ~$1.70/day**. Zero adoption friction: WhatsApp is installed on 500M+ Indian phones. Zero training: tap buttons in your dialect, onboard in under 60 seconds.
 
