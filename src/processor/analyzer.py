@@ -844,14 +844,21 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
             conf = rel.get("confidence")
             reason = rel.get("reason")
 
-            # Only proceed to diagnosis/confirmation when we have a non-low confidence "agri_photo".
-            if not (relevance == "agri_photo" and conf in ("high", "medium")):
-                if relevance == "not_agri" and conf in ("high", "medium"):
-                    msg = get_not_agri_message(dialect)
-                    return {"text": msg, "non_photo": True, "diagnosis": "non_photo", "non_photo_reason": reason}
-                # Everything else: ask for a clearer/closer crop photo (safe fail-closed).
-                msg = get_safe_retake_message(dialect)
-                return {"text": msg, "non_photo": True, "diagnosis": "non_photo", "non_photo_reason": (reason or "unclear")}
+            # Hard-block only when model is confidently non-agri.
+            if relevance == "not_agri" and conf in ("high", "medium"):
+                msg = get_not_agri_message(dialect)
+                return {"text": msg, "non_photo": True, "diagnosis": "non_photo", "non_photo_reason": reason}
+
+            # If model is unsure but reasonably confident, use heuristics metrics as a tie-breaker.
+            if relevance == "unclear" and conf in ("high", "medium"):
+                m = (heuristics or {}).get("metrics") or {}
+                green_frac = float(m.get("green_frac") or 0.0)
+                palette_size = int(m.get("palette_size") or 0)
+                # If this looks like a real photo (more colors/greens), proceed; else ask retake.
+                photo_likely = (green_frac >= 0.06) or (palette_size >= 140)
+                if not photo_likely:
+                    msg = get_safe_retake_message(dialect)
+                    return {"text": msg, "non_photo": True, "diagnosis": "non_photo", "non_photo_reason": (reason or "unclear")}
 
         if _quality_gate_enabled():
             q = _check_image_quality(image_bytes)
@@ -910,10 +917,14 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         # If crop is unclear (non-high confidence) and we couldn't infer a crop,
         # ask the user to confirm which crop this is. This preserves the existing
         # crop-confirmation UX used by `handler.py` and associated tests.
+        allow_crop_confirm = True
+        if _relevance_gate_enabled():
+            # Only allow crop confirmation when relevance gate is confidently agri.
+            allow_crop_confirm = bool(relevance == "agri_photo" and conf in ("high", "medium"))
         pk = (vision.get("photo_kind") or "unknown").strip() or "unknown"
         cc = (vision.get("crop_confidence") or vision.get("confidence") or "low").strip().lower()
         inferred = (vision.get("inferred_crop") or "unknown").strip() or "unknown"
-        if cc in ("low", "medium") and inferred == "unknown" and pk in ("pest_macro", "leaf_symptom", "unknown"):
+        if allow_crop_confirm and cc in ("low", "medium") and inferred == "unknown" and pk in ("pest_macro", "leaf_symptom", "unknown"):
             crop_local = localize_crop_name(crop, dialect)
             prompts = {
                 "hi": f"यह तस्वीर किस फसल की है? आपकी प्रोफ़ाइल में फसल: {crop_local}. क्या यह वही है?",
