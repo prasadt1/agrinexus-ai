@@ -76,7 +76,7 @@ AgriNexus is a working system with full production observability — not a proto
 
 | Metric | Value |
 | --- | --- |
-| Test-to-code ratio | **80%** ([metrics](docs/IMPLEMENTATION-QUALITY-METRICS.md)) |
+| Test-to-code ratio | **80%** ([metrics](docs/IMPLEMENTATION-QUALITY-METRICS.md) · [how we got there](docs/IMPLEMENTATION-QUALITY-METRICS.md#14-test-coverage-improvement-journey)) |
 | Infrastructure-as-Code resources (SAM) | **34** ([template.yaml](template.yaml)) |
 | Architecture Decision Records (ADRs) | **9** ([docs/adr/](docs/adr/)) |
 | EARS requirements traced to code | **144** ([docs/requirements.md](docs/requirements.md)) |
