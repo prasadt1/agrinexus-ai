@@ -13,6 +13,7 @@ from typing import Any, Dict, Optional
 
 from src.vision.heuristics import run_heuristics
 from src.vision.messages import get_block_message
+from src.vision.enforcement import enforce_message_safety
 
 bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
 s3 = boto3.client('s3', region_name='us-east-1')
@@ -683,31 +684,26 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         )
         print(f"Saved to S3: s3://{TEMP_BUCKET}/{s3_key}")
         
-        # Analyze image
+        # LAYER 2: Vision model
         district = user_profile.get("district") or user_profile.get("location")
-        result = analyze_crop_image(image_bytes, dialect, crop, district=district)
+        vision = analyze_crop_image(image_bytes, dialect, crop, district=district)
 
-        photo_kind = str(result.get("photo_kind") or "unknown")
-        crop_conf = str(result.get("crop_confidence") or "low")
-        if photo_kind in ("pest_macro", "leaf_symptom", "unknown") and crop_conf != "high":
-            profile_crop = str(crop or "").strip() or "unknown"
-            prompt_msgs = {
-                "hi": "यह *क्लोज़‑अप/आंशिक फसल फोटो* लग रहा है। सही सलाह के लिए बताइए यह फोटो किस फसल पर है?",
-                "mr": "हा *जवळून/अंशतः घेतलेला पीक फोटो* दिसतो. योग्य सल्ल्यासाठी हा फोटो कोणत्या पिकावर आहे?",
-                "te": "ఇది *దగ్గరగా/భాగంగా తీసిన పంట ఫోటోలా* ఉంది. సరైన సలహా కోసం ఇది ఏ పంటపై ఉందో చెప్పండి.",
-                "en": "This looks like a *close-up/partial crop photo*. To give the right recommendation, which crop is this?",
-            }
-            return {
-                "text": prompt_msgs.get(dialect, prompt_msgs["en"]),
-                "pending_crop_confirm": {
-                    "bucket": TEMP_BUCKET,
-                    "key": s3_key,
-                    "profile_crop": profile_crop,
-                    "inferred_crop": "",
-                },
-            }
+        # Schema already validated inside analyze_crop_image()
 
-        return {"text": result["recommendations"], "s3": {"bucket": TEMP_BUCKET, "key": s3_key}}
+        # EXISTING: _normalize_vision_metadata() already enforces metadata-level safety
+        # (crop_confidence != "high" → inferred_crop="unknown")
+        # This is preserved for metadata fields.
+
+        # NEW: enforce_message_safety() adds MESSAGE-level safety
+        # (crop_confidence != "high" → safe template text, not model prose)
+        # This prevents crop names from leaking into user-facing messages.
+
+        # LAYER 3: Handler enforcement
+        final_msg = enforce_message_safety(vision, crop, dialect)
+
+        print(f"Final message (enforced): {final_msg[:100]}...")
+
+        return {"text": final_msg, "s3": {"bucket": TEMP_BUCKET, "key": s3_key}}
         
     except Exception as e:
         print(f"Error processing image message: {e}")
