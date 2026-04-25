@@ -14,6 +14,8 @@ def _env(monkeypatch):
     monkeypatch.setenv("TABLE_NAME", "test-table")
     monkeypatch.setenv("SCHEDULER_ROLE_ARN", "arn:aws:iam::123:role/test")
     monkeypatch.setenv("REMINDER_FUNCTION_ARN", "arn:aws:lambda:us-east-1:123:function:test")
+    # Production code uses REMINDER_LAMBDA_ARN
+    monkeypatch.setenv("REMINDER_LAMBDA_ARN", "arn:aws:lambda:us-east-1:123:function:test")
 
 
 @pytest.fixture()
@@ -170,3 +172,36 @@ class TestHasPendingNudge:
         )
         monkeypatch.setattr(sender, "table", mock_table)
         assert sender.has_pending_nudge("491234", "spray") is False
+
+
+# ---------------------------------------------------------------------------
+# Scheduler idempotency / graceful degradation
+# ---------------------------------------------------------------------------
+
+class TestScheduleCreation:
+    def test_create_reminder_schedule_conflict_is_ok(self, sender, monkeypatch, capsys):
+        def _conflict(**_kwargs):
+            raise Exception("ConflictException")
+
+        monkeypatch.setattr(sender.scheduler, "create_schedule", _conflict)
+        sender.create_reminder_schedule("491234", "2026-04-25T10:00:00#spray", 24, "hi")
+        out = capsys.readouterr().out
+        assert "already exists" in out.lower()
+
+    def test_create_reminder_schedule_other_errors_do_not_crash(self, sender, monkeypatch, capsys):
+        def _throttle(**_kwargs):
+            raise Exception("ThrottlingException")
+
+        monkeypatch.setattr(sender.scheduler, "create_schedule", _throttle)
+        sender.create_reminder_schedule("491234", "2026-04-25T10:00:00#spray", 24, "hi")
+        out = capsys.readouterr().out
+        assert "failed to create reminder schedule" in out.lower()
+
+    def test_create_expiry_schedule_other_errors_do_not_crash(self, sender, monkeypatch, capsys):
+        def _boom(**_kwargs):
+            raise Exception("ServiceUnavailable")
+
+        monkeypatch.setattr(sender.scheduler, "create_schedule", _boom)
+        sender.create_expiry_schedule("491234", "2026-04-25T10:00:00#spray", 72)
+        out = capsys.readouterr().out
+        assert "failed to create expiry schedule" in out.lower()

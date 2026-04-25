@@ -57,21 +57,34 @@ def create_reminder_schedule(phone_number: str, nudge_id: str, hours_offset: int
     safe_nudge_id = nudge_id.replace(':', '-').replace('#', '-')
     schedule_name = f'reminder-{safe_nudge_id}-{hours_offset}h'
     
-    scheduler.create_schedule(
-        Name=schedule_name,
-        ScheduleExpression=f'at({schedule_time.strftime("%Y-%m-%dT%H:%M:%S")})',
-        Target={
-            'Arn': os.environ['REMINDER_LAMBDA_ARN'],
-            'RoleArn': os.environ['SCHEDULER_ROLE_ARN'],
-            'Input': json.dumps({
-                'phone_number': phone_number,
-                'nudge_id': nudge_id,
-                'reminder_type': f'T+{hours_offset}h',
-                'dialect': dialect
-            })
-        },
-        FlexibleTimeWindow={'Mode': 'OFF'}
-    )
+    try:
+        scheduler.create_schedule(
+            Name=schedule_name,
+            ScheduleExpression=f'at({schedule_time.strftime("%Y-%m-%dT%H:%M:%S")})',
+            Target={
+                'Arn': os.environ['REMINDER_LAMBDA_ARN'],
+                'RoleArn': os.environ['SCHEDULER_ROLE_ARN'],
+                'Input': json.dumps({
+                    'phone_number': phone_number,
+                    'nudge_id': nudge_id,
+                    'reminder_type': f'T+{hours_offset}h',
+                    'dialect': dialect
+                })
+            },
+            FlexibleTimeWindow={'Mode': 'OFF'}
+        )
+        print(f"Created reminder schedule: {schedule_name}")
+    except Exception as e:
+        # Idempotency: if Lambda retries after partial success, schedule may already exist.
+        code = None
+        try:
+            code = (getattr(e, "response", {}) or {}).get("Error", {}).get("Code")
+        except Exception:
+            code = None
+        if code == "ConflictException" or "ConflictException" in str(e):
+            print(f"Reminder schedule already exists (OK): {schedule_name}")
+            return
+        print(f"Failed to create reminder schedule {schedule_name}: {e}")
 
 
 def create_expiry_schedule(phone_number: str, nudge_id: str, hours_offset: int):
@@ -83,21 +96,33 @@ def create_expiry_schedule(phone_number: str, nudge_id: str, hours_offset: int):
     schedule_name = f'expiry-{safe_nudge_id}'
     
     # Use the same reminder Lambda but with a special 'EXPIRY' type
-    scheduler.create_schedule(
-        Name=schedule_name,
-        ScheduleExpression=f'at({schedule_time.strftime("%Y-%m-%dT%H:%M:%S")})',
-        Target={
-            'Arn': os.environ['REMINDER_LAMBDA_ARN'],
-            'RoleArn': os.environ['SCHEDULER_ROLE_ARN'],
-            'Input': json.dumps({
-                'phone_number': phone_number,
-                'nudge_id': nudge_id,
-                'reminder_type': 'EXPIRY',
-                'activity': 'auto-expire'
-            })
-        },
-        FlexibleTimeWindow={'Mode': 'OFF'}
-    )
+    try:
+        scheduler.create_schedule(
+            Name=schedule_name,
+            ScheduleExpression=f'at({schedule_time.strftime("%Y-%m-%dT%H:%M:%S")})',
+            Target={
+                'Arn': os.environ['REMINDER_LAMBDA_ARN'],
+                'RoleArn': os.environ['SCHEDULER_ROLE_ARN'],
+                'Input': json.dumps({
+                    'phone_number': phone_number,
+                    'nudge_id': nudge_id,
+                    'reminder_type': 'EXPIRY',
+                    'activity': 'auto-expire'
+                })
+            },
+            FlexibleTimeWindow={'Mode': 'OFF'}
+        )
+        print(f"Created expiry schedule: {schedule_name}")
+    except Exception as e:
+        code = None
+        try:
+            code = (getattr(e, "response", {}) or {}).get("Error", {}).get("Code")
+        except Exception:
+            code = None
+        if code == "ConflictException" or "ConflictException" in str(e):
+            print(f"Expiry schedule already exists (OK): {schedule_name}")
+            return
+        print(f"Failed to create expiry schedule {schedule_name}: {e}")
 
 
 def emit_metric(name: str, value: float = 1.0):
