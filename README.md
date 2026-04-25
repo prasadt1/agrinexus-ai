@@ -139,7 +139,7 @@ Real numbers from the running production stack — not projections.
 | Control | Status | Evidence |
 | --- | --- | --- |
 | Meta HMAC-SHA256 signature verification | ✅ Always on | No bypass possible |
-| Per-user rate limiting | ✅ Active | 10 msgs/hour |
+| Per-user rate limiting | ✅ Active | 25 msgs/hour |
 | PII redaction in logs | ✅ Active | Phone numbers shown as `491***` |
 | IAM least-privilege | ✅ Enforced | DynamoDB / S3 / Bedrock resource-scoped |
 | Encryption at rest | ✅ Active | DynamoDB default encryption |
@@ -148,7 +148,7 @@ Real numbers from the running production stack — not projections.
 
 ### Judge Note
 
-> All numbers above are **verifiable in the repository and live CloudWatch dashboards** — see [SAM template](https://github.com/prasadt1/agrinexus-ai/blob/main/template-week2.yaml), [ADRs](https://github.com/prasadt1/agrinexus-ai/tree/main/docs/adr), [EARS requirements](https://github.com/prasadt1/agrinexus-ai/blob/main/requirements.md), [CI workflows](https://github.com/prasadt1/agrinexus-ai/tree/main/.github/workflows), and the [full metrics report](https://github.com/prasadt1/agrinexus-ai/blob/main/docs/METRICS-AND-MONITORING.md). 
+> All numbers above are **verifiable in the repository and live CloudWatch dashboards** — see [SAM template](https://github.com/prasadt1/agrinexus-ai/blob/main/template.yaml), [ADRs](https://github.com/prasadt1/agrinexus-ai/tree/main/docs/adr), [EARS requirements](https://github.com/prasadt1/agrinexus-ai/blob/main/requirements.md), [CI workflows](https://github.com/prasadt1/agrinexus-ai/tree/main/.github/workflows), and the [full metrics report](https://github.com/prasadt1/agrinexus-ai/blob/main/docs/METRICS-AND-MONITORING.md). 
 > 
 > Cost figures at scale (~$0.54/farmer/year at 10K) are **modeled**; current production costs (~$1.70/day, ~$53/month) are **real** — see [finops-public.md](https://github.com/prasadt1/agrinexus-ai/blob/main/docs/finops-public.md) for assumptions.
 
@@ -447,15 +447,15 @@ The **$0.54** figure is **not** a separate measurement—it is **($450 × 12) ÷
 - **Before April 4, 2026**: OpenSearch Serverless **~$174/month fixed** (plus variable services → **~$214/month** all-in)
 - **After April 4, 2026**: S3 Vectors + pay-per-use stack → **~$53/month** modeled @ 1K farmers (**~75%** reduction vs the old **~$214** all-in figure)
 
-## Honest Tradeoffs & Roadmap
+## Honest Tradeoffs
 
 The production build made deliberate tradeoffs for pilot sustainability. Calling them out explicitly:
 
-1. **Voice latency ~20-34s (batch Transcribe)**: The tradeoff was cost vs. latency. Batch Transcribe at current volumes costs ~$12/month; streaming STT would be 3-5× that. For farmers sending a voice note and continuing fieldwork, the async delay is acceptable. The **voice-received** acknowledgment is sent from the webhook immediately (often ~1-3s; cold start can add more). Streaming STT is on the roadmap for Phase 2.
+1. **Voice latency ~20–34s (batch Transcribe).** The tradeoff was cost vs. latency. Batch Transcribe at current volumes costs ~$12/month; streaming STT would be 3-5× that. For farmers sending a voice note and continuing fieldwork, the async delay is acceptable — the farmer gets an immediate ack from the webhook (~1-3s) and the response arrives while they're working. Streaming STT is on the roadmap for Phase 2.
 
 2. **Telugu voice output unavailable**: Amazon Polly doesn't currently offer a native Telugu neural voice. Text-only responses are returned for Telugu users; escalation path documented in [docs/architecture.md](docs/architecture.md).
 
-3. **Single-region deployment**: Multi-region is architected but deployed single-region (us-east-1) for cost efficiency during pilot. Failover and multi-region deployment patterns are documented in the architecture.
+3. **Single-region deployment**: Multi-region is architected but deployed single-region (us-east-1) for cost efficiency during pilot. Failover and multi-region deployment patterns are documented in [docs/architecture.md](docs/architecture.md).
 
 4. **Weather API with demo fallback**: Production uses OpenWeatherMap via Secrets Manager. The `MOCK_WEATHER=true` flag exists for demo reliability and is explicitly logged so test traffic is never confused with production readings.
 
