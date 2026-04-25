@@ -10,7 +10,7 @@
 
 **What I built.** A 1:1 advisor on every farmer's phone — accessible on the WhatsApp they already use, no app install, grounded in ICAR + FAO research, responsive in Hindi / Marathi / Telugu / English, and most importantly — a closed accountability loop that follows up until the farmer confirms "हो गया" (done) or opts out.
 
-**Designed for scale.** Modeled at **~$0.54 per farmer per year at 10,000 active farmers** on fully serverless AWS. Currently running production at **~$53/month / ~$1.70/day**. Zero adoption friction: WhatsApp is installed on 500M+ Indian phones. Zero training: tap buttons in your dialect, onboard in under 60 seconds.
+**Designed for scale.** Modeled at **\~$0.54 per farmer per year at 10,000 active farmers** on fully serverless AWS. Currently running production at **\~$53/month / \~$1.70/day**. Zero adoption friction: WhatsApp is installed on 500M+ Indian phones. Zero training: tap buttons in your dialect, onboard in under 60 seconds.
 
 **The differentiator.** The closed-loop nudge engine. Most agri-AI tools stop at delivering advice. AgriNexus tracks whether the advice was acted on — advice plus accountability, not just information.
 
@@ -26,7 +26,7 @@
 > | 💬 **Try on WhatsApp** | [wa.me/4915120105731](https://wa.me/4915120105731) | 1 min |
 > | 📖 **Read the finalist article** | [AWS Builder Center](https://builder.aws.com/content/3C8hBRTcsRuQrHzE3Pq243yhXTF/aideas-finalist-agrinexus-ai) | 5 min |
 > 
-> **TL;DR:** The closed-loop nudge engine is the core differentiator against named peers (Farmer.Chat, iSDA, AgriChat.AI, Weather Impact). Weather-gated reminders that follow up at T+24h and T+48h, cancelled instantly when the farmer confirms action. 100% serverless. ~$0.54/farmer/year at 10K scale.
+> **TL;DR:** The closed-loop nudge engine is the core differentiator against named peers (Farmer.Chat, iSDA, AgriChat.AI, Weather Impact). Weather-gated reminders that follow up at T+24h and T+48h, cancelled instantly when the farmer confirms action. 100% serverless. \~$0.54/farmer/year at 10K scale.
 
 [![AWS Serverless](https://img.shields.io/badge/AWS-Serverless-232F3E?logo=amazonaws&logoColor=white)](https://aws.amazon.com/serverless/)
 [![Amazon Bedrock](https://img.shields.io/badge/Amazon%20Bedrock-Claude%203%20Sonnet-FF9900?logo=amazonaws&logoColor=white)](https://aws.amazon.com/bedrock/)
@@ -101,11 +101,11 @@ Real numbers from the running production stack — not projections.
 
 | Metric | Value |
 | --- | --- |
-| Daily cost (current) | **~$1.70/day** |
-| Monthly cost (current) | **~$53/month** |
+| Daily cost (current) | **\~$1.70/day** |
+| Monthly cost (current) | **\~$53/month** |
 | Cost alarm threshold | $5/day (never tripped) |
-| Cost at 10K farmers (modeled) | **~$0.54/farmer/year** |
-| Savings vs. Step Functions Wait State approach | **~67× cheaper** |
+| Cost at 10K farmers (modeled) | **\~$0.54/farmer/year** |
+| Savings vs. Step Functions Wait State approach | **\~67× cheaper** |
 
 ### Observability & Alarms
 
@@ -119,9 +119,9 @@ Real numbers from the running production stack — not projections.
 | SQS queue backlog | Age >300s | ✅ Armed |
 | DLQ depth (messages + voice) | >5 messages | ✅ Armed (2 alarms) |
 
-**CloudWatch Dashboard:** 9 widgets covering Lambda, SQS, API Gateway, DynamoDB, Step Functions, and custom business metrics (nudges sent vs. completed). Template: [`dashboards/cloudwatch-dashboard.json`](https://github.com/prasadt1/agrinexus-ai/blob/main/dashboards/cloudwatch-dashboard.json).
+**CloudWatch Dashboard:** 9 widgets covering Lambda, SQS, API Gateway, DynamoDB, Step Functions, and custom business metrics (nudges sent vs. completed). Template: [`dashboards/cloudwatch-dashboard.json`](dashboards/cloudwatch-dashboard.json). Screenshots: [1-week view](docs/visuals/cloudwatch-dashboard-1w.png) · [enhanced view](docs/visuals/agrinexus-dashboard-enhanced.png).
 
-**Full metrics & monitoring breakdown:** [`docs/METRICS-AND-MONITORING.md`](https://github.com/prasadt1/agrinexus-ai/blob/main/docs/METRICS-AND-MONITORING.md) (business KPIs, operational metrics, cost breakdown, security, reliability, and observability roadmap).
+**Full metrics & monitoring breakdown:** [`docs/METRICS-AND-MONITORING.md`](docs/METRICS-AND-MONITORING.md) (business KPIs, operational metrics, cost breakdown, security, reliability, and observability roadmap).
 
 ### Capability Coverage
 
@@ -148,9 +148,9 @@ Real numbers from the running production stack — not projections.
 
 ### Judge Note
 
-> All numbers above are **verifiable in the repository and live CloudWatch dashboards** — see [SAM template](https://github.com/prasadt1/agrinexus-ai/blob/main/template.yaml), [ADRs](https://github.com/prasadt1/agrinexus-ai/tree/main/docs/adr), [EARS requirements](https://github.com/prasadt1/agrinexus-ai/blob/main/requirements.md), [CI workflows](https://github.com/prasadt1/agrinexus-ai/tree/main/.github/workflows), and the [full metrics report](https://github.com/prasadt1/agrinexus-ai/blob/main/docs/METRICS-AND-MONITORING.md). 
+> All numbers above are **verifiable in the repository and live CloudWatch dashboards** — see [SAM template](template.yaml), [ADRs](docs/adr/), [EARS requirements](docs/requirements.md), [CI workflows](.github/workflows/), and the [full metrics report](docs/METRICS-AND-MONITORING.md). 
 > 
-> Cost figures at scale (~$0.54/farmer/year at 10K) are **modeled**; current production costs (~$1.70/day, ~$53/month) are **real** — see [finops-public.md](https://github.com/prasadt1/agrinexus-ai/blob/main/docs/finops-public.md) for assumptions.
+> Cost figures at scale (\~$0.54/farmer/year at 10K) are **modeled**; current production costs (\~$1.70/day, \~$53/month) are **real** — see [finops-public.md](docs/finops-public.md) for assumptions.
 
 ---
 
@@ -184,7 +184,7 @@ Pick the web demo or WhatsApp experience.
 - **Abuse / cost controls**:
   - WhatsApp **webhook**: Meta signature verification + per-user message rate limits (defaults in `template.yaml`)
   - Public **web chat**: per-IP + per-client caps + API Gateway throttling + WAF on `/chat`
-- **Cost**: modeled **~$53/month for 1,000 farmers** (pay-per-use). See [Cost breakdown](#cost-breakdown)
+- **Cost**: modeled **\~$53/month for 1,000 farmers** (pay-per-use). See [Cost breakdown](#cost-breakdown)
 
 **Diagrams:** See [architecture/diagrams.md](architecture/diagrams.md) for Mermaid diagrams (high-level, webhook, text/voice/image flows, nudge flow). Full design: [docs/architecture.md](docs/architecture.md).
 
@@ -423,35 +423,35 @@ Weather Poller → Step Functions → Nudge Sender → WhatsApp
 ### Variable Costs (~3K queries + 500 voice min/month for 1K farmers)
 | Service | Usage (1K users) | Monthly Cost |
 |---------|------------------|--------------|
-| Bedrock Claude 3 Sonnet (RAG) | 3K queries (3M input + 1.5M output tokens) | ~$32 |
-| Bedrock Claude Vision | 100 images | ~$5 |
-| Transcribe | 500 voice minutes | ~$12 |
-| Polly (neural TTS) | 200 min voice output | ~$2 |
-| S3 Vectors (Knowledge Base) | Storage + 3K queries | ~$1.30 |
-| DynamoDB (on-demand) | 1M reads, 500K writes | ~$0.90 |
-| EventBridge Scheduler | 1K schedules | ~$0.01 |
+| Bedrock Claude 3 Sonnet (RAG) | 3K queries (3M input + 1.5M output tokens) | \~$32 |
+| Bedrock Claude Vision | 100 images | \~$5 |
+| Transcribe | 500 voice minutes | \~$12 |
+| Polly (neural TTS) | 200 min voice output | \~$2 |
+| S3 Vectors (Knowledge Base) | Storage + 3K queries | \~$1.30 |
+| DynamoDB (on-demand) | 1M reads, 500K writes | \~$0.90 |
+| EventBridge Scheduler | 1K schedules | \~$0.01 |
 | Lambda, API Gateway, SQS, S3, Step Functions | | $0 (free tier) |
-| **Total** | | **~$53/month** |
+| **Total** | | **\~$53/month** |
 
 ### Cost per Farmer (from the same models as the table above)
-- **1,000 farmers**: ~$53/month total → ~**$0.053**/farmer/month → ~**$0.64**/farmer/year  
+- **1,000 farmers**: \~$53/month total → \~**$0.053**/farmer/month → \~**$0.64**/farmer/year  
 - **10,000 farmers** (projected): ~**$450**/month total → ~**$0.045**/farmer/month → ~**$0.54**/farmer/year  
 
 The **$0.54** figure is **not** a separate measurement—it is **($450 × 12) ÷ 10,000** from the §8.2 projection in `docs/architecture.md`. **Minimal economies of scale** (~16% lower per farmer vs 1K) because **Bedrock / Transcribe / Polly** scale roughly with usage; **S3 Vectors** stays a small slice.
 
-**How to read this:** **~$53/mo @ 1K** and **~$450/mo @ 10K** are **modeled** from AWS-style usage assumptions (see architecture §8), **not** audited Cost Explorer totals. **Validate** with your account before publishing hard commitments.
+**How to read this:** **\~$53/mo @ 1K** and **\~$450/mo @ 10K** are **modeled** from AWS-style usage assumptions (see architecture §8), **not** audited Cost Explorer totals. **Validate** with your account before publishing hard commitments.
 
 **100x cheaper than commercial agricultural advisory services** ($5-10/farmer/month)
 
 ### Historical Context
-- **Before April 4, 2026**: OpenSearch Serverless **~$174/month fixed** (plus variable services → **~$214/month** all-in)
-- **After April 4, 2026**: S3 Vectors + pay-per-use stack → **~$53/month** modeled @ 1K farmers (**~75%** reduction vs the old **~$214** all-in figure)
+- **Before April 4, 2026**: OpenSearch Serverless **\~$174/month fixed** (plus variable services → **\~$214/month** all-in)
+- **After April 4, 2026**: S3 Vectors + pay-per-use stack → **\~$53/month** modeled @ 1K farmers (**\~75%** reduction vs the old **\~$214** all-in figure)
 
 ## Honest Tradeoffs
 
 The production build made deliberate tradeoffs for pilot sustainability. Calling them out explicitly:
 
-1. **Voice latency ~20–34s (batch Transcribe).** The tradeoff was cost vs. latency. Batch Transcribe at current volumes costs ~$12/month; streaming STT would be 3-5× that. For farmers sending a voice note and continuing fieldwork, the async delay is acceptable — the farmer gets an immediate ack from the webhook (~1-3s) and the response arrives while they're working. Streaming STT is on the roadmap for Phase 2.
+1. **Voice latency \~20–34s (batch Transcribe).** The tradeoff was cost vs. latency. Batch Transcribe at current volumes costs \~$12/month; streaming STT would be 3-5× that. For farmers sending a voice note and continuing fieldwork, the async delay is acceptable — the farmer gets an immediate ack from the webhook (\~1-3s) and the response arrives while they're working. Streaming STT is on the roadmap for Phase 2.
 
 2. **Telugu voice output unavailable**: Amazon Polly doesn't currently offer a native Telugu neural voice. Text-only responses are returned for Telugu users; escalation path documented in [docs/architecture.md](docs/architecture.md).
 
