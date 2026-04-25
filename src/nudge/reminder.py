@@ -83,8 +83,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     crop = nudge.get('crop', 'Cotton')
     district_key = nudge.get('district') or district_key
 
-    # Only send reminder if not completed
-    if status != 'DONE':
+    # Only send reminder if not completed/closed
+    if status not in ['DONE', 'EXPIRED']:
         message = build_reminder_message(dialect, reminder_type, district_key, crop)
         
         # Send WhatsApp message with DONE/NOT YET buttons
@@ -109,4 +109,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         return {'statusCode': 200, 'message': 'Reminder sent'}
     else:
-        return {'statusCode': 200, 'message': 'Task already completed'}
+        if status == 'DONE':
+            return {'statusCode': 200, 'message': 'Task already completed'}
+        return {'statusCode': 200, 'message': 'Task already closed'}

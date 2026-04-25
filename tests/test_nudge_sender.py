@@ -101,8 +101,9 @@ class TestConvertFloats:
 
 class TestHasPendingNudge:
     def _today(self):
-        from datetime import datetime
-        return datetime.utcnow().date().isoformat()
+        # Keep tests aligned with the production "today" definition in IST.
+        from datetime import datetime, timedelta
+        return (datetime.utcnow() + timedelta(hours=5, minutes=30)).date().isoformat()
 
     def test_no_pending(self, sender, monkeypatch):
         mock_table = types.SimpleNamespace(

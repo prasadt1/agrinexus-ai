@@ -119,7 +119,10 @@ def emit_metric(name: str, value: float = 1.0):
 
 def has_pending_nudge(phone_number: str, activity: str) -> bool:
     """Check if user has a pending nudge for this activity today"""
-    today = datetime.utcnow().date().isoformat()
+    # "Today" for nudges is evaluated in IST to avoid a UTC-midnight edge case where
+    # a farmer can receive two nudges within minutes (same India morning).
+    ist_offset = timedelta(hours=5, minutes=30)
+    today_ist = (datetime.utcnow() + ist_offset).date().isoformat()
     
     # Query nudges for this user
     response = table.query(
@@ -133,12 +136,20 @@ def has_pending_nudge(phone_number: str, activity: str) -> bool:
     # Check if any nudge is pending and from today
     for item in response.get('Items', []):
         nudge_id = item.get('SK', '').replace('NUDGE#', '')
-        nudge_date = nudge_id.split('T')[0] if 'T' in nudge_id else ''
+        # Convert the nudge timestamp (stored as UTC in SK) into IST-local date.
+        # SK format: "{utc_iso_timestamp}#{activity}"
+        nudge_date = ''
+        try:
+            ts = nudge_id.split('#', 1)[0]
+            if 'T' in ts:
+                nudge_date = (datetime.fromisoformat(ts) + ist_offset).date().isoformat()
+        except Exception:
+            nudge_date = nudge_id.split('T')[0] if 'T' in nudge_id else ''
         nudge_activity = nudge_id.split('#')[-1] if '#' in nudge_id else ''
         status = item.get('status', 'SENT')  # Default to SENT if not set
         
         # Check if it's today's nudge for this activity and still pending (SENT or REMINDED, not DONE)
-        if nudge_date == today and nudge_activity == activity and status in ['SENT', 'REMINDED']:
+        if nudge_date == today_ist and nudge_activity == activity and status in ['SENT', 'REMINDED']:
             print(f"Found existing pending {activity} nudge for {phone_number}: {nudge_id} (status: {status})")
             return True
     

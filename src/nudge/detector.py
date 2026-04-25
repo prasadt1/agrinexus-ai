@@ -226,6 +226,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     
                     # Mark nudge as EXPIRED (no more reminders)
                     nudge_sk = latest_nudge['SK']
+                    nudge_id = nudge_sk.replace('NUDGE#', '')
                     table.update_item(
                         Key={
                             'PK': pk,
@@ -238,6 +239,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         }
                     )
                     print(f"Marked nudge as EXPIRED (farmer declined after T+48h)")
+
+                    # Delete scheduled reminders/expiry (avoid orphaned expiry invocation)
+                    delete_scheduled_reminders(nudge_id)
             
             # Send appropriate acknowledgment
             if is_final_reminder:
