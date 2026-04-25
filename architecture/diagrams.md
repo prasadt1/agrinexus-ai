@@ -56,7 +56,7 @@ flowchart TB
         EB[EventBridge\nschedule]
         Poll[Weather Poller Lambda]
         SF[Step Functions\nnudge workflow]
-        EBS[EventBridge Scheduler\nT+24h, T+48h]
+        EBS[EventBridge Scheduler\nT+24h, T+48h, T+72h]
     end
     EB --> Poll --> SF --> NudgeSend
     NudgeSend -.->|create| EBS --> RemindSend
@@ -180,13 +180,13 @@ sequenceDiagram
 
 ```mermaid
 flowchart TB
-    EventBridge[EventBridge\nScheduler] --> Poll[Weather Poller\nLambda]
+    EventBridge[EventBridge\nSchedule (rate: 6 hours)] --> Poll[Weather Poller\nLambda]
     Poll --> Check{Weather OK\nfor district?}
     Check -->|No| End1[End]
     Check -->|Yes| SF[Step Functions\nNudge Workflow]
     SF --> Send[Nudge Sender]
     Send --> WA[WhatsApp\nTemplate/Text]
-    Send --> Sched[EventBridge\nT+24h, T+48h, T+72h]
+    Send --> Sched[EventBridge Scheduler\nT+24h, T+48h, T+72h]
     Sched --> Remind[Reminder Sender]
     Remind --> WA
     Stream[DynamoDB Streams] --> Detector[Response Detector]
