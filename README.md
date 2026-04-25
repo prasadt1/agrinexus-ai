@@ -80,9 +80,9 @@ AgriNexus is a working system with full production observability — not a proto
 | Infrastructure-as-Code resources (SAM) | **34** ([template.yaml](template.yaml)) |
 | Architecture Decision Records (ADRs) | **9** ([docs/adr/](docs/adr/)) |
 | EARS requirements traced to code | **144** ([docs/requirements.md](docs/requirements.md)) |
-| Lambda functions deployed | **9** |
+| Lambda functions deployed | **11** |
 | CI/CD workflows | **2** ([ci.yml](.github/workflows/ci.yml) + [aws-smoke.yml](.github/workflows/aws-smoke.yml)) |
-| Lines of Python | **~3,000** across 9 services |
+| Lines of Python | **\~6,000** across 11 services |
 
 ### Live Production Metrics (rolling 7-day snapshot)
 
@@ -129,7 +129,7 @@ Real numbers from the running production stack — not projections.
 
 ### Observability & Alarms
 
-**9 active alarms** publishing to SNS topic `agrinexus-alerts-{env}`:
+**8 active alarms** publishing to SNS topic `agrinexus-alerts-{env}`:
 
 | Alarm | Threshold | Status |
 | --- | --- | --- |
@@ -384,7 +384,7 @@ Details (templates, cutover, troubleshooting): [docs/guides/WHATSAPP-SETUP-GUIDE
 ## Project Structure (quick pointers)
 
 - **`template.yaml`**: full SAM/IaC template
-- **`src/`**: Lambda handlers (webhook, processor, web-chat, voice, nudge, weather, DLQ, health)
+- **`src/`**: Lambda handlers (webhook, processor, web-chat, voice, nudge, weather, DLQ, health, beta-processor)
 - **`docs/`**: E2E guide, walkthroughs, runbooks, monitoring/metrics
 - **`tests/`**: fast unit tests + optional integration tests
 
@@ -572,7 +572,7 @@ This project was developed using **Kiro AI**, which enabled requirements-driven 
 
 **Key metrics:**
 - 100+ EARS requirements in [docs/requirements.md](docs/requirements.md)
-- ~3,000 lines of Python across 9 Lambda functions
+- \~6,000 lines of Python across 11 Lambda functions
 - Full test coverage: voice, vision, RAG, nudges
 
 ## Documentation
