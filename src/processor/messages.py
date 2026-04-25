@@ -63,6 +63,60 @@ def get_block_message(reason: str, dialect: str) -> str:
     return reason_templates.get(dialect, reason_templates['en'])
 
 
+def get_not_agri_message(dialect: str) -> str:
+    """
+    Generic message when the uploaded image is not agriculture-related.
+    Keep short and action-oriented.
+    """
+    msgs = {
+        "hi": "यह तस्वीर फसल/पत्ते की असली फोटो नहीं लग रही। कृपया प्रभावित पत्ती/पौधे की साफ़, पास से ली हुई फोटो भेजें।",
+        "mr": "ही फोटो पिक/पानाचा खरा फोटो वाटत नाही. कृपया प्रभावित पान/झाडाचा जवळून स्पष्ट फोटो पाठवा.",
+        "te": "ఇది పంట/ఆకు యొక్క నిజమైన ఫోటోలా లేదు. దయచేసి ప్రభావిత ఆకు/మొక్కను దగ్గరగా స్పష్టంగా తీసిన ఫోటో పంపండి.",
+        "en": "This doesn’t look like a crop/leaf photo. Please send a clear close-up photo of the affected leaf/plant.",
+    }
+    return msgs.get(dialect, msgs["en"])
+
+
+def localize_crop_name(crop: str, dialect: str) -> str:
+    """
+    Localize profile crop display names for farmer-facing messages.
+    Input is typically Title Case (e.g., Wheat, Cotton).
+    """
+    c = (crop or "").strip()
+    if not c:
+        return crop
+    key = c.lower()
+    mapping = {
+        "hi": {
+            "wheat": "गेहूँ",
+            "cotton": "कपास",
+            "rice": "धान",
+            "soybean": "सोयाबीन",
+            "sugarcane": "गन्ना",
+            "maize": "मक्का",
+        },
+        "mr": {
+            "wheat": "गहू",
+            "cotton": "कापूस",
+            "rice": "भात",
+            "soybean": "सोयाबीन",
+            "sugarcane": "ऊस",
+            "maize": "मका",
+        },
+        "te": {
+            "wheat": "గోధుమ",
+            "cotton": "పత్తి",
+            "rice": "వరి",
+            "soybean": "సోయాబీన్",
+            "sugarcane": "చెరకు",
+            "maize": "మొక్కజొన్న",
+        },
+        "en": {},
+    }
+    lang = (dialect or "en").strip().lower() or "en"
+    return mapping.get(lang, {}).get(key, crop)
+
+
 def get_error_message(error_type: str, dialect: str) -> str:
     """User-friendly error messages (short, 1-2 lines)"""
     messages = {

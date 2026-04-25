@@ -7,6 +7,7 @@ def test_pest_macro_low_confidence_prompts_for_crop(monkeypatch):
 
     from src.processor import analyzer as a
     a.TEMP_BUCKET = "tmp-bucket"
+    monkeypatch.setenv("VISION_RELEVANCE_GATE_ENABLED", "false")
 
     # Avoid real WhatsApp download and S3 writes
     monkeypatch.setattr(a, "download_whatsapp_image", lambda _mid: b"\xff\xd8fakejpg")
@@ -48,6 +49,7 @@ def test_leaf_symptom_low_confidence_prompts_for_crop(monkeypatch):
 
     from src.processor import analyzer as a
     a.TEMP_BUCKET = "tmp-bucket"
+    monkeypatch.setenv("VISION_RELEVANCE_GATE_ENABLED", "false")
 
     monkeypatch.setattr(a, "download_whatsapp_image", lambda _mid: b"\xff\xd8fakejpg")
 
@@ -85,6 +87,7 @@ def test_unknown_kind_low_confidence_prompts_for_crop(monkeypatch):
 
     from src.processor import analyzer as a
     a.TEMP_BUCKET = "tmp-bucket"
+    monkeypatch.setenv("VISION_RELEVANCE_GATE_ENABLED", "false")
 
     monkeypatch.setattr(a, "download_whatsapp_image", lambda _mid: b"\xff\xd8fakejpg")
 

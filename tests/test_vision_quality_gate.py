@@ -31,6 +31,7 @@ def _make_white_dominant_ui_like_jpeg() -> bytes:
 
 def test_quality_gate_blocks_tiny_images_before_model(monkeypatch):
     os.environ["VISION_QUALITY_GATE_ENABLED"] = "true"
+    monkeypatch.setenv("VISION_RELEVANCE_GATE_ENABLED", "false")
 
     from src.processor import analyzer
     # Analyzer reads TEMP_AUDIO_BUCKET at import time; force bucket for this test.

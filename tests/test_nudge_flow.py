@@ -58,7 +58,8 @@ class FakeResponse:
 
 
 def test_has_pending_nudge_detects_sent_and_reminded(monkeypatch):
-    today = datetime.utcnow().date().isoformat()
+    # Production logic evaluates "today" in IST.
+    today = (datetime.utcnow() + sender.timedelta(hours=5, minutes=30)).date().isoformat()
     fake_table = FakeTable()
     fake_table.items = [
         {"SK": f"NUDGE#{today}T00:00:00#spray", "status": "SENT"},

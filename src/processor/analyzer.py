@@ -13,7 +13,7 @@ import urllib.error
 from typing import Any, Dict, Optional
 
 from heuristics import run_heuristics
-from messages import get_block_message
+from messages import get_block_message, get_not_agri_message, localize_crop_name
 from enforcement import enforce_message_safety
 
 bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
@@ -21,6 +21,88 @@ s3 = boto3.client('s3', region_name='us-east-1')
 secrets = boto3.client('secretsmanager', region_name='us-east-1')
 
 TEMP_BUCKET = os.environ.get('TEMP_AUDIO_BUCKET')
+
+RELEVANCE_MODEL_ID = os.environ.get("VISION_RELEVANCE_MODEL_ID") or "anthropic.claude-3-haiku-20240307-v1:0"
+
+
+def _relevance_gate_enabled() -> bool:
+    # Default ON; disable explicitly for debugging.
+    v = (os.environ.get("VISION_RELEVANCE_GATE_ENABLED") or "true").strip().lower()
+    return v in ("1", "true", "yes", "on")
+
+
+def classify_image_relevance(image_bytes: bytes, dialect: str) -> Dict[str, Any]:
+    """
+    Cheap relevance check to avoid running full diagnosis on non-agri images.
+    Returns strict JSON:
+      {"relevance":"agri_photo"|"not_agri"|"unclear","reason":str,"confidence":"high"|"medium"|"low"}
+    Fail-open on any error (treat as unclear).
+    """
+    try:
+        # Detect image format from magic bytes
+        media_type = "image/jpeg"
+        if image_bytes[:2] == b'\xff\xd8':
+            media_type = "image/jpeg"
+        elif image_bytes[:4] == b'\x89PNG':
+            media_type = "image/png"
+        elif image_bytes[:4] == b'RIFF' and image_bytes[8:12] == b'WEBP':
+            media_type = "image/webp"
+
+        image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+        prompt = (
+            "Return ONLY valid JSON (no markdown). Task: classify whether this image is a real agriculture-related "
+            "photo suitable for crop/leaf diagnosis.\n\n"
+            "JSON schema:\n"
+            "{\n"
+            '  "relevance": "agri_photo" | "not_agri" | "unclear",\n'
+            '  "reason": "screenshot" | "document" | "logo" | "person" | "animal" | "food" | "landscape" | "underwater" | "other",\n'
+            '  "confidence": "high" | "medium" | "low"\n'
+            "}\n\n"
+            "Guidelines:\n"
+            "- agri_photo: real photo of plant/leaf/crop/field/plant damage/pest on plant.\n"
+            "- not_agri: UI/screenshot, logo/graphic, document, selfie/person, animals, food, underwater, random objects.\n"
+            "- unclear: too blurry/dark/cropped to be sure.\n"
+        )
+
+        resp = bedrock.invoke_model(
+            modelId=RELEVANCE_MODEL_ID,
+            body=json.dumps(
+                {
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": 200,
+                    "temperature": 0,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": image_base64}},
+                                {"type": "text", "text": prompt},
+                            ],
+                        }
+                    ],
+                }
+            ),
+        )
+
+        response_body = json.loads(resp["body"].read())
+        raw_text = response_body["content"][0]["text"].strip()
+        if raw_text.startswith("```"):
+            raw_text = "\n".join(raw_text.split("\n")[1:-1])
+        out = json.loads(raw_text)
+
+        relevance = (out.get("relevance") or "unclear").strip().lower()
+        confidence = (out.get("confidence") or "low").strip().lower()
+        reason = (out.get("reason") or "other").strip().lower()
+        if relevance not in ("agri_photo", "not_agri", "unclear"):
+            relevance = "unclear"
+        if confidence not in ("high", "medium", "low"):
+            confidence = "low"
+        if reason not in ("screenshot", "document", "logo", "person", "animal", "food", "landscape", "underwater", "other"):
+            reason = "other"
+        return {"relevance": relevance, "confidence": confidence, "reason": reason}
+    except Exception:
+        _ = dialect
+        return {"relevance": "unclear", "confidence": "low", "reason": "other"}
 
 
 def validate_vision_schema(vision: Dict[str, Any]) -> None:
@@ -754,6 +836,13 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
             print(f"Blocked by heuristics: {heuristics['reason']}")
             return {"text": blocked_msg, "non_photo": True, "diagnosis": "non_photo", "non_photo_reason": heuristics.get("reason")}
 
+        # LAYER 1.5: AI relevance gate (generic non-agri detection)
+        if _relevance_gate_enabled():
+            rel = classify_image_relevance(image_bytes, dialect)
+            if rel.get("relevance") == "not_agri" and rel.get("confidence") in ("high", "medium"):
+                msg = get_not_agri_message(dialect)
+                return {"text": msg, "non_photo": True, "diagnosis": "non_photo", "non_photo_reason": rel.get("reason")}
+
         if _quality_gate_enabled():
             q = _check_image_quality(image_bytes)
             if not q.get("is_acceptable", True):
@@ -815,11 +904,12 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         cc = (vision.get("crop_confidence") or vision.get("confidence") or "low").strip().lower()
         inferred = (vision.get("inferred_crop") or "unknown").strip() or "unknown"
         if cc in ("low", "medium") and inferred == "unknown" and pk in ("pest_macro", "leaf_symptom", "unknown"):
+            crop_local = localize_crop_name(crop, dialect)
             prompts = {
-                "hi": f"यह तस्वीर किस फसल की है? आपकी प्रोफ़ाइल में फसल: {crop}. क्या यह वही है?",
-                "mr": f"हा फोटो कोणत्या पिकाचा आहे? तुमच्या प्रोफाइलमधील पीक: {crop}. हेच आहे का?",
-                "te": f"ఇది ఏ పంట ఫోటో? మీ ప్రొఫైల్‌లో పంట: {crop}. ఇదేనా?",
-                "en": f"Which crop is this photo of? Your profile crop is {crop}. Is it the same?",
+                "hi": f"यह तस्वीर किस फसल की है? आपकी प्रोफ़ाइल में फसल: {crop_local}. क्या यह वही है?",
+                "mr": f"हा फोटो कोणत्या पिकाचा आहे? तुमच्या प्रोफाइलमधील पीक: {crop_local}. हेच आहे का?",
+                "te": f"ఇది ఏ పంట ఫోటో? మీ ప్రొఫైల్‌లో పంట: {crop_local}. ఇదేనా?",
+                "en": f"Which crop is this photo of? Your profile crop is {crop_local}. Is it the same?",
             }
             return {
                 "text": prompts.get(dialect, prompts["en"]),
