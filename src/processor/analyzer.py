@@ -9,58 +9,87 @@ import os
 import io
 import struct
 import zlib
+import urllib.error
 from typing import Any, Dict, Optional
 
-_region = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "us-east-1"
-bedrock = boto3.client("bedrock-runtime", region_name=_region)
-s3 = boto3.client("s3", region_name=_region)
-secrets = boto3.client("secretsmanager", region_name=_region)
+from heuristics import run_heuristics
+from messages import get_block_message
+from enforcement import enforce_message_safety
 
-TEMP_BUCKET = os.environ.get("TEMP_AUDIO_BUCKET")
-IMAGE_MAX_BYTES = int(os.environ.get("IMAGE_MAX_BYTES", str(5 * 1024 * 1024)))
+bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
+s3 = boto3.client('s3', region_name='us-east-1')
+secrets = boto3.client('secretsmanager', region_name='us-east-1')
+
+TEMP_BUCKET = os.environ.get('TEMP_AUDIO_BUCKET')
+
+
+def validate_vision_schema(vision: Dict[str, Any]) -> None:
+    """
+    Validate required fields in vision model response.
+    Raises ValueError if invalid.
+    """
+    required_fields = [
+        'is_real_crop_photo',
+        'inferred_crop',
+        'crop_confidence',
+        'visible_problem',
+        'severity',
+        'recommendations'
+    ]
+
+    missing = [f for f in required_fields if f not in vision or vision[f] is None]
+    if missing:
+        raise ValueError(f"Missing required fields: {missing}")
+
+    # Validate enums
+    if vision['crop_confidence'] not in ['high', 'medium', 'low']:
+        raise ValueError(f"Invalid crop_confidence: {vision['crop_confidence']}")
+
+    if vision['severity'] not in ['high', 'medium', 'low', 'none', 'unknown']:
+        raise ValueError(f"Invalid severity: {vision['severity']}")
+
+    # Validate non_photo_reason enum (if present)
+    if vision.get('non_photo_reason') and vision['non_photo_reason'] not in ['screenshot', 'logo', 'document', 'too_blurry']:
+        raise ValueError(f"Invalid non_photo_reason: {vision['non_photo_reason']}")
+
+    # Validate inferred_crop enum
+    if vision['inferred_crop'] not in ['Cotton', 'Wheat', 'Soybean', 'Rice', 'Sugarcane', 'Maize', 'unknown']:
+        raise ValueError(f"Invalid inferred_crop: {vision['inferred_crop']}")
+
+
+def _normalize_vision_metadata(photo_kind: str, inferred_crop: str, crop_confidence: str) -> Dict[str, str]:
+    pk = (photo_kind or "unknown").strip() or "unknown"
+    ic = (inferred_crop or "unknown").strip() or "unknown"
+    cc = (crop_confidence or "low").strip() or "low"
+    if pk == "pest_macro":
+        return {"photo_kind": pk, "inferred_crop": "unknown", "crop_confidence": "low"}
+
+    # Be conservative: only keep a specific crop label when confidence is truly high.
+    if cc != "high":
+        return {"photo_kind": pk, "inferred_crop": "unknown", "crop_confidence": cc}
+
+    return {"photo_kind": pk, "inferred_crop": ic, "crop_confidence": cc}
 
 def _quality_gate_enabled() -> bool:
     return (os.environ.get("VISION_QUALITY_GATE_ENABLED") or "").strip().lower() in ("1", "true", "yes", "on")
 
 
 def _check_image_quality(image_bytes: bytes) -> Dict[str, Any]:
-    """
-    Conservative, deterministic quality gate.
-    Blocks only obviously unusable thumbnails to prevent hallucinated diagnoses.
-    """
     try:
         from PIL import Image  # type: ignore
     except Exception:
-        # If Pillow isn't available, don't block.
         return {"is_acceptable": True, "reason": None, "metrics": {}}
-
     try:
         import io as _io
-
         img = Image.open(_io.BytesIO(image_bytes))
         w, h = img.size
         file_size = len(image_bytes)
         min_dim = min(w, h)
-
-        # Conservative thresholds (align with Kiro): only block obviously bad.
         if min_dim < int(os.environ.get("VISION_MIN_DIMENSION", "320")):
-            return {
-                "is_acceptable": False,
-                "reason": "too_small",
-                "metrics": {"width": w, "height": h, "file_size": file_size, "min_dimension": min_dim},
-            }
+            return {"is_acceptable": False, "reason": "too_small", "metrics": {"width": w, "height": h, "file_size": file_size, "min_dimension": min_dim}}
         if file_size < int(os.environ.get("VISION_MIN_FILE_BYTES", "3000")):
-            return {
-                "is_acceptable": False,
-                "reason": "file_too_small",
-                "metrics": {"width": w, "height": h, "file_size": file_size, "min_dimension": min_dim},
-            }
-
-        return {
-            "is_acceptable": True,
-            "reason": None,
-            "metrics": {"width": w, "height": h, "file_size": file_size, "min_dimension": min_dim},
-        }
+            return {"is_acceptable": False, "reason": "file_too_small", "metrics": {"width": w, "height": h, "file_size": file_size, "min_dimension": min_dim}}
+        return {"is_acceptable": True, "reason": None, "metrics": {"width": w, "height": h, "file_size": file_size, "min_dimension": min_dim}}
     except Exception as e:
         return {"is_acceptable": False, "reason": f"error:{type(e).__name__}", "metrics": {}}
 
@@ -72,69 +101,32 @@ def _insufficient_quality_message(dialect: str, reason: str) -> str:
         "te": "ఫోటో చాలా చిన్నగా/అస్పష్టంగా ఉంది, కాబట్టి ఖచ్చితమైన నిర్ధారణ చేయడం సురక్షితం కాదు.\n\nదయచేసి:\n- ఆకుకు/పురుగుకు దగ్గరగా (సుమారు 30cm) ఫోటో తీసండి\n- ఫోకస్ కోసం ట్యాప్ చేయండి\n- మంచి వెలుతురులో ఫోటో తీసండి\n\nతర్వాత మళ్లీ ఫోటో పంపండి.",
         "en": "The photo is too small/unclear to diagnose reliably.\n\nPlease:\n- Move closer (~30cm)\n- Tap to focus\n- Take in good light\n\nThen resend the photo.",
     }
-    _ = reason  # reserved for future per-reason messaging
+    _ = reason
     return msgs.get(dialect, msgs["en"])
 
-
-def _normalize_vision_metadata(photo_kind: str, inferred_crop: str, crop_confidence: str) -> Dict[str, str]:
-    """
-    Enforce conservative crop inference for cases where crop context is usually absent.
-    In particular, pest macro photos commonly lack crop identifiers (leaf/field context).
-    """
-    pk = (photo_kind or "unknown").strip() or "unknown"
-    ic = (inferred_crop or "unknown").strip() or "unknown"
-    cc = (crop_confidence or "low").strip() or "low"
-
-    if pk == "pest_macro":
-        return {"photo_kind": pk, "inferred_crop": "unknown", "crop_confidence": "low"}
-
-    # Be conservative: only keep a specific crop label when confidence is truly high.
-    # This prevents "helpful guessing" (e.g. calling any vegetation "wheat") from leaking
-    # into user-facing text.
-    if cc != "high":
-        return {"photo_kind": pk, "inferred_crop": "unknown", "crop_confidence": cc}
-
-    return {"photo_kind": pk, "inferred_crop": ic, "crop_confidence": cc}
-
-
 def _looks_like_screenshot_or_ui(image_bytes: bytes) -> bool:
-    """
-    Deterministic rejection for screenshots / UI captures that often trigger hallucinations.
-    Uses lightweight image statistics (bimodal black/white + lots of edges) via Pillow.
-    Fail-open if Pillow isn't available.
-    """
     try:
         from PIL import Image, ImageFilter  # type: ignore
     except Exception:
         return False
-
     try:
         img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         w, h = img.size
         if w < 96 or h < 96:
             return False
-
-        # Normalize size for stable thresholds.
         target_w = 256
         target_h = max(128, int(h * (target_w / float(w))))
         small = img.resize((target_w, target_h))
-
         gray = small.convert("L")
-        hist = gray.histogram()  # 256 bins
+        hist = gray.histogram()
         total = float(sum(hist) or 1.0)
         black_frac = sum(hist[0:20]) / total
-        # Dark grey UI (GitHub/VS Code dark, compressed) often sits in bins 21–55, not "black".
         dark_frac = sum(hist[0:56]) / total
         white_frac = sum(hist[235:256]) / total
-
         edges = gray.filter(ImageFilter.FIND_EDGES)
         ehist = edges.histogram()
         edge_total = float(sum(ehist) or 1.0)
-        # Pixels with noticeable edge strength
         edge_frac = sum(ehist[40:256]) / edge_total
-
-        # Green dominance: real crop photos usually have significant green pixels.
-        # UI/screenshots (documents, web pages) typically don't.
         s2 = img.resize((128, 128))
         gp = list(s2.getdata())
         green = 0
@@ -145,34 +137,23 @@ def _looks_like_screenshot_or_ui(image_bytes: bytes) -> bool:
             qcolors16.add((r // 16, g // 16, b // 16))
         green_frac = green / float(len(gp) or 1.0)
         approx_unique_colors16 = len(qcolors16)
-
-        # Screenshots tend to be edge-heavy (text/UI lines) and have strong black/white peaks.
         if edge_frac > 0.16 and white_frac > 0.18 and black_frac > 0.008:
             return True
         if edge_frac > 0.22 and white_frac > 0.28:
             return True
         # White-dominant web/article screenshots (WhatsApp compression can reduce near-black pixels).
-        # Still: lots of white + edges + near-zero green.
         if edge_frac > 0.14 and white_frac > 0.55 and green_frac < 0.03:
             return True
-        # Dark-mode chat/app screenshots: lots of near-black pixels + moderate edges.
-        # This is uncommon for real crop photos (which typically have mid/high luminance greens).
         if black_frac > 0.22 and edge_frac > 0.085:
             return True
-        # Dark-mode IDE / GitHub / file tree (WhatsApp compression lifts pure-black counts).
         if dark_frac > 0.30 and edge_frac > 0.052 and green_frac < 0.12:
             return True
         if dark_frac > 0.24 and edge_frac > 0.068 and green_frac < 0.085 and approx_unique_colors16 <= 140:
             return True
-        # Heavily compressed dark UI (repo/IDE): huge dark_frac, edges smeared below typical UI thresholds.
         if dark_frac > 0.72 and edge_frac > 0.034 and green_frac < 0.05 and approx_unique_colors16 <= 110:
             return True
-        # Very small/compressed images: edges get smeared, but UI thumbnails are still
-        # mostly white/black and low-green.
         if (min(w, h) <= 320) and (green_frac < 0.12) and (white_frac > 0.60 or black_frac > 0.18):
             return True
-        # Many UI screenshots have a limited color palette (flat fills + text),
-        # even when not predominantly white or black.
         if (green_frac < 0.06) and (edge_frac > 0.09) and (approx_unique_colors16 <= 90):
             return True
         return False
@@ -180,50 +161,34 @@ def _looks_like_screenshot_or_ui(image_bytes: bytes) -> bool:
         return False
 
 def _looks_like_logo_or_illustration(image_bytes: bytes) -> bool:
-    """
-    Best-effort heuristic to reject obvious non-photo images (logos, icons, UI screenshots).
-    We keep it lightweight and fail-open if Pillow isn't available.
-    """
     try:
         from PIL import Image  # type: ignore
     except Exception:
-        # Fall back to a lightweight PNG-only heuristic (no third-party deps).
         try:
             if image_bytes[:8] == b"\x89PNG\r\n\x1a\n":
                 return _png_looks_like_logo(image_bytes)
         except Exception:
             return False
         return False
-
     try:
-        img = Image.open(io.BytesIO(image_bytes))
-        img = img.convert("RGB")
+        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         w, h = img.size
         if w < 64 or h < 64:
             return True
-
-        # Downsample for fast stats.
         small = img.resize((96, 96))
         pixels = list(small.getdata())
         total = len(pixels)
         if total == 0:
             return True
-
-        # Count near-white pixels (common for logos on white background).
         whiteish = 0
         colors = set()
-        step = 2  # reduce unique-color set size a bit
+        step = 2
         for i, (r, g, b) in enumerate(pixels):
             if r > 245 and g > 245 and b > 245:
                 whiteish += 1
             if i % step == 0:
                 colors.add((r // 8, g // 8, b // 8))
-
-        white_ratio = whiteish / total
-        approx_unique_colors = len(colors)
-
-        # Heuristic: lots of white + low color variety → likely logo/illustration/screenshot.
-        if white_ratio >= 0.70 and approx_unique_colors <= 180:
+        if (whiteish / total) >= 0.70 and len(colors) <= 180:
             return True
         return False
     except Exception:
@@ -231,10 +196,6 @@ def _looks_like_logo_or_illustration(image_bytes: bytes) -> bool:
 
 
 def _png_looks_like_logo(png_bytes: bytes) -> bool:
-    """
-    Minimal PNG decoder for logo detection (supports 8-bit RGB/RGBA).
-    Heuristic: lots of near-white background + low color variety.
-    """
     # PNG signature already checked by caller.
     pos = 8
     width = height = None
@@ -247,7 +208,7 @@ def _png_looks_like_logo(png_bytes: bytes) -> bool:
         if pos + length + 4 > len(png_bytes):
             break
         data = png_bytes[pos : pos + length]
-        pos += length + 4  # skip CRC
+        pos += length + 4
         if ctype == b"IHDR":
             if length < 13:
                 return False
@@ -262,8 +223,6 @@ def _png_looks_like_logo(png_bytes: bytes) -> bool:
 
     if not width or not height or bit_depth != 8 or color_type not in (2, 6):
         return False
-
-    # Decompress image data.
     raw = zlib.decompress(bytes(idat))
     bpp = 3 if color_type == 2 else 4
     stride = width * bpp
@@ -282,7 +241,6 @@ def _png_looks_like_logo(png_bytes: bytes) -> bool:
             return b
         return c
 
-    # Reconstruct scanlines.
     pixels_sampled = 0
     whiteish = 0
     colors = set()
@@ -297,27 +255,25 @@ def _png_looks_like_logo(png_bytes: bytes) -> bool:
         line = bytearray(raw[idx : idx + stride])
         idx += stride
 
-        if f == 1:  # Sub
+        if f == 1:
             for i in range(stride):
                 left = line[i - bpp] if i >= bpp else 0
                 line[i] = (line[i] + left) & 0xFF
-        elif f == 2:  # Up
+        elif f == 2:
             for i in range(stride):
                 line[i] = (line[i] + prev[i]) & 0xFF
-        elif f == 3:  # Average
+        elif f == 3:
             for i in range(stride):
                 left = line[i - bpp] if i >= bpp else 0
                 up = prev[i]
                 line[i] = (line[i] + ((left + up) // 2)) & 0xFF
-        elif f == 4:  # Paeth
+        elif f == 4:
             for i in range(stride):
                 left = line[i - bpp] if i >= bpp else 0
                 up = prev[i]
                 up_left = prev[i - bpp] if i >= bpp else 0
                 line[i] = (line[i] + paeth(left, up, up_left)) & 0xFF
-        # f == 0 (None): already ok
 
-        # Sample pixels for stats.
         for x in range(0, stride, bpp):
             if (px_index % step) == 0:
                 r = line[x]
@@ -348,16 +304,10 @@ def _non_photo_message(dialect: str) -> str:
     return msgs.get(dialect, msgs["en"])
 
 def _extract_primary_frame(image_bytes: bytes) -> bytes:
-    """
-    WhatsApp users often send screenshots (chat UI) instead of the raw photo.
-    This tries to crop the largest bright rectangle (likely the actual photo bubble)
-    and returns cropped image bytes. If we can't confidently crop, return original.
-    """
     try:
         from PIL import Image  # type: ignore
     except Exception:
         return image_bytes
-
     try:
         img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         w, h = img.size
@@ -369,16 +319,12 @@ def _extract_primary_frame(image_bytes: bytes) -> bytes:
         small = img.resize((small_w, small_h))
         px = small.load()
 
-        # Find bounding box of bright pixels (near-white photo background).
         min_x, min_y = small_w, small_h
         max_x, max_y = -1, -1
-        bright = 0
         for y in range(small_h):
             for x in range(small_w):
                 r, g, b = px[x, y]
-                # Brightness threshold tuned for white chat-bubble frames.
                 if r > 220 and g > 220 and b > 220:
-                    bright += 1
                     if x < min_x: min_x = x
                     if y < min_y: min_y = y
                     if x > max_x: max_x = x
@@ -390,12 +336,9 @@ def _extract_primary_frame(image_bytes: bytes) -> bytes:
         bbox_w = (max_x - min_x + 1)
         bbox_h = (max_y - min_y + 1)
         area_ratio = (bbox_w * bbox_h) / float(small_w * small_h)
-
-        # Only crop if the bright rectangle is substantial (avoid random highlights).
         if area_ratio < 0.18:
             return image_bytes
 
-        # Map bbox back to original coordinates + padding.
         scale_x = w / float(small_w)
         scale_y = h / float(small_h)
         pad = 12
@@ -403,8 +346,6 @@ def _extract_primary_frame(image_bytes: bytes) -> bytes:
         upper = max(0, int(min_y * scale_y) - pad)
         right = min(w, int((max_x + 1) * scale_x) + pad)
         lower = min(h, int((max_y + 1) * scale_y) + pad)
-
-        # Crop, then ensure we didn’t basically keep the whole screenshot.
         crop = img.crop((left, upper, right, lower))
         cw, ch = crop.size
         if (cw * ch) / float(w * h) > 0.92:
@@ -417,7 +358,6 @@ def _extract_primary_frame(image_bytes: bytes) -> bytes:
         return image_bytes
 
 def _extract_json_object(text: str) -> Optional[Dict[str, Any]]:
-    """Extract first top-level JSON object from model output."""
     if not text:
         return None
     start = text.find("{")
@@ -461,10 +401,7 @@ def download_whatsapp_image(media_id: str) -> bytes:
     # Download image
     req = urllib.request.Request(media_url, headers=headers)
     with urllib.request.urlopen(req) as response:
-        body = response.read()
-    if len(body) > IMAGE_MAX_BYTES:
-        raise ValueError(f"image too large ({len(body)} bytes > {IMAGE_MAX_BYTES})")
-    return body
+        return response.read()
 
 
 def analyze_crop_image(
@@ -475,49 +412,48 @@ def analyze_crop_image(
 ) -> Dict[str, Any]:
     """
     Analyze crop image for pests, diseases, or nutrient deficiencies
-    
+
     Args:
         image_bytes: Image data
         dialect: User's dialect (hi, mr, te, en)
         crop: Crop type from PROFILE (default: cotton)
-        district: District / location from PROFILE (optional, for regional advice)
-    
+        district: District / location from PROFILE (optional)
+
     Returns:
         {
-            'diagnosis': str,  # What's wrong with the crop
-            'severity': str,   # low, medium, high
-            'recommendations': str,  # What to do
-            'confidence': str  # high, medium, low
+            'is_real_crop_photo': bool,
+            'non_photo_reason': str | None,
+            'inferred_crop': str,  # Cotton, Wheat, Soybean, Rice, Sugarcane, Maize, unknown
+            'crop_confidence': str,  # high, medium, low
+            'visible_problem': bool,
+            'severity': str,  # high, medium, low, none, unknown
+            'recommendations': str  # Advice in user's language
         }
     """
-    # If this looks like a UI/screenshot, do NOT attempt to crop/guess: reject.
-    # (Cropping an embedded picture from a UI screenshot often creates false positives.)
+    # If this looks like a UI/screenshot, reject (cropping embedded content creates false positives).
     if _looks_like_screenshot_or_ui(image_bytes):
         msg = _non_photo_message(dialect)
         return {
-            "diagnosis": "non_photo",
-            "severity": "unknown",
-            "recommendations": msg,
-            "confidence": "low",
-            "photo_kind": "unknown",
+            "is_real_crop_photo": False,
+            "non_photo_reason": "screenshot",
             "inferred_crop": "unknown",
             "crop_confidence": "low",
-            "raw_analysis": msg,
+            "visible_problem": False,
+            "severity": "none",
+            "recommendations": msg,
         }
 
-    # If the user sent a screenshot with an embedded photo, this may isolate it.
     image_bytes = _extract_primary_frame(image_bytes)
     if _looks_like_screenshot_or_ui(image_bytes):
         msg = _non_photo_message(dialect)
         return {
-            "diagnosis": "non_photo",
-            "severity": "unknown",
-            "recommendations": msg,
-            "confidence": "low",
-            "photo_kind": "unknown",
+            "is_real_crop_photo": False,
+            "non_photo_reason": "screenshot",
             "inferred_crop": "unknown",
             "crop_confidence": "low",
-            "raw_analysis": msg,
+            "visible_problem": False,
+            "severity": "none",
+            "recommendations": msg,
         }
 
     # Detect image format from magic bytes
@@ -542,71 +478,69 @@ def analyze_crop_image(
     language = language_map.get(dialect, "English")
     area = (district or "").strip() or "not specified"
 
-    # Reject obvious non-photo inputs early (prevents confident hallucinations on logos/icons).
     if _looks_like_logo_or_illustration(image_bytes):
         msg = _non_photo_message(dialect)
         return {
-            "diagnosis": "non_photo",
-            "severity": "unknown",
+            "is_real_crop_photo": False,
+            "non_photo_reason": "logo",
+            "inferred_crop": "unknown",
+            "crop_confidence": "low",
+            "visible_problem": False,
+            "severity": "none",
             "recommendations": msg,
-            "confidence": "low",
-            "raw_analysis": msg,
         }
 
-    # Visual-first prompt: profile is context only; distinctive crop organs must override it.
-    # Force JSON so we can deterministically block non-photos.
     prompt = f"""You are an agricultural extension agent helping smallholder farmers in India.
 
-CONTEXT (profile crop is background context, NOT proof of what is in the image):
-- Registered crop in the farmer's app profile: **{crop}**
-- Registered district / area: **{area}**
+**CRITICAL: Return ONLY valid JSON. No markdown code fences, no extra text. Raw JSON only.**
 
-TASK: Look at the photo for pests, diseases, nutrient stress, or other visible problems. First identify what the visible plant/crop part actually is; then use the profile crop only if the image itself is ambiguous.
+PROFILE CONTEXT (farmer's registered crop, NOT visual evidence):
+- Registered crop: {crop.title()}
+- District: {district or "not specified"}
 
-RULES:
-VISUAL CROP EVIDENCE WINS:
-- Distinctive crop organs override profile context. If you clearly see **cotton boll/fiber** on a plant, set `inferred_crop="Cotton"` and `crop_confidence="high"` even if the registered crop is Wheat or another crop.
-- Do not call cotton lint/fiber, white boll lobes, flowers, pods, fruit, or bracts “insects” unless actual insects are clearly visible.
-- Only describe the crop as Wheat/cereal if you clearly see cereal plant structure (narrow blade leaves, cereal ear/head, stem/tillers). A cotton boll/fiber photo is never wheat.
-NO CROP GUESSING:
-- If you are not strongly confident about the crop from the visible plant structure, set `inferred_crop="unknown"` and `crop_confidence="low"`.
-- In `final_message`, do not name a specific crop unless `crop_confidence="high"`. Use generic wording (e.g., “पौधा/फसल”, “leaf/plant”) when uncertain.
-NO VISIBLE PROBLEM IS A VALID DIAGNOSIS:
-- If you can identify the crop/plant part but do **not** clearly see pests, disease spots, wilting, rot, nutrient stress, chewing, holes, or other damage, say that no clear pest/disease symptom is visible in this photo.
-- Do not recommend pesticides, fungicides, insecticides, or spray schedules unless an actual pest/disease/damage symptom is clearly visible.
-- Normal crop structures are not symptoms: cotton lint/fiber, brown dry bracts, boll seams, stems, shadows, and dried plant parts should not be labeled as pests or disease by themselves.
-0. **Non-photo guardrail (be conservative)**: If the image is a logo, illustration, screenshot/UI, document, meme, diagram, or you are not clearly seeing a real plant/leaf captured by a camera, set `is_real_crop_photo=false`. Examples: a stylized leaf icon with clean lines on a white background; app/file browser screenshots; **GitHub/repo/code listings, IDE panels, or folder trees** (thin colored text on dark backgrounds); graphics with flat colors. Do not invent pests/diseases. **Never** call something a wheat/cotton/soy field from these UI images.
-   But a real close-up photo of a crop part is still a crop photo: cotton boll/fiber on the plant, flower, fruit/pod, leaf, stem, pest on plant tissue, or field canopy. Do **not** reject a cotton boll or white cotton fiber as "logo/illustration" just because it is white-dominant.
-1. **Profile fallback only**: If the picture is partly blurry, backlit, or just "green vegetation" with no distinctive crop part, do **not** relabel it as sugarcane, rice, etc. Say visibility is limited and give guidance for **{crop}**.
-2. **Foreground first**: Base the diagnosis on the **sharp, main subject** (e.g. hand-held leaf, insects on that leaf). Out-of-focus yellow flowers or other plants in the **background** are often weeds or intercrop—mention in **at most one short phrase**, not as the headline. **Do not** use background color alone to reject **{crop}**.
-3. **Visual fidelity**: Describe what you can actually see (including insect color if visible). Do not contradict obvious colors (e.g., don't call black insects “white”). If color is unclear, say “color not clear in this photo”.
-4. **Wheat / cereals (apply ONLY when conditions match)**: Only use this rule if you **clearly** see a **cereal leaf blade** (narrow leaf with parallel veins) AND **clusters of tiny soft-bodied insects** (aphid-like colonies). **Do not apply** this rule to photos of **large larvae/caterpillars**, **buds/flowers/bolls**, or macro insect shots with no cereal leaf visible. If you see a **caterpillar/larva chewing**, describe it as a chewing pest (e.g., bollworm/armyworm-type) with appropriate scouting/IPM steps, even if the profile crop is different.
-5. **Uncertainty**: If species ID or symptoms are unclear, state that briefly in **Confidence** and give conservative next steps (monitor, send a closer symptom/pest photo, check nearby plants). Do not invent a treatment.
-6. **Tone**: Support the farmer. Avoid harsh denials unless the in-focus plant structure **clearly** rules out **{crop}**.
-7. **Consistency**: Use the same four numbered headings below every time so answers feel stable across retries.
+JSON OUTPUT (all fields required):
+{{
+    "is_real_crop_photo": true | false,
+    "non_photo_reason": "screenshot" | "logo" | "document" | "too_blurry" | null,
+    "inferred_crop": "Cotton" | "Wheat" | "Soybean" | "Rice" | "Sugarcane" | "Maize" | "unknown",
+    "crop_confidence": "high" | "medium" | "low",
+    "visible_problem": true | false,
+    "severity": "high" | "medium" | "low" | "none" | "unknown",
+    "recommendations": "<2-4 sentences in {language}>"
+}}
 
-OUTPUT:
-Return ONLY one JSON object (no prose, no markdown) with keys:
-- is_real_crop_photo: boolean
-- non_photo_reason: string
-- photo_kind: one of ["leaf_symptom","pest_macro","field_view","unknown"]
-- inferred_crop: one of ["Cotton","Wheat","Soybean","Maize","unknown"]
-- crop_confidence: one of ["low","medium","high"]
-- visible_problem: boolean
-- insect_color: one of ["black","white","green","brown","mixed","unknown"]
-- severity: one of ["low","medium","high","unknown"]
-- confidence: one of ["low","medium","high"]
-- final_message: string in **{language}** with exactly these 4 sections:
-  1. **Diagnosis**
-  2. **Severity**
-  3. **Recommendations**
-  4. **Confidence**
+3-TIER CROP IDENTIFICATION (CRITICAL):
 
-If is_real_crop_photo is false:
-- final_message must ask for a real crop/leaf close-up photo and must NOT mention pests/diseases.
-If visible_problem is false:
-- final_message must say no clear pest/disease/damage symptom is visible in this photo.
-- Recommendations should be monitoring / sending a clearer close-up if symptoms appear; no pesticide or spray advice.
+1. **Visual overrides profile**: If distinctive crop organs clearly visible (cotton bolls, wheat grain heads, specific leaf morphology) → set inferred_crop to what you SEE with crop_confidence="high", EVEN if different from {crop.title()}.
+
+2. **Ambiguous → unknown**: If vegetation visible but NO distinctive features (generic leaves, far view, blur, early stage) → MUST set:
+   - inferred_crop="unknown"
+   - crop_confidence="low"
+   - In recommendations: use "this plant"/"this leaf" (NO crop name)
+   - Suggest clearer/closer photo
+
+3. **Never anchor on profile**: Do NOT use {crop.title()} as evidence. Only name crops when visual features confirm it.
+
+IMAGE TYPE RULES:
+- "real_crop": Real photograph of plant/crop (field, hand-held, close-up)
+- "screenshot": UI, terminal, app, file explorer, chat
+- "logo": Graphic, icon, illustration, stylized image
+- "document": PDF, scanned text, document photo
+- "too_blurry": Too dark/blurry/corrupted to classify
+
+If is_real_crop_photo=false:
+- Set: inferred_crop="unknown", crop_confidence="low", visible_problem=false, severity="none"
+- recommendations: one sentence asking for real crop photo in {language}
+
+CONFIDENCE LEVELS:
+- "high": Distinctive organs clearly visible
+- "medium": Crop features present but not definitive
+- "low": No distinguishing features
+
+REMEMBER:
+- Return raw JSON only (no ``` fences)
+- Title Case crops: "Cotton", "Wheat"
+- Never name crop unless visual evidence supports it
 """
     
     # Call Claude 3 Sonnet Vision
@@ -643,61 +577,25 @@ If visible_problem is false:
         
         # Parse response
         response_body = json.loads(response['body'].read())
-        analysis = response_body['content'][0]['text']
+        raw_text = response_body['content'][0]['text'].strip()
 
-        print(f"Vision analysis complete: {len(analysis)} characters")
+        # Defensive fallback: strip fences if present (should be rare with temp=0)
+        if raw_text.startswith('```'):
+            raw_text = '\n'.join(raw_text.split('\n')[1:-1])
 
-        obj = _extract_json_object(analysis)
-        if obj and isinstance(obj.get("final_message"), str):
-            if obj.get("is_real_crop_photo") is False:
-                msg = _non_photo_message(dialect)
-                return {
-                    "diagnosis": "non_photo",
-                    "severity": "unknown",
-                    "recommendations": msg,
-                    "confidence": "low",
-                    "photo_kind": "unknown",
-                    "inferred_crop": "unknown",
-                    "crop_confidence": "low",
-                    "raw_analysis": analysis,
-                }
-            photo_kind = str(obj.get("photo_kind") or "unknown")
-            inferred_crop = str(obj.get("inferred_crop") or "unknown")
-            crop_confidence = str(obj.get("crop_confidence") or "low")
-            norm = _normalize_vision_metadata(photo_kind, inferred_crop, crop_confidence)
-            photo_kind = norm["photo_kind"]
-            inferred_crop = norm["inferred_crop"]
-            crop_confidence = norm["crop_confidence"]
-            visible_problem = bool(obj.get("visible_problem", True))
-            severity = str(obj.get("severity") or "unknown")
-            confidence = str(obj.get("confidence") or "medium")
-            needs_confirm = False
-            return {
-                "diagnosis": "Unknown",
-                "severity": severity,
-                "recommendations": obj["final_message"],
-                "confidence": confidence,
-                "photo_kind": photo_kind,
-                "inferred_crop": inferred_crop,
-                "crop_confidence": crop_confidence,
-                "visible_problem": visible_problem,
-                "needs_crop_confirm": needs_confirm,
-                "raw_analysis": analysis,
-            }
+        try:
+            vision_result = json.loads(raw_text)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Vision model returned invalid JSON: {e}")
 
-        # Fail-safe: if parsing fails, don't guess—ask for a clearer crop/leaf photo.
-        msg = _non_photo_message(dialect)
-        return {
-            "diagnosis": "unknown",
-            "severity": "unknown",
-            "recommendations": msg,
-            "confidence": "low",
-            "photo_kind": "unknown",
-            "inferred_crop": "unknown",
-            "crop_confidence": "low",
-            "raw_analysis": analysis,
-        }
-        
+        # Validate schema immediately
+        validate_vision_schema(vision_result)
+
+        print(f"Vision analysis complete: {len(raw_text)} characters")
+
+        # Return validated structured result
+        return vision_result
+
     except Exception as e:
         print(f"Error analyzing image: {e}")
         
@@ -710,67 +608,77 @@ If visible_problem is false:
         }
         
         return {
-            'diagnosis': 'Error',
+            'is_real_crop_photo': False,
+            'non_photo_reason': 'too_blurry',
+            'inferred_crop': 'unknown',
+            'crop_confidence': 'low',
+            'visible_problem': False,
             'severity': 'unknown',
-            'recommendations': error_messages.get(dialect, error_messages['en']),
-            'confidence': 'low',
-            'error': str(e)
+            'recommendations': error_messages.get(dialect, error_messages['en'])
         }
 
 
-def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any]) -> Any:
+def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Process WhatsApp image message
-    
+    3-layer defense with diagnostic logging.
+    NEVER raise exceptions to webhook (breaks WhatsApp flow).
+
     Args:
         message: WhatsApp message with image
         user_profile: User profile from DynamoDB
-    
+
     Returns:
-        Analysis text to send back to user
+        Dict with 'text' key (message for user) and optional metadata (s3, heuristics_error, etc.)
     """
     try:
         image_id = message['image']['id']
         dialect = user_profile.get('dialect', 'hi')
         crop = user_profile.get('crop', 'cotton')
-        
-        print(f"Processing image message: image_id={image_id}, dialect={dialect}, crop={crop}")
-        
-        # Download image from WhatsApp
-        print("Downloading image from WhatsApp...")
-        image_bytes = download_whatsapp_image(image_id)
-        print(f"Downloaded {len(image_bytes)} bytes")
+        phone = user_profile.get('phone_number', 'unknown')
 
-        # Deterministic quality gate (beta-only via env flag).
+        print(f"Processing image message: image_id={image_id}, dialect={dialect}, crop={crop}")
+
+        # Download image from WhatsApp (can fail: network, WhatsApp auth)
+        print("Downloading image from WhatsApp...")
+        try:
+            image_bytes = download_whatsapp_image(image_id)
+            print(f"Downloaded {len(image_bytes)} bytes")
+        except (urllib.error.HTTPError, urllib.error.URLError, KeyError) as e:
+            print(f"Image download failed: {e}")
+            from messages import get_error_message
+            return {"text": get_error_message('download_failed', dialect)}
+
+        # LAYER 1: Heuristics gate (pre-flight check)
+        heuristics_error = False
+        try:
+            heuristics = run_heuristics(image_bytes)
+            print(f"Heuristics result: {heuristics['decision']}, reason: {heuristics.get('reason')}")
+        except Exception as e:
+            print(f"Heuristics failed (PIL error): {e}")
+            heuristics_error = True
+            heuristics = {'decision': 'pass', 'reason': None, 'metrics': {}}
+
+        if heuristics['decision'] == 'block':
+            blocked_msg = get_block_message(heuristics['reason'], dialect)
+            print(f"Blocked by heuristics: {heuristics['reason']}")
+            return {"text": blocked_msg}
+
         if _quality_gate_enabled():
             q = _check_image_quality(image_bytes)
             if not q.get("is_acceptable", True):
                 txt = _insufficient_quality_message(dialect, str(q.get("reason") or "unclear"))
-                # Still store for possible user-driven override / debugging.
                 import time
                 timestamp = int(time.time())
                 phone = user_profile.get('phone_number') or message.get('from', 'unknown')
                 s3_key = f"images/{phone}/{timestamp}.jpg"
                 if not TEMP_BUCKET:
                     raise RuntimeError('TEMP_AUDIO_BUCKET is required for the WhatsApp image pipeline')
-                s3.put_object(
-                    Bucket=TEMP_BUCKET,
-                    Key=s3_key,
-                    Body=image_bytes,
-                    ContentType='image/jpeg'
-                )
-                print(f"Saved to S3 (quality_fail): s3://{TEMP_BUCKET}/{s3_key}")
-                return {
-                    "text": txt,
-                    "quality_gate_failed": True,
-                    "quality": q,
-                    "s3": {"bucket": TEMP_BUCKET, "key": s3_key},
-                }
-        
+                s3.put_object(Bucket=TEMP_BUCKET, Key=s3_key, Body=image_bytes, ContentType='image/jpeg')
+                return {"text": txt, "quality_gate_failed": True, "quality": q, "s3": {"bucket": TEMP_BUCKET, "key": s3_key}}
+
         # Optional: Save to S3 for record-keeping
         import time
         timestamp = int(time.time())
-        phone = user_profile.get('phone_number') or message.get('from', 'unknown')
         s3_key = f"images/{phone}/{timestamp}.jpg"
 
         if not TEMP_BUCKET:
@@ -782,65 +690,68 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
             ContentType='image/jpeg'
         )
         print(f"Saved to S3: s3://{TEMP_BUCKET}/{s3_key}")
-        
-        # Analyze image
+
+        # LAYER 2: Vision model
         district = user_profile.get("district") or user_profile.get("location")
-        result = analyze_crop_image(image_bytes, dialect, crop, district=district)
+        try:
+            vision = analyze_crop_image(image_bytes, dialect, crop, district=district)
+        except ValueError as e:
+            # Schema validation failed or invalid JSON
+            print(f"Vision model validation error: {e}")
+            from messages import get_error_message
+            return {"text": get_error_message('model_invalid_json', dialect)}
+        except Exception as e:
+            # Other model errors (timeout, rate limit, etc.)
+            print(f"Vision model error: {e}")
+            from messages import get_error_message
+            return {"text": get_error_message('model_error', dialect)}
 
-        # If we deterministically rejected as non-photo / screenshot, return that message
-        # and do not fall into the pest-macro crop prompt.
-        if str(result.get("diagnosis") or "").strip().lower() == "non_photo":
-            return {
-                "text": str(result.get("recommendations") or _non_photo_message(dialect)),
-                "s3": {"bucket": TEMP_BUCKET, "key": s3_key},
-                "non_photo": True,
-            }
+        # Schema already validated inside analyze_crop_image()
 
-        # Pest macro shots often don't contain enough crop context. If Vision says it's a pest macro
-        # but can't infer crop confidently, do NOT return a profile-biased agronomy answer.
-        photo_kind = str(result.get("photo_kind") or "unknown")
-        crop_conf = str(result.get("crop_confidence") or "low")
-        if photo_kind in ("pest_macro", "leaf_symptom", "unknown") and crop_conf != "high":
-            profile_crop = str(crop or "").strip() or "unknown"
-            prompt_msgs = {
-                "hi": "यह *क्लोज़‑अप/आंशिक फसल फोटो* लग रहा है। सही सलाह के लिए बताइए यह फोटो किस फसल पर है?",
-                "mr": "हा *जवळून/अंशतः घेतलेला पीक फोटो* दिसतो. योग्य सल्ल्यासाठी हा फोटो कोणत्या पिकावर आहे?",
-                "te": "ఇది *దగ్గరగా/భాగంగా తీసిన పంట ఫోటోలా* ఉంది. సరైన సలహా కోసం ఇది ఏ పంటపై ఉందో చెప్పండి.",
-                "en": "This looks like a *close-up/partial crop photo*. To give the right recommendation, which crop is this?",
-            }
-            button_titles = {
-                "hi": ["कपास", "गेहूं", "सोयाबीन"],
-                "mr": ["कापूस", "गहू", "सोयाबीन"],
-                "te": ["పత్తి", "గోధుమ", "సోయాబీన్"],
-                "en": ["Cotton", "Wheat", "Soybean"],
-            }
-            return {
-                "text": prompt_msgs.get(dialect, prompt_msgs["en"]),
-                "buttons": button_titles.get(dialect, button_titles["en"]),
-                "pending_crop_confirm": {
-                    "bucket": TEMP_BUCKET,
-                    "key": s3_key,
-                    "profile_crop": profile_crop,
-                    "inferred_crop": "",
-                },
-                "s3": {"bucket": TEMP_BUCKET, "key": s3_key},
-            }
+        # EXISTING: _normalize_vision_metadata() already enforces metadata-level safety
+        # (crop_confidence != "high" → inferred_crop="unknown")
+        # This is preserved for metadata fields.
+
+        # NEW: enforce_message_safety() adds MESSAGE-level safety
+        # (crop_confidence != "high" → safe template text, not model prose)
+        # This prevents crop names from leaking into user-facing messages.
+
+        # LAYER 3: Handler enforcement
+        final_msg = enforce_message_safety(vision, crop, dialect)
+
+        print(f"Final message (enforced): {final_msg[:100]}...")
+
+        # Diagnostic logging (full decision path)
+        phone_suffix = phone[-4:] if phone and len(phone) >= 4 else 'unknown'
+
+        log_data = {
+            'phone_suffix': phone_suffix,
+            'heuristics_decision': heuristics.get('decision', 'pass'),
+            'heuristics_error': heuristics_error,
+            'is_real_crop_photo': vision.get('is_real_crop_photo'),
+            'inferred_crop': vision.get('inferred_crop'),
+            'crop_confidence': vision.get('crop_confidence'),
+            'visible_problem': vision.get('visible_problem'),
+            'severity': vision.get('severity'),
+            'raw_message_preview': vision.get('recommendations', '')[:120],
+            'final_message_preview': final_msg[:120],
+            'was_overridden': (vision.get('recommendations', '') != final_msg)
+        }
+
+        print(f"Vision analysis complete: {log_data}")
 
         return {
-            "text": result["recommendations"],
+            "text": final_msg,
             "s3": {"bucket": TEMP_BUCKET, "key": s3_key},
+            "heuristics_error": heuristics_error
         }
-        
+
     except Exception as e:
-        print(f"Error processing image message: {e}")
-        
-        # Return error message in user's dialect
+        # Ultimate fallback: log and return generic error
+        print(f"Unexpected error in image processing: {e}")
+        import traceback
+        traceback.print_exc()
+
         dialect = user_profile.get('dialect', 'hi')
-        error_messages = {
-            'hi': 'माफ़ करें, छवि प्रोसेस करने में समस्या हुई। कृपया फिर से कोशिश करें या टेक्स्ट में समस्या बताएं।',
-            'mr': 'माफ करा, प्रतिमा प्रक्रियेत समस्या आली. कृपया पुन्हा प्रयत्न करा किंवा मजकूरात समस्या सांगा.',
-            'te': 'క్షమించండి, చిత్రం ప్రాసెస్ చేయడంలో సమస్య. దయచేసి మళ్లీ ప్రయత్నించండి లేదా టెక్స్ట్‌లో సమస్య చెప్పండి.',
-            'en': 'Sorry, there was a problem processing the image. Please try again or describe the problem in text.'
-        }
-        
-        return error_messages.get(dialect, error_messages['en'])
+        from messages import get_error_message
+        return {"text": get_error_message('unknown', dialect)}
