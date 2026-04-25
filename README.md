@@ -53,8 +53,8 @@
 - [Monitoring](#monitoring)
 - [Requirements Methodology: EARS](#requirements-methodology-ears)
 - [Documentation](#documentation)
-- [Partnerships & commercialization](#partnerships--commercialization)
 - [Productization Roadmap](#productization-roadmap)
+- [Partnerships & commercialization](#partnerships--commercialization)
 - [Acknowledgments](#acknowledgments)
 - [License](#license)
 
@@ -612,16 +612,6 @@ Some documents are intentionally **not** part of the public “judge quickstart�
 - [Amazon Polly](https://docs.aws.amazon.com/polly/)
 - [WhatsApp Business API](https://developers.facebook.com/docs/whatsapp)
 
-## Partnerships & commercialization
-
-I designed AgriNexus to be deployed through partners (B2B2G2C / B2B2C): a cohort is onboarded once, farmers use WhatsApp with zero app install, and the system measures follow‑through (not just message delivery).
-
-- **Government / extension programs (B2G)**: district or block pilots with auditability (what advice was sent, when, and whether it was acted on), plus dashboards for program monitoring.
-- **Private partners (B2B2C)**: MFIs, agri‑input suppliers, and contract farming programs can embed the accountability loop into their farmer engagement, with co‑branded knowledge + nudges and outcome tracking.
-
-Example ecosystems: KVKs ([ICAR directory](https://icar.org.in/sites/default/files/inline-files/KVK-TELEPHONE-Directory-2020.pdf)), MFIs/NBFCs ([RBI registry](https://rbi.org.in/Scripts/BS_NBFCList.aspx)), mandi price signals ([eNAM](https://enam.gov.in/), [Agmarknet](https://www.enam.gov.in/web/dashboard/agmarknet)).
-
-For partnerships/licensing, contact: `prasad@prasadtilloo.com`.
 
 ## Productization Roadmap
 
@@ -656,6 +646,17 @@ The roadmap isn’t just “more nudges”—it’s **smarter triggers + smarter
 
 
 **Commercial licensing:** see [License](#license) — source available for review; commercial use via [prasad@prasadtilloo.com](mailto:prasad@prasadtilloo.com).
+
+## Partnerships & commercialization
+
+I designed AgriNexus to be deployed through partners (B2B2G2C / B2B2C): a cohort is onboarded once, farmers use WhatsApp with zero app install, and the system measures follow‑through (not just message delivery).
+
+- **Government / extension programs (B2G)**: district or block pilots with auditability (what advice was sent, when, and whether it was acted on), plus dashboards for program monitoring.
+- **Private partners (B2B2C)**: MFIs, agri‑input suppliers, and contract farming programs can embed the accountability loop into their farmer engagement, with co‑branded knowledge + nudges and outcome tracking.
+
+Example ecosystems: KVKs ([ICAR directory](https://icar.org.in/sites/default/files/inline-files/KVK-TELEPHONE-Directory-2020.pdf)), MFIs/NBFCs ([RBI registry](https://rbi.org.in/Scripts/BS_NBFCList.aspx)), mandi price signals ([eNAM](https://enam.gov.in/), [Agmarknet](https://www.enam.gov.in/web/dashboard/agmarknet)).
+
+For partnerships/licensing, contact: `prasad@prasadtilloo.com`.
 
 ## Acknowledgments
 
