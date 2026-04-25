@@ -522,11 +522,20 @@ JSON OUTPUT (all fields required):
 3. **Never anchor on profile**: Do NOT use {crop.title()} as evidence. Only name crops when visual features confirm it.
 
 IMAGE TYPE RULES:
-- "real_crop": Real photograph of plant/crop (field, hand-held, close-up)
-- "screenshot": UI, terminal, app, file explorer, chat
-- "logo": Graphic, icon, illustration, stylized image
-- "document": PDF, scanned text, document photo
-- "too_blurry": Too dark/blurry/corrupted to classify
+**is_real_crop_photo=true** (BE INCLUSIVE):
+- Field photos, hand-held leaves, close-ups of plant parts
+- **Pest macro shots** (close-up of caterpillar/insect ON crop) = REAL CROP PHOTO ✓
+- **Boll/fruit/grain with pest** = REAL CROP PHOTO ✓
+- ANY photo showing actual vegetation/plant tissue (even if very zoomed in)
+- As long as it's NOT screenshot/UI/logo/document, mark as true
+
+**is_real_crop_photo=false** (ONLY for):
+- "screenshot": UI, terminal, app, file explorer, chat interface
+- "logo": Graphic, icon, illustration, stylized drawing
+- "document": PDF, scanned text, printed document
+- "too_blurry": Completely dark/corrupted/unidentifiable
+
+**Default to true**: If it's a photograph of vegetation/plant, even extreme close-up of pest/damage, mark as true.
 
 If is_real_crop_photo=false:
 - Set: inferred_crop="unknown", crop_confidence="low", visible_problem=false, severity="none"
