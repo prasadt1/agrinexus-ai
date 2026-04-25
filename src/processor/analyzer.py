@@ -541,20 +541,35 @@ If is_real_crop_photo=false:
 - Set: inferred_crop="unknown", crop_confidence="low", visible_problem=false, severity="none"
 - recommendations: one sentence asking for real crop photo in {language}
 
-PEST/PROBLEM DETECTION (CRITICAL):
-1. **ANY visible pest = problem**: If you see ANY insect, worm, caterpillar, larva, bug, moth, beetle, aphid, or creature ON/NEAR the plant → MUST set:
-   - visible_problem=true
-   - severity="high" (if pest is clearly feeding/damaging) or "medium" (if pest present but damage unclear)
-   - Describe the pest and recommend IPM/monitoring
+⚠️ MANDATORY FIRST STEP - PEST SCAN (DO THIS BEFORE ANYTHING ELSE):
+**BEFORE analyzing crop type or health, you MUST scan the ENTIRE image for insects/pests.**
 
-2. **Disease symptoms**: Spots, lesions, yellowing, discoloration, wilting, rot, mold → visible_problem=true
+Look for:
+- Beetles, grasshoppers, locusts, moths, butterflies ON the plant
+- Caterpillars, worms, larvae ON leaves/stems/grain
+- Aphids (tiny white/green bugs in clusters)
+- ANY creature sitting on or near plant parts
 
-3. **Healthy plant**: ONLY set visible_problem=false if:
-   - NO insects/creatures visible anywhere in frame
-   - NO disease symptoms (spots, discoloration, damage)
-   - Plant appears completely healthy
+**If you see ANY insect/creature → IMMEDIATELY set:**
+- visible_problem=true
+- severity="high" (if actively feeding) or "medium" (if just present)
+- In recommendations: describe the pest (e.g., "beetle on wheat ear", "grasshopper on grain head")
 
-**Default to caution**: If unsure whether a mark is a pest or dirt, mark visible_problem=true (better safe than sorry).
+PEST DETECTION RULES (CRITICAL):
+1. **Scan foreground AND background**: Insects can be anywhere in frame - on leaves, stems, grain heads, flowers
+
+2. **Size doesn't matter**: Even small insects (beetles, aphids) = visible_problem=true
+
+3. **Disease symptoms**: Spots, lesions, yellowing, wilting, rot → visible_problem=true
+
+4. **ONLY mark healthy if**: NO insects visible ANYWHERE + NO disease symptoms + plant looks completely healthy
+
+**Your mental checklist before responding:**
+□ "Did I scan the ENTIRE frame for insects?" (Yes/No)
+□ "Are there ANY creatures ON the plant?" (Yes/No)
+□ "If YES → did I set visible_problem=true?" (Yes/No)
+
+If you marked visible_problem=false, ask yourself: "Am I 100% certain there are NO insects anywhere in this image?"
 
 CROP CONFIDENCE LEVELS:
 - "high": Distinctive organs clearly visible (bolls, grain heads, specific leaf shape) AND you are 95%+ certain
