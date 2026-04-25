@@ -419,8 +419,6 @@ The production build made deliberate tradeoffs for pilot sustainability. Calling
 
 4. **Weather API with demo fallback**: Production uses OpenWeatherMap via Secrets Manager. The `MOCK_WEATHER=true` flag exists for demo reliability and is explicitly logged so test traffic is never confused with production readings.
 
-5. **WhatsApp Test Numbers**: Meta's test numbers don't support media (voice/images). End-to-end testing requires a real WhatsApp Business number with production API access.
-
 ## Troubleshooting
 
 ### Check Logs

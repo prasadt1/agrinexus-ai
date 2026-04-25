@@ -4,6 +4,46 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## April 24-25, 2026 - Vision Reliability + Demo Polish
+
+### Summary
+Stabilized the WhatsApp vision pipeline against screenshots/logos and crop-profile bias, improved voice/text parity, fixed webhook rate limiting behavior, and refreshed the public README + hero banner for judges.
+
+### Vision reliability hardening (WhatsApp images)
+- **Issue**: Non-crop inputs (GitHub/screenshots/UI) and macro pest shots caused confident but wrong crop/pest claims (profile-crop anchoring).
+- **Fix**:
+  - Deterministic screenshot/UI + logo/illustration gating before model calls (dark-mode repo/IDE screenshots included).
+  - Crop confirmation only when crop is ambiguous; high-confidence visual crop evidence bypasses crop prompts.
+  - Added explicit **“no visible pest/disease/damage is a valid diagnosis”** rule; blocked pesticide advice unless clear symptoms exist.
+  - Reduced vision temperature to `0` to reduce creative hallucinations.
+- **Files**: `src/processor/analyzer.py`, `src/vision/analyzer.py`
+- **Tests**: screenshot heuristics, GitHub-dark UI case, cotton-boll guardrails, crop-prompt regression (`tests/test_non_photo_screenshot_heuristic.py`, `tests/test_pest_macro_crop_prompt.py`)
+
+### Voice vs text parity improvements
+- **Issue**: Same question as voice vs text could retrieve different KB context; voice transcripts were always routed through the main processor lane; Transcribe language handling was too rigid for Hinglish.
+- **Fix**:
+  - Route voice transcripts to beta queue for `BETA_PHONES` (same as text routing).
+  - Prefer Transcribe language identification with fallback to a single language code if rejected.
+  - For voice-originated RAG, skip Bedrock session to reduce session skew.
+- **Files**: `src/voice/processor.py`, `src/processor/handler.py`, `template.yaml`
+
+### RAG citation / refusal polish
+- **Issue**: Hindi refusals sometimes got a misleading generic `स्रोत: FAO/ICAR...` footer; model sometimes emitted `<source>2</source>` tags.
+- **Fix**: Expanded refusal detection for Hindi/Marathi paraphrases; stripped XML-style citation tags from model output.
+- **Files**: `src/processor/handler.py`
+- **Tests**: `tests/test_rag_refusal_detection.py`
+
+### Webhook rate limiting fix
+- **Issue**: Rate limit counted both inbound `MSG#*` rows and assistant `save_message` rows (also `MSG#*`), effectively halving the allowed user messages.
+- **Fix**: Count inbound-only rows using a DynamoDB filter (`attribute_not_exists(response)`); raised default message budget.
+- **Files**: `src/webhook/handler.py`, `template.yaml`
+- **Tests**: `tests/test_webhook_rate_limit.py`
+
+### Public README judge-first restructure
+- **Issue**: Judge flow was redundant/less credible (Try-before-Proof, redundant high-level section, stale `samconfig-week2.toml` references, hero image refresh).
+- **Fix**: Production Evidence before Try It Yourself, cost narrative clarified, deploy references updated to `samconfig.toml`, redundant section removed, hero banner replaced with committed cover image.
+- **Files**: `README.md`, `docs/visuals/hero-banner.png`
+
 ## April 4-5, 2026 - Post-Finalist Improvements
 
 ### Summary
