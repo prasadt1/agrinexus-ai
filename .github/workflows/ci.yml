@@ -9,6 +9,9 @@ on:
 jobs:
   pytest-fast:
     runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-east-1
+      AWS_DEFAULT_REGION: us-east-1
     steps:
       - uses: actions/checkout@v4
 
