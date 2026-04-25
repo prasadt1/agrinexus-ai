@@ -13,7 +13,7 @@ import urllib.error
 from typing import Any, Dict, Optional
 
 from heuristics import run_heuristics
-from messages import get_block_message, get_not_agri_message, localize_crop_name
+from messages import get_block_message, get_not_agri_message, get_safe_retake_message, localize_crop_name
 from enforcement import enforce_message_safety
 
 bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
@@ -839,9 +839,15 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         # LAYER 1.5: AI relevance gate (generic non-agri detection)
         if _relevance_gate_enabled():
             rel = classify_image_relevance(image_bytes, dialect)
+            print(f"Relevance gate: relevance={rel.get('relevance')} confidence={rel.get('confidence')} reason={rel.get('reason')}")
             if rel.get("relevance") == "not_agri" and rel.get("confidence") in ("high", "medium"):
                 msg = get_not_agri_message(dialect)
                 return {"text": msg, "non_photo": True, "diagnosis": "non_photo", "non_photo_reason": rel.get("reason")}
+            # If the classifier says "unclear" with non-low confidence, be conservative:
+            # do not run diagnosis; ask for a clearer crop/leaf photo.
+            if rel.get("relevance") == "unclear" and rel.get("confidence") in ("high", "medium"):
+                msg = get_safe_retake_message(dialect)
+                return {"text": msg, "non_photo": True, "diagnosis": "non_photo", "non_photo_reason": "unclear"}
 
         if _quality_gate_enabled():
             q = _check_image_quality(image_bytes)
