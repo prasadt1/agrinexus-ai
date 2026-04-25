@@ -4,7 +4,7 @@ Thanks for your interest in AgriNexus AI.
 
 This repository is **source-available** (see [LICENSE](LICENSE)). We welcome improvements that help reliability, safety, and documentation for reviewers and builders.
 
-## What we welcome
+## What I welcome
 
 - **Bug reports** (clear repro steps + expected vs actual)
 - **Documentation fixes** (typos, broken links, clearer setup steps)
