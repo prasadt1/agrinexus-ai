@@ -176,6 +176,50 @@ sequenceDiagram
     WA->>U: Reply
 ```
 
+## Vision (image) flow
+
+This is the **image path** through the production pipeline: WhatsApp image → webhook → SQS → processor → deterministic gates → Claude Vision → last‑mile enforcement → WhatsApp.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant WA as WhatsApp
+    participant WH as Webhook
+    participant SQS as MessageQueue
+    participant Proc as MessageProcessor
+    participant Heur as Heuristics
+    participant QG as QualityGate
+    participant V as ClaudeVision
+    participant Enf as Enforcement
+    participant DDB as DynamoDB
+
+    U->>WA: Send crop/pest photo
+    WA->>WH: POST /webhook (image)
+    WH->>DDB: Store MSG#* (for detector + audit)
+    WH->>SQS: Enqueue message
+    WH->>WA: 200 OK
+
+    SQS->>Proc: Invoke
+    Proc->>WA: Download media (Graph API)
+    Proc->>Heur: run_heuristics(image_bytes)
+    alt Heuristics blocks (screenshot/logo/etc.)
+        Heur-->>Proc: decision=block + reason
+        Proc->>WA: Block message (ask for real crop photo)
+    else Heuristics pass
+        Proc->>QG: optional quality gate (min dims/bytes)
+        alt Quality gate fails
+            QG-->>Proc: insufficient quality
+            Proc->>WA: Retake request
+        else Quality OK
+            Proc->>V: analyze_crop_image() (JSON)
+            V-->>Proc: vision_result (structured fields)
+            Proc->>Enf: enforce_message_safety(vision_result)
+            Enf-->>Proc: safe final message
+            Proc->>WA: Send diagnosis/recommendations
+        end
+    end
+```
+
 ## Nudge flow
 
 ```mermaid
