@@ -197,7 +197,7 @@ sequenceDiagram
 
 ## Vision (image) flow
 
-This is the **image path** through the production pipeline: WhatsApp image → webhook → SQS → processor → deterministic gates → Claude Vision → last‑mile enforcement → WhatsApp.
+This is the **image path** through the production pipeline: WhatsApp image → webhook → SQS → processor → **Pillow heuristics** → **optional Bedrock Haiku relevance gate** → optional quality gate → **S3 audit save** → **Claude Sonnet Vision (JSON)** → optional **crop confirm** (only if relevance was confident agri) or **`enforce_message_safety()`** → WhatsApp. Toggle: `VISION_RELEVANCE_GATE_ENABLED` (default on). See [ADR 0010](../docs/adr/0010-vision-relevance-gate-before-diagnosis.md).
 
 ```mermaid
 sequenceDiagram
@@ -206,38 +206,58 @@ sequenceDiagram
     participant WH as Webhook
     participant SQS as MessageQueue
     participant Proc as MessageProcessor
-    participant Heur as Heuristics
+    participant Heur as Heuristics<br/>(Pillow)
+    participant Rel as Relevance<br/>(Haiku JSON)
     participant QG as QualityGate
-    participant V as ClaudeVision
+    participant S3 as S3 temp images
+    participant V as Claude Vision<br/>(Sonnet JSON)
     participant Enf as Enforcement
     participant DDB as DynamoDB
 
     U->>WA: Send crop/pest photo
     WA->>WH: POST /webhook (image)
-    WH->>DDB: Store MSG#* (for detector + audit)
+    WH->>DDB: Store MSG#* (detector + audit)
     WH->>SQS: Enqueue message
     WH->>WA: 200 OK
 
     SQS->>Proc: Invoke
     Proc->>WA: Download media (Graph API)
     Proc->>Heur: run_heuristics(image_bytes)
-    alt Heuristics blocks (screenshot/logo/etc.)
-        Heur-->>Proc: decision=block + reason
-        Proc->>WA: Block message (ask for real crop photo)
+    alt Heuristics block (screenshot/logo/etc.)
+        Heur-->>Proc: decision=block
+        Proc->>WA: Block message (localized)
     else Heuristics pass
-        Proc->>QG: optional quality gate (min dims/bytes)
-        alt Quality gate fails
-            QG-->>Proc: insufficient quality
-            Proc->>WA: Retake request
-        else Quality OK
-            Proc->>V: analyze_crop_image() (JSON)
-            V-->>Proc: vision_result (structured fields)
-            Proc->>Enf: enforce_message_safety(vision_result)
-            Enf-->>Proc: safe final message
-            Proc->>WA: Send diagnosis/recommendations
+        Note over Proc,Rel: If VISION_RELEVANCE_GATE_ENABLED
+        Proc->>Rel: classify_image_relevance()
+        alt Confident not_agri
+            Rel-->>Proc: not_agri (high/medium)
+            Proc->>WA: Generic non-agri message
+        else Unclear + not photo-like (heuristic tie-break)
+            Rel-->>Proc: unclear + low greens/palette
+            Proc->>WA: Retake / clearer photo
+        else Proceed toward diagnosis
+            Proc->>QG: optional quality gate (dims/bytes)
+            alt Quality gate fails
+                QG-->>Proc: unacceptable
+                Proc->>S3: Save image (audit)
+                Proc->>WA: Retake / too small
+            else Quality OK or gate off
+                Proc->>S3: Save image (audit)
+                Proc->>V: analyze_crop_image() JSON
+                V-->>Proc: vision_result
+                alt Ambiguous crop + relevance was agri_photo (high/medium)
+                    Proc->>WA: Crop confirm + pending_crop_confirm
+                else Normal reply
+                    Proc->>Enf: enforce_message_safety()
+                    Enf-->>Proc: safe final message
+                    Proc->>WA: Structured diagnosis / template
+                end
+            end
         end
     end
 ```
+
+**Notes:** (1) **Relevance gate off** (`VISION_RELEVANCE_GATE_ENABLED=false`): skip `Rel` — flow is heuristics → QG → S3 → Vision → enforcement/crop confirm rules without the agri-photo prerequisite for crop confirm. (2) **Crop reconfirm** after user reply is handled in `handler.py` (S3 re-fetch + `analyze_crop_image` with chosen crop); not shown above. (3) **Handler** also parses Hindi/English yes-phrases so “हाँ वही है” retriggers vision instead of RAG.
 
 ## Nudge flow
 

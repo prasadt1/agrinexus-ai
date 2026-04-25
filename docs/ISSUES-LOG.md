@@ -11,13 +11,13 @@ This file tracks notable issues encountered while building and deploying AgriNex
 ### 2026-04-23 — Vision analysis: non-agri images were incorrectly diagnosed
 
 - **Symptom**: UI screenshots / leaf logos / scenery / selfies were sometimes treated as crop photos and diagnosed.
-- **Root cause**: The vision flow was optimized for "always return an agronomy answer," so non-agri images could slip through without a strict eligibility gate.
-- **Fix**:
-  - Added a **2-stage image eligibility gate** in the WhatsApp pipeline:
-    - Classify image as `AGRI_PHOTO | NON_AGRI | EXPLICIT | UNKNOWN`
-    - Only run crop diagnosis for `AGRI_PHOTO`
-  - Do not save non-agri/explicit images to S3.
-- **Verification**: Unit tests around the gating behavior. Redeploy `MessageProcessor` and re-test with non-agri examples.
+- **Root cause**: Deterministic heuristics alone could not catch every non-agri case; the model path still favored “always return agronomy” unless blocked earlier.
+- **Fix** (as shipped, with follow-ups through 2026-04-25):
+  - **Pillow heuristics** (`run_heuristics`) first: block obvious screenshots/logos/illustrations before any Bedrock vision call.
+  - **Optional Bedrock Haiku relevance gate** (`classify_image_relevance`, default on via `VISION_RELEVANCE_GATE_ENABLED`): JSON labels `agri_photo` | `not_agri` | `unclear` with confidence; **block** confident `not_agri` with a generic localized message; for **unclear** + confident model output, **tie-break** with heuristic photo-likeness (`green_frac`, `palette_size`) → retake vs proceed.
+  - **Sonnet vision** runs only after those gates pass; **S3** stores the image on the diagnosis path (including when quality gate fails, for audit). Non-agri paths return **without** running Sonnet (and **without** the normal pre-vision S3 save on hard relevance block; quality-fail path still uploads for retake UX).
+  - **Crop confirmation** in the processor is allowed only when relevance says confident **`agri_photo`** and vision output is ambiguous (`enforce_message_safety` otherwise). **ADR 0010** documents the decision; see `architecture/diagrams.md` for the sequence.
+- **Verification**: `tests/test_relevance_gate.py`, `tests/test_vision_integration.py`, redeploy `MessageProcessor`, manual non-agri samples.
 
 ### 2026-04-05 — Nudge expiry logic implementation
 

@@ -4,16 +4,45 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## April 25, 2026 — Vision relevance gate (Bedrock Haiku), CI/Pages, docs
+
+### Summary
+Shipped an **optional AI relevance classifier** before Sonnet vision (default on), tightened **crop confirmation** to confident agri photos only, improved **WhatsApp formatting** and **localized** severity/crop prompts, fixed **CI** (missing `requests`, boto region at import), fixed **GitHub Pages** Liquid on JSON-heavy superpowers docs, and aligned **architecture / changelog / issues** with the real pipeline. **ADR**: [0010](docs/adr/0010-vision-relevance-gate-before-diagnosis.md).
+
+### Vision relevance gate + pipeline ordering
+- **Issue**: Heuristics alone could miss edge non-agri cases; crop-confirm UX could still fire when relevance was unclear.
+- **Fix**:
+  - **`classify_image_relevance()`** (Bedrock Haiku, JSON): `agri_photo` | `not_agri` | `unclear` with confidence; hard block confident `not_agri`; for `unclear` + high/medium confidence, **tie-break** with Pillow metrics (`green_frac`, `palette_size`) before retake vs proceed.
+  - **Order**: download → heuristics → relevance (if `VISION_RELEVANCE_GATE_ENABLED`) → quality gate → **S3 save** → Sonnet vision → **crop confirm** only if relevance was confident `agri_photo` and vision is ambiguous; else **`enforce_message_safety()`**.
+  - **Policies**: `src/vision/policies/relevance_gate.json` (+ tests `tests/test_relevance_gate.py`).
+- **Files**: `src/processor/analyzer.py`, `src/vision/relevance.py`, `src/messages.py`, `template.yaml`, `architecture/diagrams.md`
+- **Tests**: relevance gate, crop-confirm gating, vision integration (`tests/test_vision_integration.py`)
+
+### WhatsApp UX + handler crop confirm
+- **Bold** diagnosis labels and **localized** severity line; **localized crop name** in crop-confirm prompts (hi/mr/te/en).
+- **Handler**: treat Hindi/English yes-phrases (e.g. “हाँ वही है”) as crop confirm so vision re-runs instead of accidental RAG.
+- **Files**: `src/common/whatsapp.py`, `src/processor/handler.py`, `src/messages.py`, `tests/test_whatsapp_formatting.py`, `tests/test_crop_confirm_hindi_yes.py`
+
+### CI and GitHub Pages
+- **CI**: `pip install requests` for webhook tests; **`AWS_REGION` / `AWS_DEFAULT_REGION`** on pytest job so boto3 Secrets Manager client import does not fail with `NoRegionError`.
+- **Pages**: wrap JSON `{{` snippets in superpowers plan/spec markdown with `{% raw %}…{% endraw %}` so Jekyll does not parse them as Liquid.
+- **Files**: `.github/workflows/ci.yml`, `docs/superpowers/plans/2026-04-25-vision-confidence-implementation.md`, `docs/superpowers/specs/2026-04-25-vision-confidence-design.md`
+
+### README / cost narrative
+- Linked **ADR 0007** (cost guardrails) from the cost breakdown table for traceability.
+
+---
+
 ## April 24-25, 2026 - Vision Reliability + Demo Polish
 
 ### Summary
-Stabilized the WhatsApp vision pipeline against screenshots/logos and crop-profile bias, improved voice/text parity, fixed webhook rate limiting behavior, and refreshed the public README + hero banner for judges.
+Stabilized the WhatsApp vision pipeline against screenshots/logos and crop-profile bias, improved voice/text parity, fixed webhook rate limiting behavior, and refreshed the public README + hero banner for judges. **Follow-up (same release window):** AI relevance gate, CI/Pages fixes, and ADR 0010 are documented in **April 25, 2026** above.
 
 ### Vision reliability hardening (WhatsApp images)
 - **Issue**: Non-crop inputs (GitHub/screenshots/UI) and macro pest shots caused confident but wrong crop/pest claims (profile-crop anchoring).
 - **Fix**:
   - Deterministic screenshot/UI + logo/illustration gating before model calls (dark-mode repo/IDE screenshots included).
-  - Crop confirmation only when crop is ambiguous; high-confidence visual crop evidence bypasses crop prompts.
+  - Crop confirmation only when crop is ambiguous; high-confidence visual crop evidence bypasses crop prompts. **Later:** crop confirm additionally requires confident **`agri_photo`** from the relevance gate when that gate is enabled (see April 25 entry).
   - Added explicit **“no visible pest/disease/damage is a valid diagnosis”** rule; blocked pesticide advice unless clear symptoms exist.
   - Reduced vision temperature to `0` to reduce creative hallucinations.
 - **Files**: `src/processor/analyzer.py`, `src/vision/analyzer.py`
