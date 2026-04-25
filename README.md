@@ -53,7 +53,7 @@
 - [Monitoring](#monitoring)
 - [Requirements Methodology: EARS](#requirements-methodology-ears)
 - [Documentation](#documentation)
-- [Beyond Agriculture: Productization Roadmap](#beyond-agriculture-productization-roadmap)
+- [Productization Roadmap](#productization-roadmap)
 - [Acknowledgments](#acknowledgments)
 - [License](#license)
 
@@ -611,18 +611,18 @@ Some documents are intentionally **not** part of the public “judge quickstart�
 - [Amazon Polly](https://docs.aws.amazon.com/polly/)
 - [WhatsApp Business API](https://developers.facebook.com/docs/whatsapp)
 
-## Beyond Agriculture: Productization Roadmap
+## Productization Roadmap
 
 AgriNexus is built as an **accountability engine**. The **trigger → confirm → follow-up** structure is domain-agnostic: only the trigger and message copy change; the accountability loop stays the same.
 
-The same loop can be reused beyond farming:
+### Beyond agriculture
 
 - **Irrigation scheduling** — reservoir level triggers, district-scoped reminders
 - **Medication adherence** — rural health worker follow-ups
 - **Micro-savings nudges** — financial literacy programs
 - **Vaccine schedule reminders** — maternal health networks
 
-### Nudge intelligence (next)
+### Agriculture: nudge intelligence (next)
 
 The roadmap isn’t just “more nudges”—it’s **smarter triggers + smarter follow-ups**:
 
