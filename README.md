@@ -71,6 +71,7 @@ AgriNexus is a working system with full production observability — not a proto
 | WhatsApp Business number | ✅ Live | [wa.me/4915120105731](https://wa.me/4915120105731) |
 | Web demo (public) | ✅ Live | [demo.agrinexus-ai.farm](https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html) |
 | Webhook API (Meta verified) | ✅ Live | API Gateway + WAF |
+| Health endpoint (liveness) | ✅ Live | [health](https://h4bt24ycdl.execute-api.us-east-1.amazonaws.com/dev/health) |
 | Weather API integration | ✅ Live | OpenWeatherMap via Secrets Manager |
 
 ### Engineering Quality
