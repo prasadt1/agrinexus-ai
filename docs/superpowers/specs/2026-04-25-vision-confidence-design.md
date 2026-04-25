@@ -97,9 +97,9 @@ def run_heuristics(image_bytes: bytes) -> Dict[str, Any]:
             'decision': 'pass' | 'block',
             'reason': 'screenshot_ui' | 'logo' | 'document' | 'too_small' | None,
             'metrics': {
-                'white_pixel_ratio': float,   # % pixels with luminance > 240
+                'white_frac': float,   # % pixels with luminance > 240
                 'dark_frac': float,            # fraction in grayscale bins 0-55
-                'edge_density': float,         # % pixels that are edges
+                'edge_frac': float,         # % pixels that are edges
                 'palette_size': int,           # distinct colors (quantized)
                 'aspect_ratio': float,         # width / height
                 'width': int,
@@ -280,9 +280,9 @@ def _calculate_image_metrics(image_bytes: bytes) -> Dict[str, Any]:
     'decision': 'block',
     'reason': 'screenshot_ui',
     'metrics': {
-        'white_pixel_ratio': 0.08,   # Dark mode
+        'white_frac': 0.08,   # Dark mode
         'dark_frac': 0.52,            # ✓ signal 1
-        'edge_density': 0.22,         # ✓ signal 2
+        'edge_frac': 0.22,         # ✓ signal 2
         'palette_size': 38,           # ✓ signal 3
         'aspect_ratio': 1.6,
         'width': 1920,
@@ -297,9 +297,9 @@ def _calculate_image_metrics(image_bytes: bytes) -> Dict[str, Any]:
     'decision': 'pass',
     'reason': None,
     'metrics': {
-        'white_pixel_ratio': 0.48,   # White cotton (below 0.5)
+        'white_frac': 0.48,   # White cotton (below 0.5)
         'dark_frac': 0.12,            # Some dark stems
-        'edge_density': 0.11,         # Organic edges (below 0.18)
+        'edge_frac': 0.11,         # Organic edges (below 0.18)
         'palette_size': 342,          # Rich variation
         'aspect_ratio': 0.75,
         'width': 1024,
@@ -314,9 +314,9 @@ def _calculate_image_metrics(image_bytes: bytes) -> Dict[str, Any]:
     'decision': 'pass',
     'reason': None,
     'metrics': {
-        'white_pixel_ratio': 0.02,
+        'white_frac': 0.02,
         'dark_frac': 0.38,            # Dark soil (below 0.4)
-        'edge_density': 0.09,         # Organic
+        'edge_frac': 0.09,         # Organic
         'palette_size': 876,          # ✓ Rich palette saves it
         'aspect_ratio': 1.33,
         'width': 1280,
@@ -898,7 +898,7 @@ def test_heuristics_dark_mode_ui():
     assert result['decision'] == 'block'
     assert result['reason'] == 'screenshot_ui'
     assert result['metrics']['dark_frac'] > 0.4
-    assert result['metrics']['edge_density'] > 0.18
+    assert result['metrics']['edge_frac'] > 0.18
 
 def test_heuristics_cotton_boll_white():
     """Real cotton boll (white fiber) → passes"""
@@ -906,8 +906,8 @@ def test_heuristics_cotton_boll_white():
     result = run_heuristics(image_bytes)
 
     assert result['decision'] == 'pass'
-    assert result['metrics']['white_pixel_ratio'] < 0.5
-    assert result['metrics']['edge_density'] < 0.18
+    assert result['metrics']['white_frac'] < 0.5
+    assert result['metrics']['edge_frac'] < 0.18
 
 def test_heuristics_light_mode_ui():
     """Light mode UI → blocked"""
@@ -916,7 +916,7 @@ def test_heuristics_light_mode_ui():
 
     assert result['decision'] == 'block'
     assert result['reason'] == 'screenshot_ui'
-    assert result['metrics']['white_pixel_ratio'] > 0.5
+    assert result['metrics']['white_frac'] > 0.5
 
 def test_heuristics_logo():
     """Logo/icon → blocked"""
