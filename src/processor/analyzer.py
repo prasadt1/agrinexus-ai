@@ -604,7 +604,7 @@ REMEMBER:
     
     try:
         response = bedrock.invoke_model(
-            modelId='us.anthropic.claude-sonnet-4-5-20250929-v1:0',  # Claude 4.5 Sonnet inference profile
+            modelId='anthropic.claude-3-sonnet-20240229-v1:0',  # Stable legacy model (best cost/performance)
             body=json.dumps({
                 "anthropic_version": "bedrock-2023-05-31",
                 "max_tokens": 2000,
