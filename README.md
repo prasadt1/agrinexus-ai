@@ -455,6 +455,8 @@ Weather Poller → Step Functions → Nudge Sender → WhatsApp
 | Lambda, API Gateway, SQS, S3, Step Functions | | $0 (free tier) |
 | **Total** | | **\~$53/month** |
 
+- (See [ADR 0007](docs/adr/0007-eventbridge-scheduler-vs-step-functions-wait.md) for the complete EventBridge Scheduler vs Step Functions cost/latency evaluation.)
+
 ### Cost per Farmer (from the same models as the table above)
 - **1,000 farmers**: \~$53/month total → \~**$0.053**/farmer/month → \~**$0.64**/farmer/year  
 - **10,000 farmers** (projected): ~**$450**/month total → ~**$0.045**/farmer/month → ~**$0.54**/farmer/year  
