@@ -169,3 +169,58 @@ def test_crop_confirm_then_reprocess_on_yes(monkeypatch):
 
     assert any("FINAL_COTTON_ANALYSIS" in (m["text"] or "") for m in sent)
 
+
+def test_crop_confirm_hindi_yes_phrase_reprocesses(monkeypatch):
+    os.environ["TABLE_NAME"] = "tbl"
+    os.environ["TEMP_AUDIO_BUCKET"] = "tmp-bucket"
+    os.environ.setdefault("KNOWLEDGE_BASE_ID", "kb")
+    os.environ.setdefault("GUARDRAIL_ID", "")
+    os.environ.setdefault("GUARDRAIL_VERSION", "1")
+
+    repo_root = Path(__file__).resolve().parents[1]
+
+    sent = []
+    _install_common_stubs(sent)
+
+    analyzer = types.ModuleType("analyzer")
+
+    def process_image_message(_message, _profile):
+        return {
+            "text": "CONFIRM_CROP",
+            "pending_crop_confirm": {
+                "bucket": "tmp-bucket",
+                "key": "images/phone/ts.jpg",
+                "profile_crop": "Wheat",
+                "inferred_crop": "Cotton",
+            },
+        }
+
+    def analyze_crop_image(_image_bytes, _dialect, crop="cotton", district=None):
+        assert crop == "Cotton"
+        return {"recommendations": "FINAL_COTTON_ANALYSIS", "diagnosis": "ok", "severity": "low", "confidence": "high"}
+
+    analyzer.process_image_message = process_image_message
+    analyzer.analyze_crop_image = analyze_crop_image
+    sys.modules["analyzer"] = analyzer
+
+    handler_path = repo_root / "src" / "processor" / "handler.py"
+    spec = importlib.util.spec_from_file_location("processor_handler_crop_confirm_hi", handler_path)
+    mod = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader
+    spec.loader.exec_module(mod)
+
+    fake_profile = {"onboarding_complete": True, "dialect": "hi", "district": "Latur", "crop": "Wheat", "location": "Latur"}
+    mod.table = _FakeDynamoTable(fake_profile)
+    mod.s3 = _FakeS3(b"img-bytes")
+
+    phone = "1555123000000"
+    msg_body = {"wamid": "wamid.1", "from": phone, "type": "image", "message": {"image": {"id": "mid"}}}
+    mod.lambda_handler({"Records": [{"body": json.dumps(msg_body)}]}, None)
+    assert any(m["text"] == "CONFIRM_CROP" for m in sent)
+
+    sent.clear()
+    # Hindi phrase, not exact token.
+    msg_body2 = {"wamid": "wamid.2", "from": phone, "type": "text", "message": {"text": {"body": "हाँ वही है"}}}
+    mod.lambda_handler({"Records": [{"body": json.dumps(msg_body2)}]}, None)
+    assert any("FINAL_COTTON_ANALYSIS" in (m["text"] or "") for m in sent)
+

@@ -114,12 +114,58 @@ def _parse_crop_confirm_reply(text: str, inferred_crop: str, profile_crop: str) 
     if not t:
         return None
 
-    yes = {"y", "yes", "ok", "okay", "haan", "han", "हाँ", "हां", "हो", "ठीक", "theek"}
-    no = {"n", "no", "nah", "nope", "नहीं", "नहि", "na", "नाही", "కాదు"}
+    # Normalize common punctuation so replies like "yes." or "हाँ!" are accepted.
+    t_norm = (
+        t.replace("।", " ")
+        .replace(".", " ")
+        .replace("!", " ")
+        .replace("?", " ")
+        .replace(",", " ")
+        .replace(":", " ")
+        .replace(";", " ")
+    ).strip()
+    tokens = [x for x in t_norm.split() if x]
 
-    if t in yes:
+    yes = {
+        "y",
+        "yes",
+        "yeah",
+        "yep",
+        "ok",
+        "okay",
+        # Hindi (typed variants)
+        "haan",
+        "han",
+        "haa",
+        "ha",
+        "ji",
+        "haanji",
+        "जी",
+        "हाँ",
+        "हां",
+        "हो",
+        "ठीक",
+        "theek",
+        "thik",
+    }
+    no = {
+        "n",
+        "no",
+        "nah",
+        "nope",
+        # Hindi/Marathi/Telugu common negatives
+        "नहीं",
+        "नहि",
+        "ना",
+        "na",
+        "नाही",
+        "कాదు",
+    }
+
+    # Accept exact match OR presence in a short phrase (e.g., "हाँ वही है", "yes it's wheat").
+    if t in yes or any(tok in yes for tok in tokens):
         return inferred_crop
-    if t in no:
+    if t in no or any(tok in no for tok in tokens):
         return profile_crop
 
     chosen = _parse_crop_word(text)
