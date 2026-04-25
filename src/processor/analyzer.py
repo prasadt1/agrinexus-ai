@@ -532,15 +532,33 @@ If is_real_crop_photo=false:
 - Set: inferred_crop="unknown", crop_confidence="low", visible_problem=false, severity="none"
 - recommendations: one sentence asking for real crop photo in {language}
 
-CONFIDENCE LEVELS:
-- "high": Distinctive organs clearly visible
-- "medium": Crop features present but not definitive
-- "low": No distinguishing features
+PEST/PROBLEM DETECTION (CRITICAL):
+1. **ANY visible pest = problem**: If you see ANY insect, worm, caterpillar, larva, bug, moth, beetle, aphid, or creature ON/NEAR the plant → MUST set:
+   - visible_problem=true
+   - severity="high" (if pest is clearly feeding/damaging) or "medium" (if pest present but damage unclear)
+   - Describe the pest and recommend IPM/monitoring
+
+2. **Disease symptoms**: Spots, lesions, yellowing, discoloration, wilting, rot, mold → visible_problem=true
+
+3. **Healthy plant**: ONLY set visible_problem=false if:
+   - NO insects/creatures visible anywhere in frame
+   - NO disease symptoms (spots, discoloration, damage)
+   - Plant appears completely healthy
+
+**Default to caution**: If unsure whether a mark is a pest or dirt, mark visible_problem=true (better safe than sorry).
+
+CROP CONFIDENCE LEVELS:
+- "high": Distinctive organs clearly visible (bolls, grain heads, specific leaf shape) AND you are 95%+ certain
+- "medium": Crop features present but not definitive OR you are 60-94% certain
+- "low": No distinguishing features OR you are <60% certain
+
+**Conservative crop ID**: When in doubt, use inferred_crop="unknown" and crop_confidence="low". Never guess.
 
 REMEMBER:
 - Return raw JSON only (no ``` fences)
 - Title Case crops: "Cotton", "Wheat"
-- Never name crop unless visual evidence supports it
+- Never name crop unless visual evidence strongly supports it (95%+ certainty for "high")
+- ALWAYS check for insects/pests - they are often the main issue farmers send photos about
 """
     
     # Call Claude 3 Sonnet Vision
