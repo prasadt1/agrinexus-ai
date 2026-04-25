@@ -39,6 +39,26 @@
 
 ---
 
+## Contents
+
+- [🏆 Finalist Quickstart](#-aws-builder-10000-aideas--top-50-finalist-emea--social-impact)
+- [Production Evidence](#production-evidence)
+- [Try It Yourself](#try-it-yourself)
+- [Architecture](#architecture)
+- [Usage](#usage)
+- [Testing](#testing)
+- [Quick Start (Deploy)](#quick-start-deploy-your-own)
+- [Cost Breakdown](#cost-breakdown)
+- [Honest Tradeoffs](#honest-tradeoffs)
+- [Monitoring](#monitoring)
+- [Requirements Methodology: EARS](#requirements-methodology-ears)
+- [Documentation](#documentation)
+- [Beyond Agriculture: Productization Roadmap](#beyond-agriculture-productization-roadmap)
+- [Acknowledgments](#acknowledgments)
+- [License](#license)
+
+---
+
 ## Production Evidence
 
 AgriNexus is a working system with full production observability — not a prototype.
@@ -613,13 +633,13 @@ AgriNexus is built as an **accountability engine** where only the trigger and co
 
 ## Acknowledgments
 
-This project stands on the shoulders of many:
-
-- **AWS Builder Center team** for the 10,000 AIdeas platform and the opportunity to showcase production-grade serverless AI
-- **Kiro team** for the spec-driven development workflow that enabled requirements-to-code traceability
-- **Frankfurt AWS User Group** and **Frankfurt AI Meetup** community for early feedback and encouragement
-- **Early testers** who shaped the action-first prompt style and helped refine the closed-loop nudge engine
-- **ICAR-CICR** (Indian Council of Agricultural Research - Central Institute for Cotton Research) and **FAO** (Food and Agriculture Organization) for the open agricultural knowledge that grounds this project's recommendations
+- **AWS Builder Center team** for the 10K AIdeas competition platform and clear judge-facing rubric
+- **Kiro team** for the spec-driven development workflow that made requirements-to-code traceability practical
+- **Frankfurt AWS User Group** and the **Frankfurt AI Meetup community** for early feedback and the upcoming speaking opportunity
+- **ICAR-CICR**, **FAO**, and **NFSM** for the open knowledge corpus that grounds every advisory response
+- **Early testers** who shaped the action-first prompt style and the "AI Doordarshan" brevity principle
+- **Anthropic Claude** for retrieval-augmented generation and structured vision diagnosis
+- The community of **AWS Heroes and Community Builders** whose architectural posts informed the EventBridge Scheduler vs Step Functions decision
 
 Special thanks to the smallholder farmers whose real-world challenges inspired this work — and whose feedback continues to shape it.
 
