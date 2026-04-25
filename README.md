@@ -62,6 +62,8 @@
 
 ## Production Evidence
 
+> *Last verified: April 26, 2026 · 7-day rolling window from CloudWatch*
+
 AgriNexus is a working system with full production observability — not a prototype.
 
 ### Live Endpoints
@@ -493,6 +495,42 @@ The production build made deliberate tradeoffs for pilot sustainability. Calling
 4. **Weather API with demo fallback**: Production uses OpenWeatherMap via Secrets Manager. The `MOCK_WEATHER=true` flag exists for demo reliability and is explicitly logged so test traffic is never confused with production readings.
    - **Setup**: Store the OpenWeatherMap API key in Secrets Manager (`WEATHER_API_KEY_SECRET`, e.g. `agrinexus/weather/api-key`) — never in `samconfig` or git. Set `MOCK_WEATHER=true` on the Weather Lambda only for deterministic demo weather. See [docs/guides/WEATHER-API-SETUP.md](docs/guides/WEATHER-API-SETUP.md).
 
+5. **WhatsApp test numbers limited**: Meta's WhatsApp Business test numbers don't support media (voice/images). End-to-end voice and vision testing requires a real WhatsApp Business number — which AgriNexus has provisioned for production.
+
+## Productization Roadmap
+
+AgriNexus is built as an **accountability engine**. The **trigger → confirm → follow-up** structure is domain-agnostic: only the trigger and message copy change; the accountability loop stays the same.
+
+### Beyond agriculture
+
+- **Irrigation scheduling** — reservoir level triggers, district-scoped reminders
+- **Medication adherence** — rural health worker follow-ups
+- **Micro-savings nudges** — financial literacy programs
+- **Vaccine schedule reminders** — maternal health networks
+
+### Agriculture: nudge intelligence (next)
+
+The roadmap isn't just "more nudges"—it's **smarter triggers + smarter follow-ups**:
+
+- **Market-aware nudges (mandi prices)**: price-change triggers, sell-window reminders, and location-aware price context (APMC/mandi-level where available).
+- **Risk-aware nudges**: combine weather + crop stage + known pest windows to time scouting reminders (not just spray "do/don't").
+- **Personalization**: adapt frequency and wording based on farmer responses (DONE/NOT YET), past follow-through, and preferred time windows.
+- **Escalation logic**: if repeated "NOT YET" or no response, switch to a different ask (photo request, short checklist, or human extension escalation path).
+
+
+### Layered productization model
+
+| Layer | Now | Next 6 months | Commercial model |
+|---|---|---|---|
+| Core accountability engine | Trigger → confirm → follow-up loop (AWS serverless) | Packaged "accountability loop" with drop-in triggers/copy | Per-seat / per-beneficiary licensing |
+| Triggers & intelligence | Weather-gated spray window rules | + Mandi/price signals, crop-stage signals, risk scoring, personalization | Per-signal / per-region add-ons |
+| Knowledge base | FAO + ICAR + NFSM | State-/partner-specific corpus per deployment | Partner content + co-branded |
+| Channels & integrations | WhatsApp Business | + IVR, + state agri apps, + SMS where needed | White-label for NGOs/KVKs |
+| Analytics & outcomes | CloudWatch + custom metrics | Cohort analytics + outcome dashboards (follow-through rates) | Per-partner dashboards |
+
+
+**Commercial licensing:** see [License](#license) — source available for review; commercial use via [prasad@prasadtilloo.com](mailto:prasad@prasadtilloo.com).
+
 ## Troubleshooting
 
 ### Check Logs
@@ -584,40 +622,6 @@ This project was developed using **Kiro AI**, which enabled requirements-driven 
 - 144 EARS requirements in [docs/requirements.md](docs/requirements.md)
 - ~6,000 lines of Python across 11 Lambda functions
 - Full test coverage: voice, vision, RAG, nudges
-
-## Productization Roadmap
-
-AgriNexus is built as an **accountability engine**. The **trigger → confirm → follow-up** structure is domain-agnostic: only the trigger and message copy change; the accountability loop stays the same.
-
-### Beyond agriculture
-
-- **Irrigation scheduling** — reservoir level triggers, district-scoped reminders
-- **Medication adherence** — rural health worker follow-ups
-- **Micro-savings nudges** — financial literacy programs
-- **Vaccine schedule reminders** — maternal health networks
-
-### Agriculture: nudge intelligence (next)
-
-The roadmap isn’t just “more nudges”—it’s **smarter triggers + smarter follow-ups**:
-
-- **Market-aware nudges (mandi prices)**: price-change triggers, sell-window reminders, and location-aware price context (APMC/mandi-level where available).
-- **Risk-aware nudges**: combine weather + crop stage + known pest windows to time scouting reminders (not just spray “do/don’t”).
-- **Personalization**: adapt frequency and wording based on farmer responses (DONE/NOT YET), past follow-through, and preferred time windows.
-- **Escalation logic**: if repeated “NOT YET” or no response, switch to a different ask (photo request, short checklist, or human extension escalation path).
-
-
-### Layered productization model
-
-| Layer | Now | Next 6 months | Commercial model |
-|---|---|---|---|
-| Core accountability engine | Trigger → confirm → follow-up loop (AWS serverless) | Packaged “accountability loop” with drop-in triggers/copy | Per-seat / per-beneficiary licensing |
-| Triggers & intelligence | Weather-gated spray window rules | + Mandi/price signals, crop-stage signals, risk scoring, personalization | Per-signal / per-region add-ons |
-| Knowledge base | FAO + ICAR + NFSM | State-/partner-specific corpus per deployment | Partner content + co-branded |
-| Channels & integrations | WhatsApp Business | + IVR, + state agri apps, + SMS where needed | White-label for NGOs/KVKs |
-| Analytics & outcomes | CloudWatch + custom metrics | Cohort analytics + outcome dashboards (follow-through rates) | Per-partner dashboards |
-
-
-**Commercial licensing:** see [License](#license) — source available for review; commercial use via [prasad@prasadtilloo.com](mailto:prasad@prasadtilloo.com).
 
 ## Partnerships & commercialization
 
