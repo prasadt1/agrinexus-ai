@@ -17,7 +17,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install pytest
-        run: pip install pytest boto3
+        run: pip install pytest boto3 requests
 
       - name: Fast tests (no live AWS Bedrock)
         run: |
