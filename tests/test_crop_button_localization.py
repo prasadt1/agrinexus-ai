@@ -1,17 +1,31 @@
-import importlib
-import sys
+import importlib.util
 import os
+import sys
+from pathlib import Path
 
 
 def _parse_crop_word(text: str):
-    # Import handler with its module-level relative imports resolved
-    sys.path.insert(0, "src/processor")
-    os.environ.setdefault("TABLE_NAME", "t")
-    os.environ.setdefault("KNOWLEDGE_BASE_ID", "kb")
-    os.environ.setdefault("GUARDRAIL_ID", "")
-    os.environ.setdefault("GUARDRAIL_VERSION", "1")
-    handler = importlib.import_module("handler")
-    return handler._parse_crop_word(text)
+    root = Path(__file__).resolve().parents[1]
+    original_sys_path = list(sys.path)
+    try:
+        # Resolve processor handler's sibling imports.
+        sys.path.insert(0, str(root / "src" / "processor"))
+        sys.path.insert(0, str(root / "src" / "common-layer" / "python"))
+
+        os.environ.setdefault("TABLE_NAME", "t")
+        os.environ.setdefault("KNOWLEDGE_BASE_ID", "kb")
+        os.environ.setdefault("GUARDRAIL_ID", "")
+        os.environ.setdefault("GUARDRAIL_VERSION", "1")
+
+        handler_path = root / "src" / "processor" / "handler.py"
+        spec = importlib.util.spec_from_file_location("processor_handler_for_crop", handler_path)
+        assert spec and spec.loader
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)  # type: ignore[attr-defined]
+        return mod._parse_crop_word(text)
+    finally:
+        sys.path[:] = original_sys_path
+
 
 
 def test_parse_crop_word_localized_variants():

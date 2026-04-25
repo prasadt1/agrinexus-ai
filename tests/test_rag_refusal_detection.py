@@ -3,13 +3,11 @@
 import os
 import sys
 from pathlib import Path
+import importlib.util
 
 import pytest
 
 _ROOT = Path(__file__).resolve().parents[1]
-# Lambda layout: handler imports `output` and `analyzer` from the processor folder
-sys.path.insert(0, str(_ROOT / "src" / "processor"))
-sys.path.insert(0, str(_ROOT / "src" / "common-layer" / "python"))
 
 # handler.py reads these at import time
 os.environ.setdefault("TABLE_NAME", "test-table")
@@ -17,7 +15,29 @@ os.environ.setdefault("KNOWLEDGE_BASE_ID", "test-kb")
 os.environ.setdefault("GUARDRAIL_ID", "")
 os.environ.setdefault("GUARDRAIL_VERSION", "DRAFT")
 
-import handler as processor_handler  # noqa: E402
+def _load_processor_handler():
+    """
+    Load src/processor/handler.py in isolation without polluting global sys.path.
+    This avoids breaking other tests that import their own `handler` modules.
+    """
+    original_sys_path = list(sys.path)
+    try:
+        # Lambda layout: handler imports `output` and `analyzer` from the processor folder
+        sys.path.insert(0, str(_ROOT / "src" / "processor"))
+        # Handler also imports `common.whatsapp` from the common layer package root.
+        sys.path.insert(0, str(_ROOT / "src" / "common-layer" / "python"))
+
+        handler_path = _ROOT / "src" / "processor" / "handler.py"
+        spec = importlib.util.spec_from_file_location("processor_handler", handler_path)
+        assert spec and spec.loader
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)  # type: ignore[attr-defined]
+        return mod
+    finally:
+        sys.path[:] = original_sys_path
+
+
+processor_handler = _load_processor_handler()
 
 is_rag_refusal_response = processor_handler.is_rag_refusal_response
 strip_llm_xml_citation_tags = processor_handler.strip_llm_xml_citation_tags

@@ -1,12 +1,15 @@
 """Weather handler tests — mock weather, real weather parsing, favorable logic."""
+import importlib.util
 import json
 import os
 import sys
 import types
+from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src", "weather"))
+_ROOT = Path(__file__).resolve().parents[1]
+_WEATHER_HANDLER = _ROOT / "src" / "weather" / "handler.py"
 
 
 @pytest.fixture(autouse=True)
@@ -34,8 +37,12 @@ def weather_module(monkeypatch):
     mock_boto3.client = _client
     monkeypatch.setitem(sys.modules, "boto3", mock_boto3)
 
-    sys.modules.pop("handler", None)
-    import handler as mod
+    # Load the intended weather handler by file path to avoid collisions with other
+    # `handler` modules used by the processor.
+    spec = importlib.util.spec_from_file_location("weather_handler", _WEATHER_HANDLER)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)  # type: ignore[attr-defined]
     return mod
 
 
