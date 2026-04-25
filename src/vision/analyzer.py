@@ -9,6 +9,7 @@ import os
 import io
 import struct
 import zlib
+import urllib.error
 from typing import Any, Dict, Optional
 
 from src.vision.heuristics import run_heuristics
@@ -619,12 +620,13 @@ REMEMBER:
 
 def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any]) -> Any:
     """
-    Process WhatsApp image message
-    
+    3-layer defense with diagnostic logging.
+    NEVER raise exceptions to webhook (breaks WhatsApp flow).
+
     Args:
         message: WhatsApp message with image
         user_profile: User profile from DynamoDB
-    
+
     Returns:
         Analysis text to send back to user
     """
@@ -632,13 +634,19 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         image_id = message['image']['id']
         dialect = user_profile.get('dialect', 'hi')
         crop = user_profile.get('crop', 'cotton')
-        
+        phone = user_profile.get('phone_number', 'unknown')
+
         print(f"Processing image message: image_id={image_id}, dialect={dialect}, crop={crop}")
-        
-        # Download image from WhatsApp
+
+        # Download image from WhatsApp (can fail: network, WhatsApp auth)
         print("Downloading image from WhatsApp...")
-        image_bytes = download_whatsapp_image(image_id)
-        print(f"Downloaded {len(image_bytes)} bytes")
+        try:
+            image_bytes = download_whatsapp_image(image_id)
+            print(f"Downloaded {len(image_bytes)} bytes")
+        except (urllib.error.HTTPError, urllib.error.URLError, KeyError) as e:
+            print(f"Image download failed: {e}")
+            from src.vision.messages import get_error_message
+            return get_error_message('download_failed', dialect)
 
         # LAYER 1: Heuristics gate (pre-flight check)
         heuristics_error = False
@@ -667,11 +675,10 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
                     raise RuntimeError('TEMP_AUDIO_BUCKET is required for the WhatsApp image pipeline')
                 s3.put_object(Bucket=TEMP_BUCKET, Key=s3_key, Body=image_bytes, ContentType='image/jpeg')
                 return {"text": txt, "quality_gate_failed": True, "quality": q, "s3": {"bucket": TEMP_BUCKET, "key": s3_key}}
-        
+
         # Optional: Save to S3 for record-keeping
         import time
         timestamp = int(time.time())
-        phone = user_profile.get('phone_number', 'unknown')
         s3_key = f"images/{phone}/{timestamp}.jpg"
 
         if not TEMP_BUCKET:
@@ -683,10 +690,21 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
             ContentType='image/jpeg'
         )
         print(f"Saved to S3: s3://{TEMP_BUCKET}/{s3_key}")
-        
+
         # LAYER 2: Vision model
         district = user_profile.get("district") or user_profile.get("location")
-        vision = analyze_crop_image(image_bytes, dialect, crop, district=district)
+        try:
+            vision = analyze_crop_image(image_bytes, dialect, crop, district=district)
+        except ValueError as e:
+            # Schema validation failed or invalid JSON
+            print(f"Vision model validation error: {e}")
+            from src.vision.messages import get_error_message
+            return get_error_message('model_invalid_json', dialect)
+        except Exception as e:
+            # Other model errors (timeout, rate limit, etc.)
+            print(f"Vision model error: {e}")
+            from src.vision.messages import get_error_message
+            return get_error_message('model_error', dialect)
 
         # Schema already validated inside analyze_crop_image()
 
@@ -703,18 +721,33 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
 
         print(f"Final message (enforced): {final_msg[:100]}...")
 
-        return {"text": final_msg, "s3": {"bucket": TEMP_BUCKET, "key": s3_key}}
-        
-    except Exception as e:
-        print(f"Error processing image message: {e}")
-        
-        # Return error message in user's dialect
-        dialect = user_profile.get('dialect', 'hi')
-        error_messages = {
-            'hi': 'माफ़ करें, छवि प्रोसेस करने में समस्या हुई। कृपया फिर से कोशिश करें या टेक्स्ट में समस्या बताएं।',
-            'mr': 'माफ करा, प्रतिमा प्रक्रियेत समस्या आली. कृपया पुन्हा प्रयत्न करा किंवा मजकूरात समस्या सांगा.',
-            'te': 'క్షమించండి, చిత్రం ప్రాసెస్ చేయడంలో సమస్య. దయచేసి మళ్లీ ప్రయత్నించండి లేదా టెక్స్ట్‌లో సమస్య చెప్పండి.',
-            'en': 'Sorry, there was a problem processing the image. Please try again or describe the problem in text.'
+        # Diagnostic logging (full decision path)
+        phone_suffix = phone[-4:] if phone and len(phone) >= 4 else 'unknown'
+
+        log_data = {
+            'phone_suffix': phone_suffix,
+            'heuristics_decision': heuristics.get('decision', 'pass'),
+            'heuristics_error': heuristics_error,
+            'is_real_crop_photo': vision.get('is_real_crop_photo'),
+            'inferred_crop': vision.get('inferred_crop'),
+            'crop_confidence': vision.get('crop_confidence'),
+            'visible_problem': vision.get('visible_problem'),
+            'severity': vision.get('severity'),
+            'raw_message_preview': vision.get('recommendations', '')[:120],
+            'final_message_preview': final_msg[:120],
+            'was_overridden': (vision.get('recommendations', '') != final_msg)
         }
-        
-        return error_messages.get(dialect, error_messages['en'])
+
+        print(f"Vision analysis complete: {log_data}")
+
+        return {"text": final_msg, "s3": {"bucket": TEMP_BUCKET, "key": s3_key}}
+
+    except Exception as e:
+        # Ultimate fallback: log and return generic error
+        print(f"Unexpected error in image processing: {e}")
+        import traceback
+        traceback.print_exc()
+
+        dialect = user_profile.get('dialect', 'hi')
+        from src.vision.messages import get_error_message
+        return get_error_message('unknown', dialect)
