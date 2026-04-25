@@ -20,6 +20,33 @@ secrets = boto3.client('secretsmanager', region_name='us-east-1')
 
 TEMP_BUCKET = os.environ.get('TEMP_AUDIO_BUCKET')
 
+
+def validate_vision_schema(vision: Dict[str, Any]) -> None:
+    """
+    Validate required fields in vision model response.
+    Raises ValueError if invalid.
+    """
+    required_fields = [
+        'is_real_crop_photo',
+        'inferred_crop',
+        'crop_confidence',
+        'visible_problem',
+        'severity',
+        'recommendations'
+    ]
+
+    missing = [f for f in required_fields if f not in vision or vision[f] is None]
+    if missing:
+        raise ValueError(f"Missing required fields: {missing}")
+
+    # Validate enums
+    if vision['crop_confidence'] not in ['high', 'medium', 'low']:
+        raise ValueError(f"Invalid crop_confidence: {vision['crop_confidence']}")
+
+    if vision['severity'] not in ['high', 'medium', 'low', 'none', 'unknown']:
+        raise ValueError(f"Invalid severity: {vision['severity']}")
+
+
 def _normalize_vision_metadata(photo_kind: str, inferred_crop: str, crop_confidence: str) -> Dict[str, str]:
     pk = (photo_kind or "unknown").strip() or "unknown"
     ic = (inferred_crop or "unknown").strip() or "unknown"
@@ -375,47 +402,48 @@ def analyze_crop_image(
 ) -> Dict[str, Any]:
     """
     Analyze crop image for pests, diseases, or nutrient deficiencies
-    
+
     Args:
         image_bytes: Image data
         dialect: User's dialect (hi, mr, te, en)
         crop: Crop type from PROFILE (default: cotton)
         district: District / location from PROFILE (optional)
-    
+
     Returns:
         {
-            'diagnosis': str,  # What's wrong with the crop
-            'severity': str,   # low, medium, high
-            'recommendations': str,  # What to do
-            'confidence': str  # high, medium, low
+            'is_real_crop_photo': bool,
+            'non_photo_reason': str | None,
+            'inferred_crop': str,  # Cotton, Wheat, Soybean, Rice, Sugarcane, Maize, unknown
+            'crop_confidence': str,  # high, medium, low
+            'visible_problem': bool,
+            'severity': str,  # high, medium, low, none, unknown
+            'recommendations': str  # Advice in user's language
         }
     """
     # If this looks like a UI/screenshot, reject (cropping embedded content creates false positives).
     if _looks_like_screenshot_or_ui(image_bytes):
         msg = _non_photo_message(dialect)
         return {
-            "diagnosis": "non_photo",
-            "severity": "unknown",
-            "recommendations": msg,
-            "confidence": "low",
-            "photo_kind": "unknown",
+            "is_real_crop_photo": False,
+            "non_photo_reason": "screenshot",
             "inferred_crop": "unknown",
             "crop_confidence": "low",
-            "raw_analysis": msg,
+            "visible_problem": False,
+            "severity": "none",
+            "recommendations": msg,
         }
 
     image_bytes = _extract_primary_frame(image_bytes)
     if _looks_like_screenshot_or_ui(image_bytes):
         msg = _non_photo_message(dialect)
         return {
-            "diagnosis": "non_photo",
-            "severity": "unknown",
-            "recommendations": msg,
-            "confidence": "low",
-            "photo_kind": "unknown",
+            "is_real_crop_photo": False,
+            "non_photo_reason": "screenshot",
             "inferred_crop": "unknown",
             "crop_confidence": "low",
-            "raw_analysis": msg,
+            "visible_problem": False,
+            "severity": "none",
+            "recommendations": msg,
         }
 
     # Detect image format from magic bytes
@@ -443,65 +471,66 @@ def analyze_crop_image(
     if _looks_like_logo_or_illustration(image_bytes):
         msg = _non_photo_message(dialect)
         return {
-            "diagnosis": "non_photo",
-            "severity": "unknown",
+            "is_real_crop_photo": False,
+            "non_photo_reason": "logo",
+            "inferred_crop": "unknown",
+            "crop_confidence": "low",
+            "visible_problem": False,
+            "severity": "none",
             "recommendations": msg,
-            "confidence": "low",
-            "raw_analysis": msg,
         }
 
     prompt = f"""You are an agricultural extension agent helping smallholder farmers in India.
 
-CONTEXT (profile crop is background context, NOT proof of what is in the image):
-- Registered crop in the farmer's app profile: **{crop}**
-- Registered district / area: **{area}**
+**CRITICAL: Return ONLY valid JSON. No markdown code fences, no extra text. Raw JSON only.**
 
-TASK: Look at the photo for pests, diseases, nutrient stress, or other visible problems. First identify what the visible plant/crop part actually is; then use the profile crop only if the image itself is ambiguous.
+PROFILE CONTEXT (farmer's registered crop, NOT visual evidence):
+- Registered crop: {crop.title()}
+- District: {district or "not specified"}
 
-RULES:
-VISUAL CROP EVIDENCE WINS:
-- Distinctive crop organs override profile context. If you clearly see **cotton boll/fiber** on a plant, set `inferred_crop="Cotton"` and `crop_confidence="high"` even if the registered crop is Wheat or another crop.
-- Do not call cotton lint/fiber, white boll lobes, flowers, pods, fruit, or bracts “insects” unless actual insects are clearly visible.
-- Only describe the crop as Wheat/cereal if you clearly see cereal plant structure (narrow blade leaves, cereal ear/head, stem/tillers). A cotton boll/fiber photo is never wheat.
-NO CROP GUESSING:
-- If you are not strongly confident about the crop from the visible plant structure, set `inferred_crop="unknown"` and `crop_confidence="low"`.
-- In `final_message`, do not name a specific crop unless `crop_confidence="high"`. Use generic wording (e.g., “plant/leaf”) when uncertain.
-NO VISIBLE PROBLEM IS A VALID DIAGNOSIS:
-- If you can identify the crop/plant part but do **not** clearly see pests, disease spots, wilting, rot, nutrient stress, chewing, holes, or other damage, say that no clear pest/disease symptom is visible in this photo.
-- Do not recommend pesticides, fungicides, insecticides, or spray schedules unless an actual pest/disease/damage symptom is clearly visible.
-- Normal crop structures are not symptoms: cotton lint/fiber, brown dry bracts, boll seams, stems, shadows, and dried plant parts should not be labeled as pests or disease by themselves.
-0. **Non-photo guardrail (be conservative)**: If the image is a logo, illustration, screenshot/UI, document, meme, diagram, or you are not clearly seeing a real plant/leaf captured by a camera, set `is_real_crop_photo=false`. Examples: a stylized leaf icon with clean lines on a white background; app/file browser screenshots; **GitHub/repo/code listings, IDE panels, or folder trees** (thin colored text on dark backgrounds); graphics with flat colors. Do not invent pests/diseases. **Never** call something a wheat/cotton/soy field from these UI images.
-   But a real close-up photo of a crop part is still a crop photo: cotton boll/fiber on the plant, flower, fruit/pod, leaf, stem, pest on plant tissue, or field canopy. Do **not** reject a cotton boll or white cotton fiber as "logo/illustration" just because it is white-dominant.
-1. **Profile fallback only**: If the picture is partly blurry, backlit, or just "green vegetation" with no distinctive crop part, do **not** relabel it as sugarcane, rice, etc. Say visibility is limited and give guidance for **{crop}**.
-2. **Foreground first**: Base the diagnosis on the **sharp, main subject** (e.g. hand-held leaf, insects on that leaf). Out-of-focus yellow flowers or other plants in the **background** are often weeds or intercrop—mention in **at most one short phrase**, not as the headline. **Do not** use background color alone to reject **{crop}**.
-3. **Visual fidelity**: Describe what you can actually see (including insect color if visible). Do not contradict obvious colors (e.g., don't call black insects “white”). If color is unclear, say “color not clear in this photo”.
-4. **Wheat / cereals (apply ONLY when conditions match)**: Only use this rule if you **clearly** see a **cereal leaf blade** (narrow leaf with parallel veins) AND **clusters of tiny soft-bodied insects** (aphid-like colonies). **Do not apply** this rule to photos of **large larvae/caterpillars**, **buds/flowers/bolls**, or macro insect shots with no cereal leaf visible. If you see a **caterpillar/larva chewing**, describe it as a chewing pest (e.g., bollworm/armyworm-type) with appropriate scouting/IPM steps, even if the profile crop is different.
-5. **Uncertainty**: If species ID or symptoms are unclear, state that briefly in **Confidence** and give conservative next steps (monitor, send a closer symptom/pest photo, check nearby plants). Do not invent a treatment.
-6. **Tone**: Support the farmer. Avoid harsh denials unless the in-focus plant structure **clearly** rules out **{crop}**.
-7. **Consistency**: Use the same four numbered headings below every time so answers feel stable across retries.
+JSON OUTPUT (all fields required):
+{{
+    "is_real_crop_photo": true | false,
+    "non_photo_reason": "screenshot" | "logo" | "document" | "too_blurry" | null,
+    "inferred_crop": "Cotton" | "Wheat" | "Soybean" | "Rice" | "Sugarcane" | "Maize" | "unknown",
+    "crop_confidence": "high" | "medium" | "low",
+    "visible_problem": true | false,
+    "severity": "high" | "medium" | "low" | "none" | "unknown",
+    "recommendations": "<2-4 sentences in {language}>"
+}}
 
-OUTPUT:
-Return ONLY one JSON object (no prose, no markdown) with keys:
-- is_real_crop_photo: boolean
-- non_photo_reason: string
-- photo_kind: one of ["leaf_symptom","pest_macro","field_view","unknown"]
-- inferred_crop: one of ["Cotton","Wheat","Soybean","Maize","unknown"]
-- crop_confidence: one of ["low","medium","high"]
-- visible_problem: boolean
-- insect_color: one of ["black","white","green","brown","mixed","unknown"]
-- severity: one of ["low","medium","high","unknown"]
-- confidence: one of ["low","medium","high"]
-- final_message: string in **{language}** with exactly these 4 sections:
-  1. **Diagnosis**
-  2. **Severity**
-  3. **Recommendations**
-  4. **Confidence**
+3-TIER CROP IDENTIFICATION (CRITICAL):
 
-If is_real_crop_photo is false:
-- final_message must ask for a real crop/leaf close-up photo and must NOT mention pests/diseases.
-If visible_problem is false:
-- final_message must say no clear pest/disease/damage symptom is visible in this photo.
-- Recommendations should be monitoring / sending a clearer close-up if symptoms appear; no pesticide or spray advice.
+1. **Visual overrides profile**: If distinctive crop organs clearly visible (cotton bolls, wheat grain heads, specific leaf morphology) → set inferred_crop to what you SEE with crop_confidence="high", EVEN if different from {crop.title()}.
+
+2. **Ambiguous → unknown**: If vegetation visible but NO distinctive features (generic leaves, far view, blur, early stage) → MUST set:
+   - inferred_crop="unknown"
+   - crop_confidence="low"
+   - In recommendations: use "this plant"/"this leaf" (NO crop name)
+   - Suggest clearer/closer photo
+
+3. **Never anchor on profile**: Do NOT use {crop.title()} as evidence. Only name crops when visual features confirm it.
+
+IMAGE TYPE RULES:
+- "real_crop": Real photograph of plant/crop (field, hand-held, close-up)
+- "screenshot": UI, terminal, app, file explorer, chat
+- "logo": Graphic, icon, illustration, stylized image
+- "document": PDF, scanned text, document photo
+- "too_blurry": Too dark/blurry/corrupted to classify
+
+If is_real_crop_photo=false:
+- Set: inferred_crop="unknown", crop_confidence="low", visible_problem=false, severity="none"
+- recommendations: one sentence asking for real crop photo in {language}
+
+CONFIDENCE LEVELS:
+- "high": Distinctive organs clearly visible
+- "medium": Crop features present but not definitive
+- "low": No distinguishing features
+
+REMEMBER:
+- Return raw JSON only (no ``` fences)
+- Title Case crops: "Cotton", "Wheat"
+- Never name crop unless visual evidence supports it
 """
     
     # Call Claude 3 Sonnet Vision
@@ -538,60 +567,25 @@ If visible_problem is false:
         
         # Parse response
         response_body = json.loads(response['body'].read())
-        analysis = response_body['content'][0]['text']
+        raw_text = response_body['content'][0]['text'].strip()
 
-        print(f"Vision analysis complete: {len(analysis)} characters")
+        # Defensive fallback: strip fences if present (should be rare with temp=0)
+        if raw_text.startswith('```'):
+            raw_text = '\n'.join(raw_text.split('\n')[1:-1])
 
-        obj = _extract_json_object(analysis)
-        if obj and isinstance(obj.get("final_message"), str):
-            if obj.get("is_real_crop_photo") is False:
-                msg = _non_photo_message(dialect)
-                return {
-                    "diagnosis": "non_photo",
-                    "severity": "unknown",
-                    "recommendations": msg,
-                    "confidence": "low",
-                    "photo_kind": "unknown",
-                    "inferred_crop": "unknown",
-                    "crop_confidence": "low",
-                    "raw_analysis": analysis,
-                }
-            photo_kind = str(obj.get("photo_kind") or "unknown")
-            inferred_crop = str(obj.get("inferred_crop") or "unknown")
-            crop_confidence = str(obj.get("crop_confidence") or "low")
-            norm = _normalize_vision_metadata(photo_kind, inferred_crop, crop_confidence)
-            photo_kind = norm["photo_kind"]
-            inferred_crop = norm["inferred_crop"]
-            crop_confidence = norm["crop_confidence"]
-            visible_problem = bool(obj.get("visible_problem", True))
-            severity = str(obj.get("severity") or "unknown")
-            confidence = str(obj.get("confidence") or "medium")
-            needs_confirm = False
-            return {
-                "diagnosis": "Unknown",
-                "severity": severity,
-                "recommendations": obj["final_message"],
-                "confidence": confidence,
-                "photo_kind": photo_kind,
-                "inferred_crop": inferred_crop,
-                "crop_confidence": crop_confidence,
-                "visible_problem": visible_problem,
-                "needs_crop_confirm": needs_confirm,
-                "raw_analysis": analysis,
-            }
+        try:
+            vision_result = json.loads(raw_text)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Vision model returned invalid JSON: {e}")
 
-        msg = _non_photo_message(dialect)
-        return {
-            "diagnosis": "unknown",
-            "severity": "unknown",
-            "recommendations": msg,
-            "confidence": "low",
-            "photo_kind": "unknown",
-            "inferred_crop": "unknown",
-            "crop_confidence": "low",
-            "raw_analysis": analysis,
-        }
-        
+        # Validate schema immediately
+        validate_vision_schema(vision_result)
+
+        print(f"Vision analysis complete: {len(raw_text)} characters")
+
+        # Return validated structured result
+        return vision_result
+
     except Exception as e:
         print(f"Error analyzing image: {e}")
         
@@ -604,10 +598,13 @@ If visible_problem is false:
         }
         
         return {
-            'diagnosis': 'Error',
+            'is_real_crop_photo': False,
+            'non_photo_reason': 'too_blurry',
+            'inferred_crop': 'unknown',
+            'crop_confidence': 'low',
+            'visible_problem': False,
             'severity': 'unknown',
             'recommendations': error_messages.get(dialect, error_messages['en']),
-            'confidence': 'low',
             'error': str(e)
         }
 
