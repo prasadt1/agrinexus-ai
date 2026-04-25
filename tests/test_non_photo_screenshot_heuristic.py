@@ -281,6 +281,7 @@ def test_processor_prompt_makes_visible_crop_evidence_win(monkeypatch):
 
 def test_processor_high_confidence_visible_crop_bypasses_crop_prompt(monkeypatch):
     from src.processor import analyzer as proc_analyzer
+    monkeypatch.setenv("VISION_RELEVANCE_GATE_ENABLED", "false")
 
     proc_analyzer.TEMP_BUCKET = "tmp-bucket"
     monkeypatch.setattr(proc_analyzer, "download_whatsapp_image", lambda _mid: _make_cotton_boll_like_bytes())

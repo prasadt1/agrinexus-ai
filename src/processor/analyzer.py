@@ -840,14 +840,18 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         if _relevance_gate_enabled():
             rel = classify_image_relevance(image_bytes, dialect)
             print(f"Relevance gate: relevance={rel.get('relevance')} confidence={rel.get('confidence')} reason={rel.get('reason')}")
-            if rel.get("relevance") == "not_agri" and rel.get("confidence") in ("high", "medium"):
-                msg = get_not_agri_message(dialect)
-                return {"text": msg, "non_photo": True, "diagnosis": "non_photo", "non_photo_reason": rel.get("reason")}
-            # If the classifier says "unclear" with non-low confidence, be conservative:
-            # do not run diagnosis; ask for a clearer crop/leaf photo.
-            if rel.get("relevance") == "unclear" and rel.get("confidence") in ("high", "medium"):
+            relevance = rel.get("relevance")
+            conf = rel.get("confidence")
+            reason = rel.get("reason")
+
+            # Only proceed to diagnosis/confirmation when we have a non-low confidence "agri_photo".
+            if not (relevance == "agri_photo" and conf in ("high", "medium")):
+                if relevance == "not_agri" and conf in ("high", "medium"):
+                    msg = get_not_agri_message(dialect)
+                    return {"text": msg, "non_photo": True, "diagnosis": "non_photo", "non_photo_reason": reason}
+                # Everything else: ask for a clearer/closer crop photo (safe fail-closed).
                 msg = get_safe_retake_message(dialect)
-                return {"text": msg, "non_photo": True, "diagnosis": "non_photo", "non_photo_reason": "unclear"}
+                return {"text": msg, "non_photo": True, "diagnosis": "non_photo", "non_photo_reason": (reason or "unclear")}
 
         if _quality_gate_enabled():
             q = _check_image_quality(image_bytes)
