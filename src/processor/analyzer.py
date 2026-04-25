@@ -604,7 +604,7 @@ REMEMBER:
     
     try:
         response = bedrock.invoke_model(
-            modelId='anthropic.claude-3-sonnet-20240229-v1:0',
+            modelId='anthropic.claude-3-5-sonnet-20240620-v1:0',  # Upgraded for better vision
             body=json.dumps({
                 "anthropic_version": "bedrock-2023-05-31",
                 "max_tokens": 2000,
