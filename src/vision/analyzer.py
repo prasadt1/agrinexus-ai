@@ -11,6 +11,9 @@ import struct
 import zlib
 from typing import Any, Dict, Optional
 
+from src.vision.heuristics import run_heuristics
+from src.vision.messages import get_block_message
+
 bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
 s3 = boto3.client('s3', region_name='us-east-1')
 secrets = boto3.client('secretsmanager', region_name='us-east-1')
@@ -631,6 +634,21 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         print("Downloading image from WhatsApp...")
         image_bytes = download_whatsapp_image(image_id)
         print(f"Downloaded {len(image_bytes)} bytes")
+
+        # LAYER 1: Heuristics gate (pre-flight check)
+        heuristics_error = False
+        try:
+            heuristics = run_heuristics(image_bytes)
+            print(f"Heuristics result: {heuristics['decision']}, reason: {heuristics.get('reason')}")
+        except Exception as e:
+            print(f"Heuristics failed (PIL error): {e}")
+            heuristics_error = True
+            heuristics = {'decision': 'pass', 'reason': None, 'metrics': {}}
+
+        if heuristics['decision'] == 'block':
+            blocked_msg = get_block_message(heuristics['reason'], dialect)
+            print(f"Blocked by heuristics: {heuristics['reason']}")
+            return blocked_msg
 
         if _quality_gate_enabled():
             q = _check_image_quality(image_bytes)
