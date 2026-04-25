@@ -577,43 +577,6 @@ This project was developed using **Kiro AI**, which enabled requirements-driven 
 - \~6,000 lines of Python across 11 Lambda functions
 - Full test coverage: voice, vision, RAG, nudges
 
-## Documentation
-
-- [docs/architecture.md](docs/architecture.md) — full system design
-- [architecture/diagrams.md](architecture/diagrams.md) — Mermaid flow diagrams
-- [docs/testing/E2E-TEST-CHECKLIST.md](docs/testing/E2E-TEST-CHECKLIST.md) — pre-demo checklist (manual + automated smoke pointer)
-- [docs/E2E-TEST-GUIDE.md](docs/E2E-TEST-GUIDE.md) — end-to-end test walkthrough
-- [docs/CODE-WALKTHROUGH.md](docs/CODE-WALKTHROUGH.md) — component-by-component guide
-- [docs/IMPLEMENTATION-QUALITY-METRICS.md](docs/IMPLEMENTATION-QUALITY-METRICS.md) — test coverage, code quality, traceability
-- [docs/INFRASTRUCTURE-CAPACITY-ANALYSIS.md](docs/INFRASTRUCTURE-CAPACITY-ANALYSIS.md) — capacity planning, load testing, scaling
-- [docs/product/RAG-FLOW-EXPLAINED.md](docs/product/RAG-FLOW-EXPLAINED.md) — how the RAG pipeline works
-- [docs/product/NUDGE-BEHAVIOR-GUIDE.md](docs/product/NUDGE-BEHAVIOR-GUIDE.md) — nudge system behavior and templates
-- [docs/reports/VISION-RELIABILITY-REPORT.md](docs/reports/VISION-RELIABILITY-REPORT.md) — vision pipeline reliability analysis
-- [docs/finops-public.md](docs/finops-public.md) — cost modeling and FinOps breakdown
-- [data/fao-pdfs/README.md](data/fao-pdfs/README.md) — knowledge-base PDF sources, S3 sync, and **URL manifests / batch download** (`kb_url_manifest_*.csv`, `scripts/download_kb_from_manifest.py`)
-- [docs/requirements.md](docs/requirements.md) — EARS requirements specification (144 requirements)
-- [docs/ISSUES-LOG.md](docs/ISSUES-LOG.md) — troubleshooting history (resolved issues)
-- [docs/competitive-evidence-notes.md](docs/competitive-evidence-notes.md) — competitive landscape analysis (public sources)
-- [docs/guides/INSTALL-PREREQUISITES.md](docs/guides/INSTALL-PREREQUISITES.md) — setup prerequisites (SAM, AWS CLI, Python)
-
-<details>
-<summary><strong>Maintainers (internal / non-public)</strong></summary>
-
-Some documents are intentionally **not** part of the public “judge quickstart” narrative. If you’re maintaining a deployed stack, you may also consult:
-
-- `docs/operations/RUNBOOK-ALERTS.md` — alarms, DLQ, abuse envelope, rate limits
-
-</details>
-
-## Resources
-
-- [AWS SAM Documentation](https://docs.aws.amazon.com/serverless-application-model/)
-- [Bedrock Knowledge Bases](https://docs.aws.amazon.com/bedrock/latest/userguide/knowledge-base.html)
-- [Amazon Transcribe](https://docs.aws.amazon.com/transcribe/)
-- [Amazon Polly](https://docs.aws.amazon.com/polly/)
-- [WhatsApp Business API](https://developers.facebook.com/docs/whatsapp)
-
-
 ## Productization Roadmap
 
 AgriNexus is built as an **accountability engine**. The **trigger → confirm → follow-up** structure is domain-agnostic: only the trigger and message copy change; the accountability loop stays the same.
@@ -670,6 +633,42 @@ For partnerships/licensing, contact: `prasad@prasadtilloo.com`.
 - The community of **AWS Heroes and Community Builders** whose architectural posts informed the EventBridge Scheduler vs Step Functions decision
 
 Special thanks to the smallholder farmers whose real-world challenges inspired this work — and whose feedback continues to shape it.
+
+## Documentation
+
+- [docs/architecture.md](docs/architecture.md) — full system design
+- [architecture/diagrams.md](architecture/diagrams.md) — Mermaid flow diagrams
+- [docs/testing/E2E-TEST-CHECKLIST.md](docs/testing/E2E-TEST-CHECKLIST.md) — pre-demo checklist (manual + automated smoke pointer)
+- [docs/E2E-TEST-GUIDE.md](docs/E2E-TEST-GUIDE.md) — end-to-end test walkthrough
+- [docs/CODE-WALKTHROUGH.md](docs/CODE-WALKTHROUGH.md) — component-by-component guide
+- [docs/IMPLEMENTATION-QUALITY-METRICS.md](docs/IMPLEMENTATION-QUALITY-METRICS.md) — test coverage, code quality, traceability
+- [docs/INFRASTRUCTURE-CAPACITY-ANALYSIS.md](docs/INFRASTRUCTURE-CAPACITY-ANALYSIS.md) — capacity planning, load testing, scaling
+- [docs/product/RAG-FLOW-EXPLAINED.md](docs/product/RAG-FLOW-EXPLAINED.md) — how the RAG pipeline works
+- [docs/product/NUDGE-BEHAVIOR-GUIDE.md](docs/product/NUDGE-BEHAVIOR-GUIDE.md) — nudge system behavior and templates
+- [docs/reports/VISION-RELIABILITY-REPORT.md](docs/reports/VISION-RELIABILITY-REPORT.md) — vision pipeline reliability analysis
+- [docs/finops-public.md](docs/finops-public.md) — cost modeling and FinOps breakdown
+- [data/fao-pdfs/README.md](data/fao-pdfs/README.md) — knowledge-base PDF sources, S3 sync, and **URL manifests / batch download** (`kb_url_manifest_*.csv`, `scripts/download_kb_from_manifest.py`)
+- [docs/requirements.md](docs/requirements.md) — EARS requirements specification (144 requirements)
+- [docs/ISSUES-LOG.md](docs/ISSUES-LOG.md) — troubleshooting history (resolved issues)
+- [docs/competitive-evidence-notes.md](docs/competitive-evidence-notes.md) — competitive landscape analysis (public sources)
+- [docs/guides/INSTALL-PREREQUISITES.md](docs/guides/INSTALL-PREREQUISITES.md) — setup prerequisites (SAM, AWS CLI, Python)
+
+<details>
+<summary><strong>Maintainers (internal / non-public)</strong></summary>
+
+Some documents are intentionally **not** part of the public “judge quickstart” narrative. If you’re maintaining a deployed stack, you may also consult:
+
+- `docs/operations/RUNBOOK-ALERTS.md` — alarms, DLQ, abuse envelope, rate limits
+
+</details>
+
+## Resources
+
+- [AWS SAM Documentation](https://docs.aws.amazon.com/serverless-application-model/)
+- [Bedrock Knowledge Bases](https://docs.aws.amazon.com/bedrock/latest/userguide/knowledge-base.html)
+- [Amazon Transcribe](https://docs.aws.amazon.com/transcribe/)
+- [Amazon Polly](https://docs.aws.amazon.com/polly/)
+- [WhatsApp Business API](https://developers.facebook.com/docs/whatsapp)
 
 ## License
 
