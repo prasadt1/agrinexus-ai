@@ -2,7 +2,6 @@
 Localized message templates for vision analysis responses.
 Supports: Hindi (hi), Marathi (mr), Telugu (te), English (en).
 """
-from typing import Dict
 
 
 def get_safe_retake_message(dialect: str) -> str:
@@ -22,7 +21,7 @@ def get_safe_retake_message(dialect: str) -> str:
 def get_block_message(reason: str, dialect: str) -> str:
     """Hard block messages for non-crop inputs (short, 1-2 lines)"""
     messages = {
-        'screenshot_ui': {
+        'screenshot': {
             'hi': 'यह स्क्रीनशॉट लगती है। कृपया फसल/पत्ती की असली फोटो भेजें।',
             'mr': 'ही स्क्रीनशॉट दिसते. कृपया पिक/पानाची खरी फोटो पाठवा.',
             'te': 'ఇది స్క్రీన్‌షాట్ లా కనిపిస్తోంది. దయచేసి పంట/ఆకు యొక్క నిజమైన ఫోటో పంపండి.',
@@ -39,10 +38,22 @@ def get_block_message(reason: str, dialect: str) -> str:
             'mr': 'फोटो खूप लहान आहे. कृपया मोठा फोटो पाठवा.',
             'te': 'ఫోటో చాలా చిన్నది. దయచేసి పెద్ద ఫోటో పంపండి.',
             'en': 'Photo is too small. Please send a larger photo.'
+        },
+        'document': {
+            'hi': 'यह डॉक्यूमेंट लगती है। कृपया फसल की फोटो भेजें।',
+            'mr': 'हे दस्तऐवज दिसते. कृपया पिकाचा फोटो पाठवा.',
+            'te': 'ఇది డాక్యుమెంట్ లా కనిపిస్తోంది. దయచేసి పంట ఫోటో పంపండి.',
+            'en': 'This looks like a document. Please send a crop photo.'
+        },
+        'too_blurry': {
+            'hi': 'फोटो धुंधली है। कृपया स्पष्ट फोटो भेजें।',
+            'mr': 'फोटो अस्पष्ट आहे. कृपया स्पष्ट फोटो पाठवा.',
+            'te': 'ఫోటో అస్పష్టంగా ఉంది. దయచేసి స్పష్ట ఫోటో పంపండి.',
+            'en': 'Photo is blurry. Please send a clearer photo.'
         }
     }
 
-    reason_templates = messages.get(reason, messages['screenshot_ui'])
+    reason_templates = messages.get(reason, messages['screenshot'])
     return reason_templates.get(dialect, reason_templates['en'])
 
 
@@ -72,6 +83,12 @@ def get_error_message(error_type: str, dialect: str) -> str:
             'mr': 'काहीतरी चूक. कृपया पुन्हा प्रयत्न करा.',
             'te': 'ఏదో తప్పు. దయచేసి మళ్లీ ప్రయత్నించండి.',
             'en': 'Something went wrong. Please try again.'
+        },
+        'rate_limit': {
+            'hi': 'अभी बहुत व्यस्त हैं। 1 मिनट बाद कोशिश करें।',
+            'mr': 'आत्ता खूप व्यस्त. 1 मिनिटानंतर प्रयत्न करा.',
+            'te': 'ఇప్పుడు చాలా బిజీ. 1 నిమిషం తర్వాత ప్రయత్నించండి.',
+            'en': 'Very busy now. Try after 1 minute.'
         }
     }
 

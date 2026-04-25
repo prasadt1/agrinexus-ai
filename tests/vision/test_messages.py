@@ -27,10 +27,10 @@ def test_safe_retake_message_unsupported_dialect():
 
 def test_block_message_screenshot():
     """Screenshot block message in all dialects"""
-    assert 'स्क्रीनशॉट' in get_block_message('screenshot_ui', 'hi')
-    assert 'स्क्रीनशॉट' in get_block_message('screenshot_ui', 'mr')
-    assert 'స్క్రీన్‌షాట్' in get_block_message('screenshot_ui', 'te')
-    assert 'screenshot' in get_block_message('screenshot_ui', 'en')
+    assert 'स्क्रीनशॉट' in get_block_message('screenshot', 'hi')
+    assert 'स्क्रीनशॉट' in get_block_message('screenshot', 'mr')
+    assert 'స్క్రీన్‌షాట్' in get_block_message('screenshot', 'te')
+    assert 'screenshot' in get_block_message('screenshot', 'en')
 
 
 def test_block_message_logo():
@@ -49,3 +49,32 @@ def test_error_message_unknown_fallback():
     """Unknown error type should return generic error"""
     msg = get_error_message('nonexistent_error', 'en')
     assert 'wrong' in msg.lower() or 'try again' in msg.lower()
+
+
+@pytest.mark.parametrize('dialect', ['hi', 'mr', 'te', 'en'])
+def test_safe_retake_all_dialects(dialect):
+    """All dialects should have safe retake messages"""
+    msg = get_safe_retake_message(dialect)
+    assert len(msg) > 0
+    assert len(msg) < 150  # WhatsApp-friendly
+
+
+@pytest.mark.parametrize('dialect', ['hi', 'mr', 'te', 'en'])
+def test_error_messages_all_dialects(dialect):
+    """All dialects should have error messages"""
+    for error_type in ['download_failed', 'model_error', 'model_invalid_json', 'unknown', 'rate_limit']:
+        msg = get_error_message(error_type, dialect)
+        assert len(msg) > 0
+        assert len(msg) < 150
+
+
+def test_all_messages_whatsapp_friendly():
+    """All messages should be under 150 characters for mobile display"""
+    for dialect in ['hi', 'mr', 'te', 'en']:
+        assert len(get_safe_retake_message(dialect)) < 150
+
+        for reason in ['screenshot', 'logo', 'too_small', 'document', 'too_blurry']:
+            assert len(get_block_message(reason, dialect)) < 150
+
+        for error in ['download_failed', 'model_error', 'model_invalid_json', 'unknown', 'rate_limit']:
+            assert len(get_error_message(error, dialect)) < 150
