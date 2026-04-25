@@ -6,6 +6,17 @@ For slide-ready / article figures (PNG / GIF / MP4), see:
 - [`../docs/diagrams/`](../docs/diagrams/)
 - [`./polished/`](./polished/)
 
+## Contents
+
+- [System architecture (competition-style, accurate)](#system-architecture-competition-style-accurate)
+- [High-level system](#high-level-system)
+- [Webhook and routing](#webhook-and-routing)
+- [Text message flow](#text-message-flow)
+- [Voice message flow](#voice-message-flow)
+- [Vision (image) flow](#vision-image-flow)
+- [Nudge flow](#nudge-flow)
+- [WhatsApp integration (secrets and webhook)](#whatsapp-integration-secrets-and-webhook)
+
 ## System architecture (competition-style, accurate)
 
 Use this for slides or a single “system architecture” image. It matches the actual code: **Webhook Lambda → SQS → Processor Lambdas** for messages; **Step Functions only for nudges**; **Lambdas call WhatsApp API directly** for outbound.
@@ -70,6 +81,8 @@ flowchart TB
 
 ## High-level system
 
+This is the simplified “big picture” view: WhatsApp → webhook → queues → processors → Bedrock/Vision/Polly + DynamoDB; plus a separate weather→nudge workflow.
+
 ```mermaid
 flowchart TB
     subgraph Farmer
@@ -103,6 +116,8 @@ flowchart TB
 
 ## Webhook and routing
 
+This diagram shows webhook validation (signature + dedup) and the routing split between audio vs text/image into separate SQS queues.
+
 ```mermaid
 flowchart LR
     WA[WhatsApp] -->|POST body| API[API Gateway]
@@ -122,6 +137,8 @@ flowchart LR
 ```
 
 ## Text message flow
+
+This is the text-only path: webhook → SQS → processor → Bedrock RAG → WhatsApp reply (with citations when available).
 
 ```mermaid
 sequenceDiagram
@@ -147,6 +164,8 @@ sequenceDiagram
 ```
 
 ## Voice message flow
+
+This is the voice-note path: webhook ACK → voice queue → Transcribe → message queue → processor → optional Polly audio reply.
 
 ```mermaid
 sequenceDiagram
@@ -222,6 +241,8 @@ sequenceDiagram
 
 ## Nudge flow
 
+This is the closed-loop nudge path: weather poll (rate: 6 hours) → Step Functions → nudge send → Scheduler reminders (T+24h/T+48h/T+72h) → DONE/NOT YET detection via DynamoDB Streams.
+
 ```mermaid
 flowchart TB
     EventBridge["EventBridge\nSchedule (rate: 6 hours)"] --> Poll[Weather Poller\nLambda]
@@ -241,6 +262,8 @@ flowchart TB
 ```
 
 ## WhatsApp integration (secrets and webhook)
+
+This diagram shows where WhatsApp secrets live (Secrets Manager) and how the webhook/processor use them to verify signatures and send outbound messages via Meta’s Cloud API.
 
 ```mermaid
 flowchart LR
