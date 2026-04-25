@@ -83,7 +83,6 @@ README-POLISH-COMPLETE.md
 
 # Old/unused templates and configs
 template-simple.yaml
-template.yaml
 samconfig.toml
 
 # Deploy info (reveals infra details)

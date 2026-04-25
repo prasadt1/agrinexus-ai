@@ -1,0 +1,979 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: AgriNexus AI - Week 2 (WhatsApp Integration + Behavioral Nudge Engine)
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+    Description: Environment name
+  
+  TableName:
+    Type: String
+    Default: agrinexus-data
+    Description: DynamoDB table name from Week 1
+  
+  TableStreamArn:
+    Type: String
+    Description: DynamoDB Stream ARN from Week 1 (required for Response Detector)
+  
+  KnowledgeBaseId:
+    Type: String
+    Description: Bedrock Knowledge Base ID from Week 1
+  
+  GuardrailId:
+    Type: String
+    Default: ""
+    Description: Bedrock Guardrail ID from Week 1 (optional)
+  
+  GuardrailVersion:
+    Type: String
+    Default: "1"
+    Description: Bedrock Guardrail Version from Week 1 (optional)
+
+  RateLimitBypassPhones:
+    Type: String
+    Default: ""
+    Description: >-
+      Comma-separated WhatsApp numbers (digits only, no +) exempt from webhook MSG rate limit.
+      Use for demo/pilot; leave empty for normal operation.
+
+  RateLimitDisabled:
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: If true, disables per-user WhatsApp message rate limiting (demo only).
+
+  BetaPhones:
+    Type: String
+    Default: ""
+    Description: >-
+      Comma-separated WhatsApp numbers (digits only, no +) routed to the beta vision pipeline.
+      Leave empty to disable beta routing.
+
+Globals:
+  Function:
+    Runtime: python3.11
+    Timeout: 30
+    MemorySize: 512
+    Tracing: Active  # Enable AWS X-Ray distributed tracing
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref TableName
+        KNOWLEDGE_BASE_ID: !Ref KnowledgeBaseId
+        GUARDRAIL_ID: !Ref GuardrailId
+        GUARDRAIL_VERSION: !Ref GuardrailVersion
+        RATE_LIMIT_MESSAGES: "25"  # Max inbound WhatsApp messages per user per hour (see webhook FilterExpression)
+        RATE_LIMIT_WINDOW_SECONDS: "3600"  # 1 hour window
+
+Resources:
+  # ============================================================================
+  # Lambda Layer: Common Utilities
+  # ============================================================================
+  CommonLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub agrinexus-common-${Environment}
+      Description: Common utilities for WhatsApp integration (caching, PII redaction, district helplines)
+      ContentUri: src/common-layer/
+      CompatibleRuntimes:
+        - python3.11
+
+  # ============================================================================
+  # Note: WhatsApp secrets are already created in Secrets Manager:
+  # - agrinexus/whatsapp/verify-token
+  # - agrinexus/whatsapp/access-token
+  # - agrinexus/whatsapp/phone-number-id
+  # No need to create them here
+  # ============================================================================
+
+  # ============================================================================
+  # SQS Queue for Async Message Processing
+  # ============================================================================
+  MessageQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub agrinexus-messages-${Environment}.fifo
+      FifoQueue: true
+      ContentBasedDeduplication: true
+      VisibilityTimeout: 180
+      MessageRetentionPeriod: 345600  # 4 days
+      ReceiveMessageWaitTimeSeconds: 20  # Long polling - reduces SQS API calls
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt MessageDLQ.Arn
+        maxReceiveCount: 3
+
+  MessageDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub agrinexus-messages-dlq-${Environment}.fifo
+      FifoQueue: true
+      MessageRetentionPeriod: 1209600  # 14 days
+      ReceiveMessageWaitTimeSeconds: 20  # Long polling - reduces SQS API calls
+
+  # ============================================================================
+  # SQS Queue for Beta Message Processing (your phone only)
+  # ============================================================================
+  BetaMessageQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub agrinexus-messages-beta-${Environment}.fifo
+      FifoQueue: true
+      ContentBasedDeduplication: true
+      VisibilityTimeout: 180
+      MessageRetentionPeriod: 345600  # 4 days
+      ReceiveMessageWaitTimeSeconds: 20
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt BetaMessageDLQ.Arn
+        maxReceiveCount: 3
+
+  BetaMessageDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub agrinexus-messages-beta-dlq-${Environment}.fifo
+      FifoQueue: true
+      MessageRetentionPeriod: 1209600  # 14 days
+      ReceiveMessageWaitTimeSeconds: 20
+
+  # ============================================================================
+  # SQS Queue for Voice Processing
+  # ============================================================================
+  VoiceQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub agrinexus-voice-${Environment}.fifo
+      FifoQueue: true
+      ContentBasedDeduplication: true
+      VisibilityTimeout: 180
+      MessageRetentionPeriod: 345600  # 4 days
+      ReceiveMessageWaitTimeSeconds: 20  # Long polling - reduces SQS API calls
+
+  # ============================================================================
+  # S3 Bucket for Temporary Audio Storage
+  # ============================================================================
+  TempAudioBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub agrinexus-temp-audio-${Environment}-${AWS::AccountId}
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldAudio
+            Status: Enabled
+            Prefix: voice/
+            ExpirationInDays: 1  # Delete voice files after 1 day
+          - Id: DeleteOldImages
+            Status: Enabled
+            Prefix: images/
+            ExpirationInDays: 7  # Delete analyzed images after 7 days
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # ============================================================================
+  # API Gateway for WhatsApp Webhook
+  # ============================================================================
+  WhatsAppApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub agrinexus-whatsapp-${Environment}
+      StageName: !Ref Environment
+      Cors:
+        AllowMethods: "'GET,POST'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+
+  # ============================================================================
+  # API Gateway for Web Chat Demo
+  # ============================================================================
+  WebChatApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub agrinexus-web-chat-${Environment}
+      StageName: !Ref Environment
+      Cors:
+        AllowMethods: "'POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+          # Demo-safe throttling: reduces burst/bot risk at the edge
+          ThrottlingRateLimit: 2
+          ThrottlingBurstLimit: 5
+
+  # ============================================================================
+  # WAFv2: Protect public Web Chat API from abuse
+  # ============================================================================
+  WebChatWebAcl:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: !Sub agrinexus-web-chat-waf-${Environment}
+      Scope: REGIONAL
+      DefaultAction:
+        Allow: {}
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: !Sub agrinexusWebChatWaf-${Environment}
+      Rules:
+        - Name: RateLimitChat
+          Priority: 1
+          Action:
+            Block: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: !Sub agrinexusWebChatRateLimit-${Environment}
+          Statement:
+            RateBasedStatement:
+              AggregateKeyType: IP
+              # WAF rate limits are evaluated over a fixed 5-minute window.
+              # This is a backstop; app-layer hourly caps still apply.
+              Limit: 300
+              ScopeDownStatement:
+                ByteMatchStatement:
+                  SearchString: "/chat"
+                  FieldToMatch:
+                    UriPath: {}
+                  TextTransformations:
+                    - Priority: 0
+                      Type: NONE
+                  PositionalConstraint: ENDS_WITH
+
+  WebChatWebAclAssociation:
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties:
+      ResourceArn: !Sub arn:aws:apigateway:${AWS::Region}::/restapis/${WebChatApi}/stages/${Environment}
+      WebACLArn: !GetAtt WebChatWebAcl.Arn
+
+  # ============================================================================
+  # Lambda: WhatsApp Webhook Handler
+  # ============================================================================
+  WebhookHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-webhook-${Environment}
+      CodeUri: src/webhook/
+      Handler: handler.lambda_handler
+      Description: WhatsApp webhook handler with signature validation
+      MemorySize: 256  # Reduced from 512MB - only does validation + SQS enqueue
+      Layers:
+        - !Ref CommonLayer
+      Environment:
+        Variables:
+          QUEUE_URL: !Ref MessageQueue
+          QUEUE_URL_BETA: !Ref BetaMessageQueue
+          VOICE_QUEUE_URL: !Ref VoiceQueue
+          BETA_PHONES: !Ref BetaPhones
+          VERIFY_TOKEN_SECRET: agrinexus/whatsapp/verify-token
+          APP_SECRET_NAME: agrinexus/whatsapp/app-secret
+          VERIFY_SIGNATURE: "true"
+          ACCESS_TOKEN_SECRET: agrinexus/whatsapp/access-token
+          PHONE_NUMBER_ID_SECRET: agrinexus/whatsapp/phone-number-id
+          RATE_LIMIT_BYPASS_PHONES: !Ref RateLimitBypassPhones
+          RATE_LIMIT_DISABLED: !Ref RateLimitDisabled
+      Policies:
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt MessageQueue.QueueName
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt BetaMessageQueue.QueueName
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt VoiceQueue.QueueName
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TableName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus/whatsapp/*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus-whatsapp-*
+      Events:
+        WebhookGet:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WhatsAppApi
+            Path: /webhook
+            Method: GET
+        WebhookPost:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WhatsAppApi
+            Path: /webhook
+            Method: POST
+
+  # ============================================================================
+  # Lambda: Web Chat Handler (Public Demo)
+  # ============================================================================
+  WebChatHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-web-chat-${Environment}
+      CodeUri: src/web-chat/
+      Handler: handler.lambda_handler
+      Description: Public web chat API for text queries (no phone number required)
+      Timeout: 60
+      MemorySize: 512
+      Environment:
+        Variables:
+          WEB_RATE_LIMIT: "5"  # 5 queries per hour per IP
+          WEB_RATE_LIMIT_WINDOW: "3600"  # 1 hour
+          MODEL_ARN: arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TableName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+                - bedrock:RetrieveAndGenerate
+                - bedrock:Retrieve
+                - bedrock-agent:Retrieve
+                - bedrock-agent:RetrieveAndGenerate
+              Resource: '*'
+      Events:
+        WebChatPost:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebChatApi
+            Path: /chat
+            Method: POST
+        WebChatOptions:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebChatApi
+            Path: /chat
+            Method: OPTIONS
+
+  # ============================================================================
+  # Lambda: Health Check (Judge-friendly liveness endpoint)
+  # ============================================================================
+  HealthHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-health-${Environment}
+      CodeUri: src/health/
+      Handler: handler.lambda_handler
+      Description: Simple liveness endpoint for API verification
+      MemorySize: 128
+      Timeout: 5
+      Environment:
+        Variables:
+          APP_VERSION: "1.0.0"
+      Events:
+        HealthGet:
+          Type: Api
+          Properties:
+            RestApiId: !Ref WebChatApi
+            Path: /health
+            Method: GET
+
+  # ============================================================================
+  # Lambda: Message Processor
+  # ============================================================================
+  MessageProcessor:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-processor-${Environment}
+      CodeUri: src/processor/
+      Handler: handler.lambda_handler
+      Description: Process messages from SQS and interact with Bedrock
+      Timeout: 60
+      Layers:
+        - !Ref CommonLayer
+      Environment:
+        Variables:
+          QUEUE_URL: !Ref MessageQueue
+          ACCESS_TOKEN_SECRET: agrinexus/whatsapp/access-token
+          PHONE_NUMBER_ID_SECRET: agrinexus/whatsapp/phone-number-id
+          TEMP_AUDIO_BUCKET: !Ref TempAudioBucket
+          MODEL_ARN: arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0
+          APPEND_DISTRICT_HELPLINE: "true"
+          # Shorter Polly audio; full reply always sent as text first (see output.truncate_for_voice)
+          VOICE_TTS_MAX_CHARS: "700"
+          IMAGE_MAX_BYTES: "5242880"
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TableName
+        - S3CrudPolicy:
+            BucketName: !Ref TempAudioBucket
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
+                - bedrock:RetrieveAndGenerate
+                - bedrock:Retrieve
+                - bedrock-agent:Retrieve
+                - bedrock-agent:RetrieveAndGenerate
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - polly:SynthesizeSpeech
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus/whatsapp/*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus-whatsapp-*
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt MessageQueue.Arn
+            BatchSize: 1  # Process one message at a time to maintain strict ordering
+
+  # ============================================================================
+  # Lambda: Message Processor (Beta lane)
+  # ============================================================================
+  BetaMessageProcessor:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-processor-beta-${Environment}
+      CodeUri: src/processor/
+      Handler: handler.lambda_handler
+      Description: Beta message processor (isolated from judges)
+      Timeout: 60
+      Layers:
+        - !Ref CommonLayer
+      Environment:
+        Variables:
+          QUEUE_URL: !Ref BetaMessageQueue
+          ACCESS_TOKEN_SECRET: agrinexus/whatsapp/access-token
+          PHONE_NUMBER_ID_SECRET: agrinexus/whatsapp/phone-number-id
+          TEMP_AUDIO_BUCKET: !Ref TempAudioBucket
+          MODEL_ARN: arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0
+          APPEND_DISTRICT_HELPLINE: "true"
+          VOICE_TTS_MAX_CHARS: "700"
+          IMAGE_MAX_BYTES: "5242880"
+          VISION_QUALITY_GATE_ENABLED: "true"
+          LAST_IMAGE_OVERRIDE_ENABLED: "true"
+          LAST_IMAGE_TTL_SECONDS: "600"
+          VISION_MIN_DIMENSION: "320"
+          VISION_MIN_FILE_BYTES: "3000"
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TableName
+        - S3CrudPolicy:
+            BucketName: !Ref TempAudioBucket
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
+                - bedrock:RetrieveAndGenerate
+                - bedrock:Retrieve
+                - bedrock-agent:Retrieve
+                - bedrock-agent:RetrieveAndGenerate
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - polly:SynthesizeSpeech
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus/whatsapp/*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus-whatsapp-*
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt BetaMessageQueue.Arn
+            BatchSize: 1
+
+  # ============================================================================
+  # Lambda: Voice Processor (Amazon Transcribe)
+  # ============================================================================
+  VoiceProcessor:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-voice-${Environment}
+      CodeUri: src/voice/
+      Handler: processor.lambda_handler
+      Description: Process WhatsApp voice notes using Amazon Transcribe
+      Timeout: 120
+      Layers:
+        - !Ref CommonLayer
+      Environment:
+        Variables:
+          TEMP_AUDIO_BUCKET: !Ref TempAudioBucket
+          QUEUE_URL: !Ref MessageQueue
+          ACCESS_TOKEN_SECRET: agrinexus/whatsapp/access-token
+          PHONE_NUMBER_ID_SECRET: agrinexus/whatsapp/phone-number-id
+          VOICE_INPUT_MAX_BYTES: "5242880"
+          TRANSCRIBE_MAX_POLL_SEC: "105"
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TableName
+        - S3CrudPolicy:
+            BucketName: !Ref TempAudioBucket
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt MessageQueue.QueueName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - transcribe:StartTranscriptionJob
+                - transcribe:GetTranscriptionJob
+                - transcribe:DeleteTranscriptionJob
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus/whatsapp/*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus-whatsapp-*
+      Events:
+        VoiceQueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt VoiceQueue.Arn
+            BatchSize: 1  # Process one voice note at a time
+
+  # ============================================================================
+  # Lambda: DLQ Handler (Dialect-Aware Error Messages)
+  # ============================================================================
+  DLQHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-dlq-${Environment}
+      CodeUri: src/dlq/
+      Handler: handler.lambda_handler
+      Description: Handle failed messages with dialect-aware error responses
+      Layers:
+        - !Ref CommonLayer
+      Environment:
+        Variables:
+          ACCESS_TOKEN_SECRET: agrinexus/whatsapp/access-token
+          PHONE_NUMBER_ID_SECRET: agrinexus/whatsapp/phone-number-id
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TableName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus/whatsapp/*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus-whatsapp-*
+      Events:
+        DLQEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt MessageDLQ.Arn
+            BatchSize: 10
+
+  # ============================================================================
+  # Lambda: Weather Poller
+  # ============================================================================
+  WeatherPoller:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-weather-${Environment}
+      CodeUri: src/weather/
+      Handler: handler.lambda_handler
+      Description: Poll weather API and trigger nudge workflow
+      MemorySize: 256  # Reduced from 512MB - minimal processing, just DynamoDB scan + Step Functions trigger
+      Timeout: 60
+      Environment:
+        Variables:
+          STATE_MACHINE_ARN: !Ref NudgeStateMachine
+          MOCK_WEATHER: "false"
+          WEATHER_API_KEY_SECRET: agrinexus/weather/api-key
+          WEATHER_API_BASE: "https://api.openweathermap.org/data/2.5/weather"
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TableName
+        - StepFunctionsExecutionPolicy:
+            StateMachineName: !GetAtt NudgeStateMachine.Name
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus/weather/api-key-*
+      Events:
+        ScheduledPoll:
+          Type: Schedule
+          Properties:
+            Schedule: rate(6 hours)
+            Description: Poll weather every 6 hours
+            Enabled: true
+
+  # ============================================================================
+  # Lambda: Nudge Sender
+  # ============================================================================
+  NudgeSender:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-nudge-sender-${Environment}
+      CodeUri: src/nudge/
+      Handler: sender.lambda_handler
+      Description: Send behavioral nudges via WhatsApp
+      Timeout: 60
+      Layers:
+        - !Ref CommonLayer
+      Environment:
+        Variables:
+          REMINDER_LAMBDA_ARN: !GetAtt ReminderSender.Arn
+          SCHEDULER_ROLE_ARN: !GetAtt SchedulerRole.Arn
+          ACCESS_TOKEN_SECRET: agrinexus/whatsapp/access-token
+          PHONE_NUMBER_ID_SECRET: agrinexus/whatsapp/phone-number-id
+          NUDGE_TEMPLATE_NAME: weather_nudge_spray
+          USE_NUDGE_TEMPLATE: "true"
+          NUDGE_BEDROCK_LINER: "false"
+          NUDGE_LINER_MODEL_ID: anthropic.claude-3-haiku-20240307-v1:0
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TableName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource:
+                - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0'
+        - Statement:
+            - Effect: Allow
+              Action:
+                - scheduler:CreateSchedule
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - iam:PassRole
+              Resource: !GetAtt SchedulerRole.Arn
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus/whatsapp/*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus-whatsapp-*
+
+  # ============================================================================
+  # Lambda: Reminder Sender
+  # ============================================================================
+  ReminderSender:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-reminder-${Environment}
+      CodeUri: src/nudge/
+      Handler: reminder.lambda_handler
+      Description: Send T+24h and T+48h reminders
+      Layers:
+        - !Ref CommonLayer
+      Environment:
+        Variables:
+          ACCESS_TOKEN_SECRET: agrinexus/whatsapp/access-token
+          PHONE_NUMBER_ID_SECRET: agrinexus/whatsapp/phone-number-id
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TableName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus/whatsapp/*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus-whatsapp-*
+
+  # ============================================================================
+  # Lambda: Response Detector (DynamoDB Streams)
+  # ============================================================================
+  ResponseDetector:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub agrinexus-response-detector-${Environment}
+      CodeUri: src/nudge/
+      Handler: detector.lambda_handler
+      Description: Detect DONE/NOT YET responses and update nudge status
+      Layers:
+        - !Ref CommonLayer
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TableName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - scheduler:DeleteSchedule
+                - scheduler:GetSchedule
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - dynamodb:GetRecords
+                - dynamodb:GetShardIterator
+                - dynamodb:DescribeStream
+                - dynamodb:ListStreams
+              Resource: !Ref TableStreamArn
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource:
+                - !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus/whatsapp/*'
+
+  # ============================================================================
+  # SNS Topic for Alerts
+  # ============================================================================
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub agrinexus-alerts-${Environment}
+      DisplayName: AgriNexus System Alerts
+
+  # ============================================================================
+  # CloudWatch Alarm for Failed State Machine Executions
+  # ============================================================================
+  NudgeWorkflowFailureAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub agrinexus-nudge-workflow-failures-${Environment}
+      AlarmDescription: Alert when nudge workflow executions fail
+      MetricName: ExecutionsFailed
+      Namespace: AWS/States
+      Statistic: Sum
+      Period: 300  # 5 minutes
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: StateMachineArn
+          Value: !Ref NudgeStateMachine
+      AlarmActions:
+        - !Ref AlertTopic
+      TreatMissingData: notBreaching
+
+  # ============================================================================
+  # Step Functions: Nudge Workflow
+  # ============================================================================
+  NudgeStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Name: !Sub agrinexus-nudge-workflow-${Environment}
+      DefinitionUri: statemachine/nudge-workflow.asl.json
+      DefinitionSubstitutions:
+        NudgeSenderArn: !GetAtt NudgeSender.Arn
+        TableName: !Ref TableName
+        AlertTopicArn: !Ref AlertTopic
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref NudgeSender
+        - DynamoDBReadPolicy:
+            TableName: !Ref TableName
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt AlertTopic.TopicName
+
+  # ============================================================================
+  # IAM Role for EventBridge Scheduler
+  # ============================================================================
+  SchedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub AgriNexus-Scheduler-Role-${Environment}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeLambda
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt ReminderSender.Arn
+
+  # ============================================================================
+  # DynamoDB Stream Event Source Mapping for Response Detector
+  # Note: Requires DynamoDB table from Week 1 to have Streams enabled
+  # ============================================================================
+  ResponseDetectorEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !Ref TableStreamArn
+      FunctionName: !GetAtt ResponseDetector.Arn
+      StartingPosition: LATEST
+      BatchSize: 100
+      MaximumBatchingWindowInSeconds: 10
+
+  # ============================================================================
+  # Cost Monitoring: Budget Alert
+  # ============================================================================
+  CostAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub agrinexus-high-cost-${Environment}
+      AlarmDescription: Alert when daily estimated charges exceed threshold
+      MetricName: EstimatedCharges
+      Namespace: AWS/Billing
+      Statistic: Maximum
+      Period: 86400  # 24 hours
+      EvaluationPeriods: 1
+      Threshold: 20  # Alert if daily cost >= $20
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: Currency
+          Value: USD
+      AlarmActions:
+        - !Ref AlertTopic
+      TreatMissingData: notBreaching
+
+  # --------------------------------------------------------------------------
+  # Lambda + SQS alarms (credibility: catch silent failures / stuck queues)
+  # See docs/operations/RUNBOOK-ALERTS.md
+  # --------------------------------------------------------------------------
+  ProcessorErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub agrinexus-processor-errors-${Environment}
+      AlarmDescription: MessageProcessor Lambda error count
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub agrinexus-processor-${Environment}
+      AlarmActions:
+        - !Ref AlertTopic
+
+  WebhookErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub agrinexus-webhook-errors-${Environment}
+      AlarmDescription: WebhookHandler Lambda error count
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub agrinexus-webhook-${Environment}
+      AlarmActions:
+        - !Ref AlertTopic
+
+  WebChatErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub agrinexus-web-chat-errors-${Environment}
+      AlarmDescription: WebChatHandler Lambda error count
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub agrinexus-web-chat-${Environment}
+      AlarmActions:
+        - !Ref AlertTopic
+
+  VoiceProcessorErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub agrinexus-voice-errors-${Environment}
+      AlarmDescription: VoiceProcessor Lambda error count
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub agrinexus-voice-${Environment}
+      AlarmActions:
+        - !Ref AlertTopic
+
+  MessageQueueBacklogAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub agrinexus-messages-queue-age-${Environment}
+      AlarmDescription: Main FIFO queue oldest message age (stuck pipeline)
+      Namespace: AWS/SQS
+      MetricName: ApproximateAgeOfOldestMessage
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 300
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt MessageQueue.QueueName
+      AlarmActions:
+        - !Ref AlertTopic
+
+  MessageDLQDepthAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub agrinexus-messages-dlq-depth-${Environment}
+      AlarmDescription: Messages landed on processor DLQ (after retries)
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt MessageDLQ.QueueName
+      AlarmActions:
+        - !Ref AlertTopic
+
+Outputs:
+  WebhookUrl:
+    Description: WhatsApp webhook URL
+    Value: !Sub https://${WhatsAppApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/webhook
+
+  WebChatApiUrl:
+    Description: Web chat API endpoint (for public demo)
+    Value: !Sub https://${WebChatApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/chat
+
+  WebChatHealthUrl:
+    Description: Health endpoint (liveness check)
+    Value: !Sub https://${WebChatApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/health
+
+  MessageQueueUrl:
+    Description: SQS queue URL for message processing
+    Value: !Ref MessageQueue
+
+  VoiceQueueUrl:
+    Description: SQS queue URL for voice processing
+    Value: !Ref VoiceQueue
+
+  TempAudioBucketName:
+    Description: S3 bucket for temporary audio storage
+    Value: !Ref TempAudioBucket
+
+  NudgeStateMachineArn:
+    Description: Step Functions state machine ARN
+    Value: !Ref NudgeStateMachine
+
+  AlertTopicArn:
+    Description: SNS topic ARN for system alerts
+    Value: !Ref AlertTopic
