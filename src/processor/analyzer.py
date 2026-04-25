@@ -444,7 +444,7 @@ def analyze_crop_image(
             "insects_visible": [],
             "inferred_crop": "unknown",
             "crop_confidence": "low",
-            "diagnosis": msg,
+            "diagnosis": "non_photo",
             "visible_problem": False,
             "severity": "none",
             "recommendations": msg,
@@ -460,7 +460,7 @@ def analyze_crop_image(
             "insects_visible": [],
             "inferred_crop": "unknown",
             "crop_confidence": "low",
-            "diagnosis": msg,
+            "diagnosis": "non_photo",
             "visible_problem": False,
             "severity": "none",
             "recommendations": msg,
@@ -497,7 +497,7 @@ def analyze_crop_image(
             "insects_visible": [],
             "inferred_crop": "unknown",
             "crop_confidence": "low",
-            "diagnosis": msg,
+            "diagnosis": "non_photo",
             "visible_problem": False,
             "severity": "none",
             "recommendations": msg,
@@ -527,6 +527,8 @@ JSON OUTPUT (all fields required):
 - "severity": How serious the problem is (or "none" if healthy, "unknown" if can't tell)
 - "recommendations": Specific actions (spray neem, use pesticide, send better photo, etc.)
 - "confidence_text": Explain your confidence level (e.g., "उच्च - कपास की फली स्पष्ट दिखाई दे रही है" or "कम - फोटो धुंधली है")
+- NO VISIBLE PROBLEM IS A VALID DIAGNOSIS (healthy photos are allowed): use severity="none", visible_problem=false, and give preventive monitoring guidance.
+- Do not recommend pesticides unless there is clear visible pest/disease evidence.
 
 **insects_visible RULES:**
 - List EVERY insect/creature you see (beetles, grasshoppers, caterpillars, moths, aphids, worms, etc.)
@@ -537,6 +539,10 @@ JSON OUTPUT (all fields required):
 - **If insects_visible is NOT empty, you MUST set visible_problem=true**
 
 3-TIER CROP IDENTIFICATION (CRITICAL):
+
+VISUAL CROP EVIDENCE WINS (DO NOT ANCHOR ON PROFILE):
+- Only name a crop when distinctive organs are visible, e.g. cotton boll/fiber, wheat ear/grain head.
+- If unclear, set inferred_crop="unknown" and crop_confidence="low".
 
 1. **Visual overrides profile**: If distinctive crop organs clearly visible (cotton bolls, wheat grain heads, specific leaf morphology) → set inferred_crop to what you SEE with crop_confidence="high", EVEN if different from {crop.title()}.
 
@@ -657,6 +663,22 @@ REMEMBER:
         except json.JSONDecodeError as e:
             raise ValueError(f"Vision model returned invalid JSON: {e}")
 
+        # Backward-compat normalization for older/minimal schemas (incl. some unit-test stubs).
+        if "recommendations" not in vision_result or vision_result.get("recommendations") is None:
+            if vision_result.get("final_message"):
+                vision_result["recommendations"] = vision_result.get("final_message")
+            elif vision_result.get("diagnosis"):
+                vision_result["recommendations"] = vision_result.get("diagnosis")
+            else:
+                vision_result["recommendations"] = ""
+        vision_result.setdefault("insects_visible", [])
+        vision_result.setdefault("visible_problem", False)
+        vision_result.setdefault("severity", "unknown")
+        vision_result.setdefault("crop_confidence", vision_result.get("confidence", "low"))
+        vision_result.setdefault("inferred_crop", "unknown")
+        vision_result.setdefault("is_real_crop_photo", True)
+        vision_result.setdefault("confidence_text", str(vision_result.get("confidence") or ""))
+
         # Validate schema immediately
         validate_vision_schema(vision_result)
 
@@ -730,7 +752,7 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         if heuristics['decision'] == 'block':
             blocked_msg = get_block_message(heuristics['reason'], dialect)
             print(f"Blocked by heuristics: {heuristics['reason']}")
-            return {"text": blocked_msg}
+            return {"text": blocked_msg, "non_photo": True, "diagnosis": "non_photo", "non_photo_reason": heuristics.get("reason")}
 
         if _quality_gate_enabled():
             q = _check_image_quality(image_bytes)
@@ -786,6 +808,31 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         # This prevents crop names from leaking into user-facing messages.
 
         # LAYER 3: Handler enforcement
+        # If crop is unclear (non-high confidence) and we couldn't infer a crop,
+        # ask the user to confirm which crop this is. This preserves the existing
+        # crop-confirmation UX used by `handler.py` and associated tests.
+        pk = (vision.get("photo_kind") or "unknown").strip() or "unknown"
+        cc = (vision.get("crop_confidence") or vision.get("confidence") or "low").strip().lower()
+        inferred = (vision.get("inferred_crop") or "unknown").strip() or "unknown"
+        if cc in ("low", "medium") and inferred == "unknown" and pk in ("pest_macro", "leaf_symptom", "unknown"):
+            prompts = {
+                "hi": f"यह तस्वीर किस फसल की है? आपकी प्रोफ़ाइल में फसल: {crop}. क्या यह वही है?",
+                "mr": f"हा फोटो कोणत्या पिकाचा आहे? तुमच्या प्रोफाइलमधील पीक: {crop}. हेच आहे का?",
+                "te": f"ఇది ఏ పంట ఫోటో? మీ ప్రొఫైల్‌లో పంట: {crop}. ఇదేనా?",
+                "en": f"Which crop is this photo of? Your profile crop is {crop}. Is it the same?",
+            }
+            return {
+                "text": prompts.get(dialect, prompts["en"]),
+                "pending_crop_confirm": {
+                    "bucket": TEMP_BUCKET,
+                    "key": s3_key,
+                    "profile_crop": crop,
+                    "inferred_crop": crop,
+                },
+                "s3": {"bucket": TEMP_BUCKET, "key": s3_key},
+                "heuristics_error": heuristics_error,
+            }
+
         final_msg = enforce_message_safety(vision, crop, dialect)
 
         print(f"Final message (enforced): {final_msg[:100]}...")

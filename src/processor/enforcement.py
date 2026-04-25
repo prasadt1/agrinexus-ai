@@ -7,6 +7,27 @@ from typing import Dict, Any
 from messages import get_safe_retake_message, get_block_message, get_safe_structured_template
 
 
+def _localize_severity(severity: str, dialect: str) -> str:
+    """
+    Convert model enum severity (high/medium/low/none/unknown) into user-facing localized text.
+    Keep enums out of farmer-facing text to avoid language mixing.
+    """
+    sev = (severity or "unknown").strip().lower() or "unknown"
+    if sev not in ("high", "medium", "low", "none", "unknown"):
+        sev = "unknown"
+
+    mapping = {
+        "hi": {"high": "उच्च", "medium": "मध्यम", "low": "कम", "none": "कोई नहीं", "unknown": "अज्ञात"},
+        "mr": {"high": "उच्च", "medium": "मध्यम", "low": "कमी", "none": "नाही", "unknown": "अज्ञात"},
+        "te": {"high": "ఎక్కువ", "medium": "మధ్యమ", "low": "తక్కువ", "none": "లేదు", "unknown": "తెలియదు"},
+        "en": {"high": "High", "medium": "Medium", "low": "Low", "none": "None", "unknown": "Unknown"},
+    }
+    lang = (dialect or "en").strip().lower() or "en"
+    if lang not in mapping:
+        lang = "en"
+    return mapping[lang][sev]
+
+
 def _format_structured_output(
     diagnosis: str,
     severity: str,
@@ -23,37 +44,40 @@ def _format_structured_output(
     **सिफ़ारिशें (Recommendations):** [what to do]
     **विश्वास (Confidence):** [confidence level + why]
     """
+    # WhatsApp uses single-asterisk for bold: *text*.
+    # Avoid markdown "**" which can show up as stray "*" in WhatsApp clients.
     section_labels = {
         'hi': {
-            'diagnosis': '**निदान (Diagnosis):**',
-            'severity': '**गंभीरता (Severity):**',
-            'recommendations': '**सिफ़ारिशें (Recommendations):**',
-            'confidence': '**विश्वास (Confidence):**'
+            'diagnosis': '*निदान (Diagnosis):*',
+            'severity': '*गंभीरता (Severity):*',
+            'recommendations': '*सिफ़ारिशें (Recommendations):*',
+            'confidence': '*विश्वास (Confidence):*'
         },
         'mr': {
-            'diagnosis': '**निदान (Diagnosis):**',
-            'severity': '**गंभीरता (Severity):**',
-            'recommendations': '**सिफ़ारिशें (Recommendations):**',
-            'confidence': '**विश्वास (Confidence):**'
+            'diagnosis': '*निदान (Diagnosis):*',
+            'severity': '*गंभीरता (Severity):*',
+            'recommendations': '*सिफ़ारिशें (Recommendations):*',
+            'confidence': '*विश्वास (Confidence):*'
         },
         'te': {
-            'diagnosis': '**నిర్ధారణ (Diagnosis):**',
-            'severity': '**తీవ్రత (Severity):**',
-            'recommendations': '**సిఫార్సులు (Recommendations):**',
-            'confidence': '**విశ్వాసం (Confidence):**'
+            'diagnosis': '*నిర్ధారణ (Diagnosis):*',
+            'severity': '*తీవ్రత (Severity):*',
+            'recommendations': '*సిఫార్సులు (Recommendations):*',
+            'confidence': '*విశ్వాసం (Confidence):*'
         },
         'en': {
-            'diagnosis': '**Diagnosis:**',
-            'severity': '**Severity:**',
-            'recommendations': '**Recommendations:**',
-            'confidence': '**Confidence:**'
+            'diagnosis': '*Diagnosis:*',
+            'severity': '*Severity:*',
+            'recommendations': '*Recommendations:*',
+            'confidence': '*Confidence:*'
         }
     }
 
     labels = section_labels.get(dialect, section_labels['en'])
+    localized_severity = _localize_severity(severity, dialect)
 
     return f"""{labels['diagnosis']} {diagnosis}
-{labels['severity']} {severity}
+{labels['severity']} {localized_severity}
 {labels['recommendations']} {recommendations}
 {labels['confidence']} {confidence_text}"""
 
@@ -78,9 +102,10 @@ def enforce_message_safety(
     Returns:
         Structured 4-section message for WhatsApp
     """
-    is_real_crop = vision_result['is_real_crop_photo']
+    # Backward-compat: some unit tests and legacy paths stub minimal fields.
+    is_real_crop = vision_result.get('is_real_crop_photo', True)
     non_photo_reason = vision_result.get('non_photo_reason')
-    crop_confidence = vision_result['crop_confidence']
+    crop_confidence = (vision_result.get('crop_confidence') or vision_result.get('confidence') or "low")
     visible_problem = vision_result.get('visible_problem', False)
 
     # Gate 1: Non-crop → hard block
@@ -92,10 +117,10 @@ def enforce_message_safety(
         return get_safe_structured_template(dialect)
 
     # Gate 3: High confidence → format model's structured output
-    diagnosis = vision_result['diagnosis']
-    severity = vision_result['severity']
-    recommendations = vision_result['recommendations']
-    confidence_text = vision_result['confidence_text']
+    diagnosis = vision_result.get('diagnosis') or ""
+    severity = vision_result.get('severity') or "unknown"
+    recommendations = vision_result.get('recommendations') or vision_result.get('final_message') or ""
+    confidence_text = vision_result.get('confidence_text') or str(vision_result.get('confidence') or "")
 
     # Add hedge language if no visible problem (uncertainty about small pests)
     if not visible_problem:

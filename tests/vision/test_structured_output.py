@@ -25,14 +25,14 @@ def test_high_confidence_formats_4_sections():
     result = enforce_message_safety(vision_result, 'Cotton', 'hi')
 
     # Check all 4 sections present
-    assert '**निदान (Diagnosis):**' in result
-    assert '**गंभीरता (Severity):**' in result
-    assert '**सिफ़ारिशें (Recommendations):**' in result
-    assert '**विश्वास (Confidence):**' in result
+    assert '*निदान (Diagnosis):*' in result
+    assert '*गंभीरता (Severity):*' in result
+    assert '*सिफ़ारिशें (Recommendations):*' in result
+    assert '*विश्वास (Confidence):*' in result
 
     # Check content
     assert 'कपास की फली पर इल्ली दिखाई दे रही है' in result
-    assert 'high' in result
+    assert 'उच्च' in result
     assert 'नीम का तेल स्प्रे करें' in result
     assert 'उच्च - कपास की फली स्पष्ट दिखाई दे रही है' in result
 
@@ -52,10 +52,10 @@ def test_low_confidence_uses_structured_template():
     result = enforce_message_safety(vision_result, 'Cotton', 'hi')
 
     # Check all 4 sections present
-    assert '**निदान (Diagnosis):**' in result
-    assert '**गंभीरता (Severity):**' in result
-    assert '**सिफ़ारिशें (Recommendations):**' in result
-    assert '**विश्वास (Confidence):**' in result
+    assert '*निदान (Diagnosis):*' in result
+    assert '*गंभीरता (Severity):*' in result
+    assert '*सिफ़ारिशें (Recommendations):*' in result
+    assert '*विश्वास (Confidence):*' in result
 
     # Check safe template content
     assert 'पौधे की पहचान स्पष्ट नहीं है' in result
@@ -79,7 +79,7 @@ def test_medium_confidence_also_uses_structured_template():
     result = enforce_message_safety(vision_result, 'Wheat', 'hi')
 
     # Should get structured template (not model output)
-    assert '**निदान (Diagnosis):**' in result
+    assert '*निदान (Diagnosis):*' in result
     assert 'पौधे की पहचान स्पष्ट नहीं है' in result
 
 
@@ -112,10 +112,10 @@ def test_format_helper_english():
         dialect='en'
     )
 
-    assert '**Diagnosis:** Cotton bollworm visible on boll' in result
-    assert '**Severity:** high' in result
-    assert '**Recommendations:** Apply neem oil spray' in result
-    assert '**Confidence:** High - clear image of cotton boll' in result
+    assert '*Diagnosis:* Cotton bollworm visible on boll' in result
+    assert '*Severity:* High' in result
+    assert '*Recommendations:* Apply neem oil spray' in result
+    assert '*Confidence:* High - clear image of cotton boll' in result
 
 
 def test_template_all_dialects():
@@ -123,8 +123,8 @@ def test_template_all_dialects():
     for dialect in ['hi', 'mr', 'te', 'en']:
         template = get_safe_structured_template(dialect)
 
-        # All should have 4 sections (check for 4 occurrences of **)
-        assert template.count('**') >= 8  # 4 sections × 2 markers each
+        # All should have 4 sections (WhatsApp-style bold markers: single *)
+        assert template.count('*') >= 8  # 4 sections × 2 markers each
 
         # All should mention diagnosis/severity/recommendations/confidence concepts
         assert len(template) > 100  # Non-empty template

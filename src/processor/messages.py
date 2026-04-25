@@ -113,24 +113,24 @@ def get_safe_structured_template(dialect: str) -> str:
     **विश्वास (Confidence):** [why confidence is low]
     """
     templates = {
-        'hi': """**निदान (Diagnosis):** पौधे की पहचान स्पष्ट नहीं है
-**गंभीरता (Severity):** अज्ञात
-**सिफ़ारिशें (Recommendations):** कृपया प्रभावित पत्ती या हिस्से का करीब से स्पष्ट फोटो भेजें
-**विश्वास (Confidence):** कम - फोटो की गुणवत्ता या कोण के कारण स्पष्ट विश्लेषण नहीं कर सकते""",
+        'hi': """*निदान (Diagnosis):* पौधे की पहचान स्पष्ट नहीं है
+*गंभीरता (Severity):* अज्ञात
+*सिफ़ारिशें (Recommendations):* कृपया प्रभावित पत्ती या हिस्से का करीब से स्पष्ट फोटो भेजें
+*विश्वास (Confidence):* कम - फोटो की गुणवत्ता या कोण के कारण स्पष्ट विश्लेषण नहीं कर सकते""",
 
-        'mr': """**निदान (Diagnosis):** रोपाची ओळख स्पष्ट नाही
-**गंभीरता (Severity):** अज्ञात
-**सिफ़ारिशें (Recommendations):** कृपया प्रभावित पानाचा किंवा भागाचा जवळून स्पष्ट फोटो पाठवा
-**विश्वास (Confidence):** कम - फोटोची गुणवत्ता किंवा कोनामुळे स्पष्ट विश्लेषण करू शकत नाही""",
+        'mr': """*निदान (Diagnosis):* रोपाची ओळख स्पष्ट नाही
+*गंभीरता (Severity):* अज्ञात
+*सिफ़ारिशें (Recommendations):* कृपया प्रभावित पानाचा किंवा भागाचा जवळून स्पष्ट फोटो पाठवा
+*विश्वास (Confidence):* कम - फोटोची गुणवत्ता किंवा कोनामुळे स्पष्ट विश्लेषण करू शकत नाही""",
 
-        'te': """**నిర్ధారణ (Diagnosis):** మొక్క గుర్తింపు స్పష్టంగా లేదు
-**తీవ్రత (Severity):** తెలియదు
-**సిఫార్సులు (Recommendations):** దయచేసి ప్రభావిత ఆకు లేదా భాగం యొక్క దగ్గరి స్పష్ట ఫోటో పంపండి
-**విశ్వాసం (Confidence):** తక్కువ - ఫోటో నాణ్యత లేదా కోణం కారణంగా స్పష్ట విశ్లేషణ చేయలేము""",
+        'te': """*నిర్ధారణ (Diagnosis):* మొక్క గుర్తింపు స్పష్టంగా లేదు
+*తీవ్రత (Severity):* తెలియదు
+*సిఫార్సులు (Recommendations):* దయచేసి ప్రభావిత ఆకు లేదా భాగం యొక్క దగ్గరి స్పష్ట ఫోటో పంపండి
+*విశ్వాసం (Confidence):* తక్కువ - ఫోటో నాణ్యత లేదా కోణం కారణంగా స్పష్ట విశ్లేషణ చేయలేము""",
 
-        'en': """**Diagnosis:** Cannot identify the plant clearly
-**Severity:** Unknown
-**Recommendations:** Please send a closer, clearer photo of the affected leaf or part
-**Confidence:** Low - Cannot provide clear analysis due to photo quality or angle"""
+        'en': """*Diagnosis:* Cannot identify the plant clearly
+*Severity:* Unknown
+*Recommendations:* Please send a closer, clearer photo of the affected leaf or part
+*Confidence:* Low - Cannot provide clear analysis due to photo quality or angle"""
     }
     return templates.get(dialect, templates['en'])
