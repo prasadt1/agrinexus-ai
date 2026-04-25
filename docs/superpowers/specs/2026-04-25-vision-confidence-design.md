@@ -112,25 +112,27 @@ def run_heuristics(image_bytes: bytes) -> Dict[str, Any]:
 
 #### Detection Rules
 
-**Screenshot/UI (dark or light mode) - requires 2+ signals:**
-- High white (light mode): `white_pixel_ratio > 0.5`
-- High dark (dark mode): `dark_frac > 0.4` (bins 0-55 in grayscale histogram)
-- Sharp edges (UI elements/text): `edge_density > 0.18`
-- Limited palette (flat design): `palette_size < 60`
+**Screenshot/UI Detection** (matches existing `_looks_like_screenshot_or_ui()`):
 
-**Logo/icon - requires 2+ signals:**
-- Very limited palette: `palette_size < 30`
-- High white background: `white_pixel_ratio > 0.6`
-- Square-ish (weak signal): `0.85 < aspect_ratio < 1.15`
+Multiple rule combinations (OR logic - any match triggers block):
 
-**Document/PDF - requires all 3:**
-- Extremely high white: `white_pixel_ratio > 0.75`
-- Very sharp edges (text lines): `edge_density > 0.25`
-- Low palette (B&W): `palette_size < 40`
+1. **Light mode UI/docs**: `edge_frac > 0.16 AND white_frac > 0.18 AND black_frac > 0.008`
+2. **Very white screenshots**: `edge_frac > 0.22 AND white_frac > 0.28`
+3. **White-dominant articles**: `edge_frac > 0.14 AND white_frac > 0.55 AND green_frac < 0.03`
+4. **Dark-mode chat/app**: `black_frac > 0.22 AND edge_frac > 0.085`
+5. **Dark-mode IDE (compressed)**: `dark_frac > 0.30 AND edge_frac > 0.052 AND green_frac < 0.12`
+6. **GitHub dark repo tree**: `dark_frac > 0.24 AND edge_frac > 0.068 AND green_frac < 0.085 AND palette_size <= 140`
+7. **Heavily compressed dark UI**: `dark_frac > 0.72 AND edge_frac > 0.034 AND green_frac < 0.05 AND palette_size <= 110`
+8. **Small UI thumbnails**: `min(width, height) <= 320 AND green_frac < 0.12 AND (white_frac > 0.60 OR black_frac > 0.18)`
+9. **Flat UI (limited palette)**: `green_frac < 0.06 AND edge_frac > 0.09 AND palette_size <= 90`
 
-**Unusable image - hard rule:**
-- `width < 150` OR `height < 150` → too small
-- `file_size_kb < 3` → likely corrupt/placeholder
+**Logo/Illustration Detection** (matches existing `_looks_like_logo_or_illustration()`):
+
+- `white_frac >= 0.70 AND palette_size <= 180` → Logo/icon on white background
+
+**Unusable image:**
+- `width < 64` OR `height < 64` → too small
+- `file_size_kb < 3` → likely corrupt (optional check)
 
 **Pass criteria (default):**
 - None of the above block rules triggered → PASS to vision model
@@ -141,39 +143,63 @@ def run_heuristics(image_bytes: bytes) -> Dict[str, Any]:
 
 ```python
 def run_heuristics(image_bytes: bytes) -> Dict[str, Any]:
-    """Consolidates existing heuristic functions into unified detector"""
+    """
+    Consolidates existing _looks_like_screenshot_or_ui() and
+    _looks_like_logo_or_illustration() into unified detector.
+    """
 
     # Calculate all metrics once
     metrics = _calculate_image_metrics(image_bytes)
+    m = metrics  # shorthand
 
-    # Check unusable first (hard block)
-    if metrics['width'] < 150 or metrics['height'] < 150 or metrics['file_size_kb'] < 3:
+    # Check unusable first
+    if m['width'] < 64 or m['height'] < 64:
         return {'decision': 'block', 'reason': 'too_small', 'metrics': metrics}
 
-    # Count UI signals (strongest pair: extreme white/dark + edge density)
-    ui_signals = 0
-    if metrics['white_pixel_ratio'] > 0.5: ui_signals += 1
-    if metrics['dark_frac'] > 0.4: ui_signals += 1
-    if metrics['edge_density'] > 0.18: ui_signals += 1
-    if metrics['palette_size'] < 60: ui_signals += 1
+    # Screenshot/UI detection (9 rules - matches existing implementation)
 
-    if ui_signals >= 2:
+    # Rule 1: Light mode UI/docs
+    if m['edge_frac'] > 0.16 and m['white_frac'] > 0.18 and m['black_frac'] > 0.008:
         return {'decision': 'block', 'reason': 'screenshot_ui', 'metrics': metrics}
 
-    # Check logo signals
-    logo_signals = 0
-    if metrics['palette_size'] < 30: logo_signals += 1
-    if metrics['white_pixel_ratio'] > 0.6: logo_signals += 1
-    if 0.85 < metrics['aspect_ratio'] < 1.15: logo_signals += 0.5  # weak signal
+    # Rule 2: Very white screenshots
+    if m['edge_frac'] > 0.22 and m['white_frac'] > 0.28:
+        return {'decision': 'block', 'reason': 'screenshot_ui', 'metrics': metrics}
 
-    if logo_signals >= 2:
+    # Rule 3: White-dominant articles (low green)
+    if m['edge_frac'] > 0.14 and m['white_frac'] > 0.55 and m['green_frac'] < 0.03:
+        return {'decision': 'block', 'reason': 'screenshot_ui', 'metrics': metrics}
+
+    # Rule 4: Dark-mode chat/app
+    if m['black_frac'] > 0.22 and m['edge_frac'] > 0.085:
+        return {'decision': 'block', 'reason': 'screenshot_ui', 'metrics': metrics}
+
+    # Rule 5: Dark-mode IDE (GitHub, VS Code compressed)
+    if m['dark_frac'] > 0.30 and m['edge_frac'] > 0.052 and m['green_frac'] < 0.12:
+        return {'decision': 'block', 'reason': 'screenshot_ui', 'metrics': metrics}
+
+    # Rule 6: GitHub dark repo tree
+    if (m['dark_frac'] > 0.24 and m['edge_frac'] > 0.068 and
+        m['green_frac'] < 0.085 and m['palette_size'] <= 140):
+        return {'decision': 'block', 'reason': 'screenshot_ui', 'metrics': metrics}
+
+    # Rule 7: Heavily compressed dark UI
+    if (m['dark_frac'] > 0.72 and m['edge_frac'] > 0.034 and
+        m['green_frac'] < 0.05 and m['palette_size'] <= 110):
+        return {'decision': 'block', 'reason': 'screenshot_ui', 'metrics': metrics}
+
+    # Rule 8: Small UI thumbnails
+    if (min(m['width'], m['height']) <= 320 and m['green_frac'] < 0.12 and
+        (m['white_frac'] > 0.60 or m['black_frac'] > 0.18)):
+        return {'decision': 'block', 'reason': 'screenshot_ui', 'metrics': metrics}
+
+    # Rule 9: Flat UI (limited palette, low green)
+    if m['green_frac'] < 0.06 and m['edge_frac'] > 0.09 and m['palette_size'] <= 90:
+        return {'decision': 'block', 'reason': 'screenshot_ui', 'metrics': metrics}
+
+    # Logo/illustration detection
+    if m['white_frac'] >= 0.70 and m['palette_size'] <= 180:
         return {'decision': 'block', 'reason': 'logo', 'metrics': metrics}
-
-    # Check document (requires all 3)
-    if (metrics['white_pixel_ratio'] > 0.75 and
-        metrics['edge_density'] > 0.25 and
-        metrics['palette_size'] < 40):
-        return {'decision': 'block', 'reason': 'document', 'metrics': metrics}
 
     # Default: pass to vision model
     return {'decision': 'pass', 'reason': None, 'metrics': metrics}
@@ -181,48 +207,60 @@ def run_heuristics(image_bytes: bytes) -> Dict[str, Any]:
 
 def _calculate_image_metrics(image_bytes: bytes) -> Dict[str, Any]:
     """
-    Calculate all image metrics using PIL/Pillow.
+    Pillow-only metrics matching existing _looks_like_screenshot_or_ui() implementation.
+    No OpenCV/NumPy to keep Lambda cold starts fast.
 
     Returns metrics dict with all required fields for heuristic detection.
     """
-    from PIL import Image
+    from PIL import Image, ImageFilter
     import io
-    import numpy as np
 
-    # Load image
-    img = Image.open(io.BytesIO(image_bytes))
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     width, height = img.size
     file_size_kb = len(image_bytes) / 1024.0
     aspect_ratio = width / height if height > 0 else 1.0
 
-    # Convert to grayscale for histogram analysis
-    gray = img.convert('L')
-    hist = gray.histogram()
-    total_pixels = width * height
+    # Normalize size for stable thresholds (matches existing implementation)
+    target_w = 256
+    target_h = max(128, int(height * (target_w / float(width))))
+    small = img.resize((target_w, target_h))
+    gray = small.convert("L")
 
-    # Dark fraction: bins 0-55 in grayscale histogram (existing implementation)
-    dark_frac = sum(hist[0:56]) / total_pixels if total_pixels > 0 else 0
+    # Histogram-based metrics
+    hist = gray.histogram()  # 256 bins
+    total = float(sum(hist) or 1.0)
 
-    # White pixel ratio: luminance > 240
-    white_frac = sum(hist[241:256]) / total_pixels if total_pixels > 0 else 0
+    black_frac = sum(hist[0:20]) / total
+    dark_frac = sum(hist[0:56]) / total  # Dark grey UI (GitHub/VS Code dark)
+    white_frac = sum(hist[235:256]) / total
 
-    # Edge density using Canny edge detection
-    import cv2
-    img_array = np.array(gray)
-    edges = cv2.Canny(img_array, 50, 150)
-    edge_density = np.count_nonzero(edges) / total_pixels if total_pixels > 0 else 0
+    # Edge detection using Pillow's FIND_EDGES filter
+    edges = gray.filter(ImageFilter.FIND_EDGES)
+    ehist = edges.histogram()
+    edge_total = float(sum(ehist) or 1.0)
+    edge_frac = sum(ehist[40:256]) / edge_total  # Pixels with noticeable edge strength
 
-    # Palette size: quantize to 256 colors then count unique
-    img_rgb = img.convert('RGB')
-    img_small = img_rgb.resize((100, 100))  # Reduce size for speed
-    quantized = img_small.quantize(colors=256)
-    palette_size = len(set(quantized.getdata()))
+    # Green dominance: real crop photos have significant green pixels
+    s2 = img.resize((128, 128))
+    gp = list(s2.getdata())
+    green = 0
+    qcolors16 = set()
+
+    for r, g, b in gp:
+        if g > r + 18 and g > b + 18 and g > 60:
+            green += 1
+        qcolors16.add((r // 16, g // 16, b // 16))
+
+    green_frac = green / float(len(gp) or 1.0)
+    approx_unique_colors16 = len(qcolors16)
 
     return {
-        'white_pixel_ratio': white_frac,
+        'black_frac': black_frac,
         'dark_frac': dark_frac,
-        'edge_density': edge_density,
-        'palette_size': palette_size,
+        'white_frac': white_frac,
+        'edge_frac': edge_frac,
+        'green_frac': green_frac,
+        'palette_size': approx_unique_colors16,  # Approximate unique colors (quantized to 16-level)
         'aspect_ratio': aspect_ratio,
         'width': width,
         'height': height,
@@ -230,9 +268,9 @@ def _calculate_image_metrics(image_bytes: bytes) -> Dict[str, Any]:
     }
 ```
 
-**Dependencies:** Requires `pillow`, `opencv-python`, `numpy` (already in project dependencies).
+**Dependencies:** Pillow only (already in Lambda layer). No OpenCV/NumPy.
 
-**Performance:** Typical execution time <50ms on Lambda for images up to 5MB.
+**Performance:** ~30-40ms on Lambda for typical WhatsApp images after cold start.
 
 #### Example Decisions
 
@@ -532,6 +570,40 @@ REMEMBER:
 **Purpose:** Final safety layer that validates structured fields and **overrides or blocks** user-facing messages when they violate confidence rules.
 
 **Design Principle:** Handler is source of truth, not model prose. Structured fields control display logic; prose is untrusted input that must be validated.
+
+#### Integration with Existing Code
+
+**Current implementation** (`src/processor/analyzer.py`) already has:
+- `_normalize_vision_metadata(photo_kind, inferred_crop, crop_confidence)` - enforces `crop_confidence != "high" → inferred_crop="unknown"`
+- This handles **metadata normalization** but doesn't control the user-facing **message text**
+
+**New requirement** (this spec):
+- `enforce_message_safety(vision_result, profile_crop, dialect)` - enforces message-level safety
+- Returns the **actual text sent to WhatsApp**, blocking crop names when confidence != "high"
+
+**Integration path:**
+```python
+# In process_image_message() after vision model call:
+vision = analyze_crop_image(...)  # Returns JSON with 'recommendations' field
+
+# NEW: Validate schema (already added to spec)
+validate_vision_schema(vision)
+
+# EXISTING: Normalize metadata fields
+normalized = _normalize_vision_metadata(
+    vision.get('photo_kind', 'unknown'),
+    vision['inferred_crop'],
+    vision['crop_confidence']
+)
+
+# NEW: Enforce message-level safety (Option A - bulletproof)
+final_message = enforce_message_safety(vision, profile_crop, dialect)
+
+# Return final_message to WhatsApp (not vision['recommendations'] directly)
+return final_message
+```
+
+**Note:** `enforce_message_safety()` is **additive** - it doesn't replace `_normalize_vision_metadata()`, it adds message-level enforcement on top of metadata normalization.
 
 #### Handler Flow
 
