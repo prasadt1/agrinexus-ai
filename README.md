@@ -56,12 +56,12 @@ AgriNexus is a working system with full production observability — not a proto
 
 | Metric | Value |
 | --- | --- |
-| Test-to-code ratio | **64%** |
-| Infrastructure-as-Code resources (SAM) | **24** |
-| Architecture Decision Records (ADRs) | **8** |
-| EARS requirements traced to code | **100+** |
+| Test-to-code ratio | **64%** ([metrics](docs/IMPLEMENTATION-QUALITY-METRICS.md)) |
+| Infrastructure-as-Code resources (SAM) | **34** ([template.yaml](template.yaml)) |
+| Architecture Decision Records (ADRs) | **9** ([docs/adr/](docs/adr/)) |
+| EARS requirements traced to code | **144** ([docs/requirements.md](docs/requirements.md)) |
 | Lambda functions deployed | **9** |
-| CI/CD workflows | **2** (fast unit tests + optional AWS smoke) |
+| CI/CD workflows | **2** ([ci.yml](.github/workflows/ci.yml) + [aws-smoke.yml](.github/workflows/aws-smoke.yml)) |
 | Lines of Python | **~3,000** across 9 services |
 
 ### Live Production Metrics (rolling 7-day snapshot)
@@ -562,10 +562,17 @@ This project was developed using **Kiro AI**, which enabled requirements-driven 
 - [docs/testing/E2E-TEST-CHECKLIST.md](docs/testing/E2E-TEST-CHECKLIST.md) — pre-demo checklist (manual + automated smoke pointer)
 - [docs/E2E-TEST-GUIDE.md](docs/E2E-TEST-GUIDE.md) — end-to-end test walkthrough
 - [docs/CODE-WALKTHROUGH.md](docs/CODE-WALKTHROUGH.md) — component-by-component guide
+- [docs/IMPLEMENTATION-QUALITY-METRICS.md](docs/IMPLEMENTATION-QUALITY-METRICS.md) — test coverage, code quality, traceability
+- [docs/INFRASTRUCTURE-CAPACITY-ANALYSIS.md](docs/INFRASTRUCTURE-CAPACITY-ANALYSIS.md) — capacity planning, load testing, scaling
+- [docs/product/RAG-FLOW-EXPLAINED.md](docs/product/RAG-FLOW-EXPLAINED.md) — how the RAG pipeline works
+- [docs/product/NUDGE-BEHAVIOR-GUIDE.md](docs/product/NUDGE-BEHAVIOR-GUIDE.md) — nudge system behavior and templates
+- [docs/reports/VISION-RELIABILITY-REPORT.md](docs/reports/VISION-RELIABILITY-REPORT.md) — vision pipeline reliability analysis
+- [docs/finops-public.md](docs/finops-public.md) — cost modeling and FinOps breakdown
 - [data/fao-pdfs/README.md](data/fao-pdfs/README.md) — knowledge-base PDF sources, S3 sync, and **URL manifests / batch download** (`kb_url_manifest_*.csv`, `scripts/download_kb_from_manifest.py`)
-- [docs/requirements.md](docs/requirements.md) — EARS requirements specification
+- [docs/requirements.md](docs/requirements.md) — EARS requirements specification (144 requirements)
 - [docs/ISSUES-LOG.md](docs/ISSUES-LOG.md) — troubleshooting history (resolved issues)
 - [docs/competitive-evidence-notes.md](docs/competitive-evidence-notes.md) — competitive landscape analysis (public sources)
+- [docs/guides/INSTALL-PREREQUISITES.md](docs/guides/INSTALL-PREREQUISITES.md) — setup prerequisites (SAM, AWS CLI, Python)
 
 <details>
 <summary><strong>Maintainers (internal / non-public)</strong></summary>
