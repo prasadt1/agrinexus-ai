@@ -75,8 +75,10 @@
 |--------|-------------|---------|--------|----------|
 | Total Users | Registered farmers | 7 | 1,000 | ✅ DynamoDB |
 | Active Users | Used in last 7 days | 1 | 500 | ⚠️ Manual |
-| Messages/User | Avg messages per user | ~16/user | 10/user | ⚠️ Manual |
+| Messages/User | Avg messages per user (engagement KPI; **not** the webhook cap) | ~16/user | 10/user | ⚠️ Manual |
 | Retention Rate | Users active after 30d | Not tracked | 80% | 🛠️ Roadmap |
+
+> **Webhook vs engagement:** WhatsApp abuse protection is **25 messages/hour per user** (`RATE_LIMIT_MESSAGES` in `template.yaml` **Globals**). `src/webhook/handler.py` uses **10**/hour only when that env var is absent (e.g. some local tests). The `Messages/User` target above is a separate product metric.
 
 ### Message Volume
 
@@ -96,8 +98,11 @@
 | Function | Invocations/Week | Errors | Duration (p95) | Status |
 |----------|------------------|--------|----------------|--------|
 | Webhook | ~724 | 0 | <1s | ✅ Healthy |
+| Web Chat | ~50 | 0 | <2s | ✅ Healthy |
 | Processor | ~724 | 0 | <3s | ✅ Healthy |
+| Processor (beta) | Low | 0 | <3s | ✅ Healthy |
 | Voice | Low | 0 | <5s | ✅ Healthy |
+| Health | Low | 0 | <200ms | ✅ Healthy |
 | Weather Poller | 28 (4×/day) | 0 | <2s | ✅ Healthy |
 | Nudge Sender | ~4 | 0 | <2s | ✅ Healthy |
 | Reminder | Variable | 0 | <1s | ✅ Healthy |
@@ -167,7 +172,7 @@
 | Metric | Status | Details |
 |--------|--------|---------|
 | Signature Verification | ✅ Always On | Meta HMAC-SHA256, no bypass possible |
-| Rate Limiting | ✅ Active | 25 msgs/hour per user |
+| Rate Limiting | ✅ Active | 25 msgs/hour per user (WhatsApp webhook; SAM `Globals.Environment`) |
 | Allowlist Gating | ✅ Active | Nudges/voice gated |
 | PII Redaction | ✅ Active | All phone numbers redacted in logs |
 
@@ -312,11 +317,11 @@ For the full production evidence summary, see [README — Production Evidence](.
 
 Counted from `template.yaml` as **non-`String`** entries under `Resources`.
 
-**Total:** **31** resources
+**Total:** **32** resources
 
 Breakdown:
 
-- **10** `AWS::Serverless::Function`
+- **11** `AWS::Serverless::Function` (Webhook, Web Chat, Health, MessageProcessor, BetaMessageProcessor, Voice, Nudge, Reminder, ResponseDetector, Weather, DLQ)
 - **8** `AWS::CloudWatch::Alarm`
 - **3** `AWS::SQS::Queue`
 - **2** `AWS::Serverless::Api`

@@ -91,7 +91,7 @@ The architecture is a serverless system with pay-as-you-go Bedrock. Estimated co
 **Responsibilities**:
 - Receive incoming WhatsApp messages via webhook
 - Validate webhook signatures (Meta `X-Hub-Signature-256` + app secret)
-- **Per-user rate limiting** before enqueueing work: count recent **`MSG#*`** items in DynamoDB within a configurable window (default 25 messages/hour; see SAM template `RATE_LIMIT_*` env vars)
+- **Per-user rate limiting** before enqueueing work: count recent **`MSG#*`** items in DynamoDB within a configurable window. **`template.yaml`** sets **`RATE_LIMIT_MESSAGES`** to **25**/hour in **Globals**; `src/webhook/handler.py` falls back to **10**/hour only if that env var is unset (e.g. some local runs).
 - Extract message content (text, images, audio)
 - Route to appropriate processing Lambda
 - Send responses back to WhatsApp

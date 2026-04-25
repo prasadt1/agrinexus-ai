@@ -53,7 +53,7 @@
 - [Monitoring](#monitoring)
 - [Requirements Methodology: EARS](#requirements-methodology-ears)
 - [Productization Roadmap](#productization-roadmap)
-- [Partnerships & commercialization](#partnerships--commercialization)
+  - [Partnerships & commercialization](#partnerships--commercialization)
 - [Acknowledgments](#acknowledgments)
 - [Documentation](#documentation)
 - [License](#license)
@@ -163,7 +163,7 @@ Real numbers from the running production stack — not projections.
 | Control | Status | Evidence |
 | --- | --- | --- |
 | Meta HMAC-SHA256 signature verification | ✅ Always on | No bypass possible |
-| Per-user rate limiting | ✅ Active | 25 msgs/hour |
+| Per-user rate limiting | ✅ Active | **25**/hour WhatsApp (`RATE_LIMIT_MESSAGES` in `template.yaml` **Globals**; handler defaults to **10** only if env unset) |
 | PII redaction in logs | ✅ Active | Phone numbers shown as `491***` |
 | IAM least-privilege | ✅ Enforced | DynamoDB / S3 / Bedrock resource-scoped |
 | Encryption at rest | ✅ Active | DynamoDB default encryption |
@@ -407,8 +407,8 @@ For a deeper walkthrough, see [`docs/CODE-WALKTHROUGH.md`](docs/CODE-WALKTHROUGH
 7. **ResponseDetector**: Detects DONE/NOT YET responses via DynamoDB Streams
 8. **WeatherPoller**: Checks weather, triggers nudge workflow
 9. **DLQHandler**: Handles failed messages with dialect-aware errors
-10. **HealthHandler**: Simple liveness endpoint for API verification
-11. **BetaMessageProcessor**: Beta message processor (isolated from judges)
+10. **HealthHandler**: Simple liveness endpoint (`GET /health`) on the web-chat API — returns version + timestamp for uptime checks and judge-facing API verification
+11. **BetaMessageProcessor**: Same handler package as **MessageProcessor** but consumes **BetaMessageQueue**; the webhook routes numbers in **`BETA_PHONES`** (SAM parameter) here so experimental vision settings (e.g. quality gate / last-image TTL overrides in `template.yaml`) can be validated on allowlisted users without affecting the main **MessageProcessor** lane
 
 ### Data Flow
 
@@ -531,6 +531,17 @@ The roadmap isn't just "more nudges"—it's **smarter triggers + smarter follow-
 
 **Commercial licensing:** see [License](#license) — source available for review; commercial use via [prasad@prasadtilloo.com](mailto:prasad@prasadtilloo.com).
 
+### Partnerships & commercialization
+
+I designed AgriNexus to be deployed through partners (B2B2G2C / B2B2C): a cohort is onboarded once, farmers use WhatsApp with zero app install, and the system measures follow‑through (not just message delivery).
+
+- **Government / extension programs (B2G)**: district or block pilots with auditability (what advice was sent, when, and whether it was acted on), plus dashboards for program monitoring.
+- **Private partners (B2B2C)**: MFIs, agri‑input suppliers, and contract farming programs can embed the accountability loop into their farmer engagement, with co‑branded knowledge + nudges and outcome tracking.
+
+Example ecosystems: KVKs ([ICAR directory](https://icar.org.in/sites/default/files/inline-files/KVK-TELEPHONE-Directory-2020.pdf)), MFIs/NBFCs ([RBI registry](https://rbi.org.in/Scripts/BS_NBFCList.aspx)), mandi price signals ([eNAM](https://enam.gov.in/), [Agmarknet](https://www.enam.gov.in/web/dashboard/agmarknet)).
+
+For partnerships/licensing, contact: `prasad@prasadtilloo.com`.
+
 ## Troubleshooting
 
 ### Check Logs
@@ -622,17 +633,6 @@ This project was developed using **Kiro AI**, which enabled requirements-driven 
 - 144 EARS requirements in [docs/requirements.md](docs/requirements.md)
 - ~6,000 lines of Python across 11 Lambda functions
 - Full test coverage: voice, vision, RAG, nudges
-
-## Partnerships & commercialization
-
-I designed AgriNexus to be deployed through partners (B2B2G2C / B2B2C): a cohort is onboarded once, farmers use WhatsApp with zero app install, and the system measures follow‑through (not just message delivery).
-
-- **Government / extension programs (B2G)**: district or block pilots with auditability (what advice was sent, when, and whether it was acted on), plus dashboards for program monitoring.
-- **Private partners (B2B2C)**: MFIs, agri‑input suppliers, and contract farming programs can embed the accountability loop into their farmer engagement, with co‑branded knowledge + nudges and outcome tracking.
-
-Example ecosystems: KVKs ([ICAR directory](https://icar.org.in/sites/default/files/inline-files/KVK-TELEPHONE-Directory-2020.pdf)), MFIs/NBFCs ([RBI registry](https://rbi.org.in/Scripts/BS_NBFCList.aspx)), mandi price signals ([eNAM](https://enam.gov.in/), [Agmarknet](https://www.enam.gov.in/web/dashboard/agmarknet)).
-
-For partnerships/licensing, contact: `prasad@prasadtilloo.com`.
 
 ## Acknowledgments
 
