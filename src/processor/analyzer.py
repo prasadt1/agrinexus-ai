@@ -441,11 +441,14 @@ def analyze_crop_image(
         return {
             "is_real_crop_photo": False,
             "non_photo_reason": "screenshot",
+            "insects_visible": [],
             "inferred_crop": "unknown",
             "crop_confidence": "low",
+            "diagnosis": msg,
             "visible_problem": False,
             "severity": "none",
             "recommendations": msg,
+            "confidence_text": msg
         }
 
     image_bytes = _extract_primary_frame(image_bytes)
@@ -454,11 +457,14 @@ def analyze_crop_image(
         return {
             "is_real_crop_photo": False,
             "non_photo_reason": "screenshot",
+            "insects_visible": [],
             "inferred_crop": "unknown",
             "crop_confidence": "low",
+            "diagnosis": msg,
             "visible_problem": False,
             "severity": "none",
             "recommendations": msg,
+            "confidence_text": msg
         }
 
     # Detect image format from magic bytes
@@ -488,20 +494,19 @@ def analyze_crop_image(
         return {
             "is_real_crop_photo": False,
             "non_photo_reason": "logo",
+            "insects_visible": [],
             "inferred_crop": "unknown",
             "crop_confidence": "low",
+            "diagnosis": msg,
             "visible_problem": False,
             "severity": "none",
             "recommendations": msg,
+            "confidence_text": msg
         }
 
     prompt = f"""You are an agricultural extension agent helping smallholder farmers in India.
 
 **CRITICAL: Return ONLY valid JSON. No markdown code fences, no extra text. Raw JSON only.**
-
-PROFILE CONTEXT (farmer's registered crop, NOT visual evidence):
-- Registered crop: {crop.title()}
-- District: {district or "not specified"}
 
 JSON OUTPUT (all fields required):
 {{
@@ -510,10 +515,18 @@ JSON OUTPUT (all fields required):
     "insects_visible": ["beetle", "grasshopper", "caterpillar", "aphid", "moth"] | [],
     "inferred_crop": "Cotton" | "Wheat" | "Soybean" | "Rice" | "Sugarcane" | "Maize" | "unknown",
     "crop_confidence": "high" | "medium" | "low",
+    "diagnosis": "<1-2 sentences describing what you see in {language}>",
     "visible_problem": true | false,
     "severity": "high" | "medium" | "low" | "none" | "unknown",
-    "recommendations": "<2-4 sentences in {language}>"
+    "recommendations": "<specific actions to take in {language}>",
+    "confidence_text": "<why you are/aren't confident in {language}>"
 }}
+
+**STRUCTURED OUTPUT RULES:**
+- "diagnosis": What's wrong OR what you see (e.g., "कपास की फली पर इल्ली दिखाई दे रही है" or "पौधे की पहचान स्पष्ट नहीं")
+- "severity": How serious the problem is (or "none" if healthy, "unknown" if can't tell)
+- "recommendations": Specific actions (spray neem, use pesticide, send better photo, etc.)
+- "confidence_text": Explain your confidence level (e.g., "उच्च - कपास की फली स्पष्ट दिखाई दे रही है" or "कम - फोटो धुंधली है")
 
 **insects_visible RULES:**
 - List EVERY insect/creature you see (beetles, grasshoppers, caterpillars, moths, aphids, worms, etc.)
