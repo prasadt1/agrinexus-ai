@@ -618,7 +618,7 @@ REMEMBER:
         }
 
 
-def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any]) -> Any:
+def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any]) -> Dict[str, Any]:
     """
     3-layer defense with diagnostic logging.
     NEVER raise exceptions to webhook (breaks WhatsApp flow).
@@ -628,7 +628,7 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         user_profile: User profile from DynamoDB
 
     Returns:
-        Analysis text to send back to user
+        Dict with 'text' key (message for user) and optional metadata (s3, heuristics_error, etc.)
     """
     try:
         image_id = message['image']['id']
@@ -646,7 +646,7 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         except (urllib.error.HTTPError, urllib.error.URLError, KeyError) as e:
             print(f"Image download failed: {e}")
             from src.vision.messages import get_error_message
-            return get_error_message('download_failed', dialect)
+            return {"text": get_error_message('download_failed', dialect)}
 
         # LAYER 1: Heuristics gate (pre-flight check)
         heuristics_error = False
@@ -661,7 +661,7 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         if heuristics['decision'] == 'block':
             blocked_msg = get_block_message(heuristics['reason'], dialect)
             print(f"Blocked by heuristics: {heuristics['reason']}")
-            return blocked_msg
+            return {"text": blocked_msg}
 
         if _quality_gate_enabled():
             q = _check_image_quality(image_bytes)
@@ -699,12 +699,12 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
             # Schema validation failed or invalid JSON
             print(f"Vision model validation error: {e}")
             from src.vision.messages import get_error_message
-            return get_error_message('model_invalid_json', dialect)
+            return {"text": get_error_message('model_invalid_json', dialect)}
         except Exception as e:
             # Other model errors (timeout, rate limit, etc.)
             print(f"Vision model error: {e}")
             from src.vision.messages import get_error_message
-            return get_error_message('model_error', dialect)
+            return {"text": get_error_message('model_error', dialect)}
 
         # Schema already validated inside analyze_crop_image()
 
@@ -740,7 +740,11 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
 
         print(f"Vision analysis complete: {log_data}")
 
-        return {"text": final_msg, "s3": {"bucket": TEMP_BUCKET, "key": s3_key}}
+        return {
+            "text": final_msg,
+            "s3": {"bucket": TEMP_BUCKET, "key": s3_key},
+            "heuristics_error": heuristics_error
+        }
 
     except Exception as e:
         # Ultimate fallback: log and return generic error
@@ -750,4 +754,4 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
 
         dialect = user_profile.get('dialect', 'hi')
         from src.vision.messages import get_error_message
-        return get_error_message('unknown', dialect)
+        return {"text": get_error_message('unknown', dialect)}

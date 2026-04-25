@@ -27,6 +27,12 @@ def get_block_message(reason: str, dialect: str) -> str:
             'te': 'ఇది స్క్రీన్‌షాట్ లా కనిపిస్తోంది. దయచేసి పంట/ఆకు యొక్క నిజమైన ఫోటో పంపండి.',
             'en': 'This looks like a screenshot. Please send a real photo of the crop/leaf.'
         },
+        'screenshot_ui': {
+            'hi': 'यह स्क्रीनशॉट लगती है। कृपया फसल/पत्ती की असली फोटो भेजें।',
+            'mr': 'ही स्क्रीनशॉट दिसते. कृपया पिक/पानाची खरी फोटो पाठवा.',
+            'te': 'ఇది స్క్రీన్‌షాట్ లా కనిపిస్తోంది. దయచేసి పంట/ఆకు యొక్క నిజమైన ఫోటో పంపండి.',
+            'en': 'This looks like a screenshot. Please send a real photo of the crop/leaf.'
+        },
         'logo': {
             'hi': 'यह लोगो/ग्राफिक लगती है। कृपया पत्ती का क्लोज-अप भेजें।',
             'mr': 'ही लोगो/ग्राफिक दिसते. कृपया पानाचा क्लोज-अप पाठवा.',
