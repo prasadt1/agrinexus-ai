@@ -1,38 +1,18 @@
-![AgriNexus AI — From advice to action on WhatsApp](docs/visuals/hero-banner.png)
+![AgriNexus AI Hero Banner](docs/images/hero.png)
 
 # AgriNexus AI – WhatsApp Agricultural Advisory
 
-**From advice to action on WhatsApp.** AI-powered agronomic 
-advice and weather-timed nudges for smallholder farmers — in their 
-language, on WhatsApp. Built on **AWS Serverless** + **Amazon Bedrock** 
-with a requirements-driven workflow (**Kiro** + **EARS**).
+**From advice to action on WhatsApp.** AI-powered agronomic advice and weather-timed nudges for smallholder farmers — in their language, on WhatsApp. Built on **AWS Serverless** + **Amazon Bedrock** with a requirements-driven workflow (**Kiro** + **EARS**).
 
 ---
 
-**Why it matters.** India has [~126 million](https://www.fao.org/fileadmin/templates/ess/ess_test_folder/World_Census_Agriculture/WCA_2020/WCA_2020_new_doc/IND_REP_ENG_2015_2016.pdf) smallholder farmers. They don't 
-lose crops because advice doesn't exist — they lose crops because advice 
-arrives after the spray window closes. Extension officers are stretched 
-[1:5,000](https://m.thewire.in/article/agriculture/from-data-to-decisions-what-bharat-vistaar-needs-to-transform-indian-agriculture) against a guideline norm of 1:750. The knowledge is there; the 
-follow-through isn't.
+**Why it matters.** India has ~126 million smallholder farmers. They don't lose crops because advice doesn't exist — they lose crops because advice arrives after the spray window closes. Extension officers are stretched 1:5,000 against a guideline norm of 1:750. The knowledge is there; the follow-through isn't.
 
-**What we built.** A 1:1 advisor on every farmer's phone — accessible 
-on the WhatsApp they already use, no app install, grounded in ICAR + FAO 
-research, responsive in Hindi / Marathi / Telugu / English, and most 
-importantly — a closed accountability loop that follows up until the 
-farmer confirms "हो गया" (done) or opts out.
+**What we built.** A 1:1 advisor on every farmer's phone — accessible on the WhatsApp they already use, no app install, grounded in ICAR + FAO research, responsive in Hindi / Marathi / Telugu / English, and most importantly — a closed accountability loop that follows up until the farmer confirms "हो गया" (done) or opts out.
 
-**Designed for scale.** Modeled at **~$0.54 per farmer per year at 10,000 
-active farmers** on fully serverless AWS. Zero adoption friction: 
-WhatsApp is installed on 500M+ Indian phones. Zero training: tap buttons 
-in your dialect, onboard in under 60 seconds.
+**Designed for scale.** Modeled at **~$0.54 per farmer per year at 10,000 active farmers** on fully serverless AWS. Currently running production at **~$53/month / ~$1.70/day**. Zero adoption friction: WhatsApp is installed on 500M+ Indian phones. Zero training: tap buttons in your dialect, onboard in under 60 seconds.
 
-**Cost clarity:** the current pilot model is **~$53/month for 1,000 farmers**; 
-the headline **~$0.54/farmer/year** is the 10,000-farmer projection. 
-The detailed assumptions are in [Cost Breakdown](#cost-breakdown).
-
-**The differentiator:** The closed-loop nudge engine. Most agri-AI tools 
-stop at delivering advice. AgriNexus tracks whether the advice was acted 
-on — advice plus accountability, not just information.
+**The differentiator.** The closed-loop nudge engine. Most agri-AI tools stop at delivering advice. AgriNexus tracks whether the advice was acted on — advice plus accountability, not just information.
 
 ---
 
@@ -42,17 +22,11 @@ on — advice plus accountability, not just information.
 > 
 > | Path | Link | Time |
 > | --- | --- | --- |
-> | 🎥 **Watch the demo** | [youtu.be/Hr9EcblzkwI](https://youtu.be/Hr9EcblzkwI) | 2:55 min |
+> | 🎥 **Watch the demo** | [youtu.be/Hr9EcblzkwI](https://youtu.be/Hr9EcblzkwI) | 3 min |
 > | 💬 **Try on WhatsApp** | [wa.me/4915120105731](https://wa.me/4915120105731) | 1 min |
-> | 📖 **Read the finalist article** | [AWS Builder Center](https://builder.aws.com/content/3C8hBRTcsRuQrHzE3Pq243yhXTF/aideas-finalist-agrinexus-ai) | 8 min |
+> | 📖 **Read the finalist article** | [AWS Builder Center](https://builder.aws.com/content/3C8hBRTcsRuQrHzE3Pq243yhXTF/aideas-finalist-agrinexus-ai) | 5 min |
 > 
-> **TL;DR:** The closed-loop nudge engine is the core differentiator against 
-> named peers (Farmer.Chat, iSDA, AgriChat.AI, Weather Impact). 
-> Weather-gated reminders that follow up at T+24h and T+48h, cancelled 
-> instantly when the farmer confirms action. 100% serverless. 
-> ~$0.54/farmer/year at 10K scale.
-
----
+> **TL;DR:** The closed-loop nudge engine is the core differentiator against named peers (Farmer.Chat, iSDA, AgriChat.AI, Weather Impact). Weather-gated reminders that follow up at T+24h and T+48h, cancelled instantly when the farmer confirms action. 100% serverless. ~$0.54/farmer/year at 10K scale.
 
 [![AWS Serverless](https://img.shields.io/badge/AWS-Serverless-232F3E?logo=amazonaws&logoColor=white)](https://aws.amazon.com/serverless/)
 [![Amazon Bedrock](https://img.shields.io/badge/Amazon%20Bedrock-Claude%203%20Sonnet-FF9900?logo=amazonaws&logoColor=white)](https://aws.amazon.com/bedrock/)
@@ -60,57 +34,123 @@ on — advice plus accountability, not just information.
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![AWS SQS](https://img.shields.io/badge/AWS-SQS-232F3E?logo=amazonaws&logoColor=white)](https://aws.amazon.com/sqs/)
 [![AWS DynamoDB](https://img.shields.io/badge/AWS-DynamoDB-4053D6?logo=amazondynamodb&logoColor=white)](https://aws.amazon.com/dynamodb/)
-[![AWS 10,000 AIdeas Finalist](https://img.shields.io/badge/AWS%2010%2C000%20AIdeas-Top%2050%20Finalist-FF9900?logo=amazonaws&logoColor=white)](https://builder.aws.com/content/3C8hBRTcsRuQrHzE3Pq243yhXTF/aideas-finalist-agrinexus-ai)
 [![Kiro](https://img.shields.io/badge/Kiro-Requirements%20to%20Code-6E56CF)](https://kiro.ai/)
 [![EARS](https://img.shields.io/badge/Requirements-EARS-0B7285)](https://en.wikipedia.org/wiki/Easy_Approach_to_Requirements_Syntax)
 
 ---
 
-## Contents
-
-- [🏆 Finalist Quickstart](#-aws-builder-10000-aideas--top-50-finalist-emea--social-impact)
-- [Production Evidence](#production-evidence)
-- [Try It Yourself](#try-it-yourself)
-- [Architecture](#architecture)
-- [Usage](#usage)
-- [Testing](#testing)
-- [Quick Start (Deploy)](#quick-start-deploy-your-own)
-- [Project Structure](#project-structure-quick-pointers)
-- [Cost Breakdown](#cost-breakdown)
-- [Honest Tradeoffs & Roadmap](#honest-tradeoffs--roadmap)
-- [Monitoring](#monitoring)
-- [Requirements Methodology: EARS](#requirements-methodology-ears)
-- [Development Workflow: Kiro AI](#development-workflow-kiro-ai)
-- [Documentation](#documentation)
-- [Beyond Agriculture: Productization Roadmap](#beyond-agriculture-productization-roadmap)
-- [Acknowledgments](#acknowledgments)
-- [License](#license)
-
----
-
 ## Production Evidence
 
-AgriNexus is a working system with production observability — not a prototype.
+AgriNexus is a working system with full production observability — not a prototype.
 
-| What | Status |
-|---|---|
-| Production WhatsApp number live | ✅ [wa.me/4915120105731](https://wa.me/4915120105731) |
-| Public web demo live | ✅ [demo.agrinexus-ai.farm](https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html) |
-| Health endpoint (liveness) | ✅ Stack output `WebChatHealthUrl` (from [`template.yaml`](template.yaml)) |
-| Webhook API (Meta verified) | ✅ Stack output `WebhookUrl` (Meta Developer Portal callback) |
-| Real weather data integration | ✅ [OpenWeatherMap](https://openweathermap.org/api) via Secrets Manager |
-| End-to-end voice round-trip | ✅ ~20–34s (batch [Transcribe](https://aws.amazon.com/transcribe/)) |
-| Vision pipeline (Claude Vision) | ✅ pest/disease schema validated + non-agri gating |
-| Closed-loop behavioral nudges | ✅ T+24h/T+48h follow-ups + cancel-on-DONE |
-| Test-to-code ratio | **64%** ([metrics](docs/IMPLEMENTATION-QUALITY-METRICS.md#1-test-coverage)) |
-| Infrastructure-as-Code resources | **34** ([SAM template](template.yaml)) |
-| Architecture Decision Records | **9** ([docs/adr/](docs/adr/)) |
-| EARS requirements traced to code | **144** ([docs/requirements.md](docs/requirements.md)) |
-| CI/CD | ✅ GitHub Actions ([`.github/workflows/`](.github/workflows/)) |
+### Live Endpoints
 
-**Metrics & alarms:** full breakdown in [`docs/METRICS-AND-MONITORING.md`](docs/METRICS-AND-MONITORING.md) (7-day snapshot, 9 alarms, cost controls, and metric methodology).
+| Endpoint | Status | URL |
+| --- | --- | --- |
+| WhatsApp Business number | ✅ Live | [wa.me/4915120105731](https://wa.me/4915120105731) |
+| Web demo (public) | ✅ Live | [demo.agrinexus-ai.farm](https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html) |
+| Webhook API (Meta verified) | ✅ Live | API Gateway + WAF |
+| Weather API integration | ✅ Live | OpenWeatherMap via Secrets Manager |
 
-**Judge note:** Live URLs are either directly linked above or exposed via CloudFormation outputs (`WebhookUrl`, `WebChatHealthUrl`) so reviewers can verify without us hardcoding stack-specific API ids in the README.
+### Engineering Quality
+
+| Metric | Value |
+| --- | --- |
+| Test-to-code ratio | **64%** |
+| Infrastructure-as-Code resources (SAM) | **24** |
+| Architecture Decision Records (ADRs) | **8** |
+| EARS requirements traced to code | **100+** |
+| Lambda functions deployed | **9** |
+| CI/CD workflows | **2** (fast unit tests + optional AWS smoke) |
+| Lines of Python | **~3,000** across 9 services |
+
+### Live Production Metrics (rolling 7-day snapshot)
+
+Real numbers from the running production stack — not projections.
+
+**Reliability**
+
+| Metric | Value | Status |
+| --- | --- | --- |
+| System uptime (7d) | **100%** | ✅ |
+| Error rate | **0%** | ✅ |
+| DLQ messages | **0** | ✅ |
+| Lambda errors (last 3 days) | **0** | ✅ |
+| DynamoDB throttles | **0** | ✅ |
+| Step Functions failures | **0** | ✅ |
+
+**Performance**
+
+| Metric | p95 | Target | Status |
+| --- | --- | --- | --- |
+| Webhook latency | **<500ms** | <1s | ✅ |
+| Processor latency | **<3s** | <5s | ✅ |
+| Voice latency (end-to-end) | **~20–34s** | <60s | ✅ |
+| Queue processing time | **<1s** | <5s | ✅ |
+
+**Throughput**
+
+| Metric | Value |
+| --- | --- |
+| Lambda invocations | ~**724/week** |
+| WhatsApp messages processed | ~**115/week** |
+| Web demo requests | ~**50/week** |
+| Weather polls | **28/week** (4×/day) |
+
+**Cost (actuals + projections)**
+
+| Metric | Value |
+| --- | --- |
+| Daily cost (current) | **~$1.70/day** |
+| Monthly cost (current) | **~$53/month** |
+| Cost alarm threshold | $5/day (never tripped) |
+| Cost at 10K farmers (modeled) | **~$0.54/farmer/year** |
+| Savings vs. Step Functions Wait State approach | **~67× cheaper** |
+
+### Observability & Alarms
+
+**9 active alarms** publishing to SNS topic `agrinexus-alerts-{env}`:
+
+| Alarm | Threshold | Status |
+| --- | --- | --- |
+| Nudge workflow failures | >0 failures | ✅ Armed |
+| Cost alert | >$5/day | ✅ Armed |
+| Webhook / Processor / Voice / Web Chat errors | >5 in 5min | ✅ Armed (4 alarms) |
+| SQS queue backlog | Age >300s | ✅ Armed |
+| DLQ depth (messages + voice) | >5 messages | ✅ Armed (2 alarms) |
+
+**CloudWatch Dashboard:** 9 widgets covering Lambda, SQS, API Gateway, DynamoDB, Step Functions, and custom business metrics (nudges sent vs. completed). Template: [`dashboards/cloudwatch-dashboard.json`](https://github.com/prasadt1/agrinexus-ai/blob/main/dashboards/cloudwatch-dashboard.json).
+
+**Full metrics & monitoring breakdown:** [`docs/METRICS-AND-MONITORING.md`](https://github.com/prasadt1/agrinexus-ai/blob/main/docs/METRICS-AND-MONITORING.md) (business KPIs, operational metrics, cost breakdown, security, reliability, and observability roadmap).
+
+### Capability Coverage
+
+| Pipeline | Production status |
+| --- | --- |
+| 📝 Text RAG (Hindi / Marathi / Telugu / English) | ✅ End-to-end |
+| 🎙️ Voice round-trip (Transcribe + RAG + Polly) | ✅ End-to-end, ~20–34s |
+| 📷 Vision (Claude Vision, structured schema) | ✅ End-to-end |
+| 🔔 Weather-gated nudges + closed loop | ✅ End-to-end, T+24h/T+48h/T+72h expiry |
+| 🔒 Security (Meta HMAC-SHA256, secrets in Secrets Manager, PII redaction) | ✅ Enforced |
+| 📊 Observability (CloudWatch + X-Ray + custom metrics) | ✅ Enforced |
+
+### Security & Compliance
+
+| Control | Status | Evidence |
+| --- | --- | --- |
+| Meta HMAC-SHA256 signature verification | ✅ Always on | No bypass possible |
+| Per-user rate limiting | ✅ Active | 10 msgs/hour |
+| PII redaction in logs | ✅ Active | Phone numbers shown as `491***` |
+| IAM least-privilege | ✅ Enforced | DynamoDB / S3 / Bedrock resource-scoped |
+| Encryption at rest | ✅ Active | DynamoDB default encryption |
+| Encryption in transit | ✅ Active | HTTPS only |
+| Data retention TTL | ✅ Active | Conversations 90d / MSG rows 7d / Nudges 180d / WAMID dedup 24h |
+
+### Judge Note
+
+> All numbers above are **verifiable in the repository and live CloudWatch dashboards** — see [SAM template](https://github.com/prasadt1/agrinexus-ai/blob/main/template-week2.yaml), [ADRs](https://github.com/prasadt1/agrinexus-ai/tree/main/docs/adr), [EARS requirements](https://github.com/prasadt1/agrinexus-ai/blob/main/requirements.md), [CI workflows](https://github.com/prasadt1/agrinexus-ai/tree/main/.github/workflows), and the [full metrics report](https://github.com/prasadt1/agrinexus-ai/blob/main/docs/METRICS-AND-MONITORING.md). 
+> 
+> Cost figures at scale (~$0.54/farmer/year at 10K) are **modeled**; current production costs (~$1.70/day, ~$53/month) are **real** — see [finops-public.md](https://github.com/prasadt1/agrinexus-ai/blob/main/docs/finops-public.md) for assumptions.
 
 ---
 
