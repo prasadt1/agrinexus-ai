@@ -88,6 +88,12 @@ def _normalize_vision_metadata(photo_kind: str, inferred_crop: str, crop_confide
     if pk == "pest_macro":
         return {"photo_kind": pk, "inferred_crop": "unknown", "crop_confidence": "low"}
 
+    # Be conservative: only keep a specific crop label when confidence is truly high.
+    # This prevents "helpful guessing" (e.g. calling any vegetation "wheat") from leaking
+    # into user-facing text.
+    if cc != "high":
+        return {"photo_kind": pk, "inferred_crop": "unknown", "crop_confidence": cc}
+
     return {"photo_kind": pk, "inferred_crop": ic, "crop_confidence": cc}
 
 
@@ -562,6 +568,9 @@ VISUAL CROP EVIDENCE WINS:
 - Distinctive crop organs override profile context. If you clearly see **cotton boll/fiber** on a plant, set `inferred_crop="Cotton"` and `crop_confidence="high"` even if the registered crop is Wheat or another crop.
 - Do not call cotton lint/fiber, white boll lobes, flowers, pods, fruit, or bracts “insects” unless actual insects are clearly visible.
 - Only describe the crop as Wheat/cereal if you clearly see cereal plant structure (narrow blade leaves, cereal ear/head, stem/tillers). A cotton boll/fiber photo is never wheat.
+NO CROP GUESSING:
+- If you are not strongly confident about the crop from the visible plant structure, set `inferred_crop="unknown"` and `crop_confidence="low"`.
+- In `final_message`, do not name a specific crop unless `crop_confidence="high"`. Use generic wording (e.g., “पौधा/फसल”, “leaf/plant”) when uncertain.
 NO VISIBLE PROBLEM IS A VALID DIAGNOSIS:
 - If you can identify the crop/plant part but do **not** clearly see pests, disease spots, wilting, rot, nutrient stress, chewing, holes, or other damage, say that no clear pest/disease symptom is visible in this photo.
 - Do not recommend pesticides, fungicides, insecticides, or spray schedules unless an actual pest/disease/damage symptom is clearly visible.

@@ -314,3 +314,13 @@ def test_processor_high_confidence_visible_crop_bypasses_crop_prompt(monkeypatch
     assert "buttons" not in out
     assert "pending_crop_confirm" not in out
     assert "Cotton boll visible" in out["text"]
+
+
+def test_processor_non_high_crop_confidence_never_emits_specific_crop_label():
+    # Even if the model "guesses" a crop at low/medium confidence, we normalize it
+    # to unknown to avoid misleading statements like "this looks like wheat".
+    from src.processor import analyzer as a
+
+    norm = a._normalize_vision_metadata("field_view", "Wheat", "medium")
+    assert norm["inferred_crop"] == "unknown"
+    assert norm["crop_confidence"] == "medium"
