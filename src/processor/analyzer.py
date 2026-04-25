@@ -32,6 +32,7 @@ def validate_vision_schema(vision: Dict[str, Any]) -> None:
         'is_real_crop_photo',
         'inferred_crop',
         'crop_confidence',
+        'insects_visible',
         'visible_problem',
         'severity',
         'recommendations'
@@ -40,6 +41,10 @@ def validate_vision_schema(vision: Dict[str, Any]) -> None:
     missing = [f for f in required_fields if f not in vision or vision[f] is None]
     if missing:
         raise ValueError(f"Missing required fields: {missing}")
+
+    # Validate insects_visible is a list
+    if not isinstance(vision['insects_visible'], list):
+        raise ValueError(f"insects_visible must be a list, got: {type(vision['insects_visible'])}")
 
     # Validate enums
     if vision['crop_confidence'] not in ['high', 'medium', 'low']:
@@ -502,12 +507,21 @@ JSON OUTPUT (all fields required):
 {{
     "is_real_crop_photo": true | false,
     "non_photo_reason": "screenshot" | "logo" | "document" | "too_blurry" | null,
+    "insects_visible": ["beetle", "grasshopper", "caterpillar", "aphid", "moth"] | [],
     "inferred_crop": "Cotton" | "Wheat" | "Soybean" | "Rice" | "Sugarcane" | "Maize" | "unknown",
     "crop_confidence": "high" | "medium" | "low",
     "visible_problem": true | false,
     "severity": "high" | "medium" | "low" | "none" | "unknown",
     "recommendations": "<2-4 sentences in {language}>"
 }}
+
+**insects_visible RULES:**
+- List EVERY insect/creature you see (beetles, grasshoppers, caterpillars, moths, aphids, worms, etc.)
+- Even if tiny/small, LIST IT
+- If you see a beetle → add "beetle" to the list
+- If you see a grasshopper → add "grasshopper" to the list
+- If you see NOTHING → empty list []
+- **If insects_visible is NOT empty, you MUST set visible_problem=true**
 
 3-TIER CROP IDENTIFICATION (CRITICAL):
 
