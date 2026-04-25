@@ -631,14 +631,26 @@ The roadmap isn’t just “more nudges”—it’s **smarter triggers + smarter
 - **Personalization**: adapt frequency and wording based on farmer responses (DONE/NOT YET), past follow-through, and preferred time windows.
 - **Escalation logic**: if repeated “NOT YET” or no response, switch to a different ask (photo request, short checklist, or human extension escalation path).
 
+## Partnerships & commercialization (pilot-ready)
+
+I designed AgriNexus to be deployed through partners (B2B2G2C / B2B2C): a cohort is onboarded once, farmers use WhatsApp with zero app install, and the system measures follow‑through (not just message delivery).
+
+- **Government / extension programs (B2G)**: district or block pilots with auditability (what advice was sent, when, and whether it was acted on), plus dashboards for program monitoring.
+- **Private partners (B2B2C)**: MFIs, agri‑input suppliers, and contract farming programs can embed the accountability loop into their farmer engagement, with co‑branded knowledge + nudges and outcome tracking.
+
+Example ecosystems: KVKs ([ICAR directory](https://icar.org.in/sites/default/files/inline-files/KVK-TELEPHONE-Directory-2020.pdf)), MFIs/NBFCs ([RBI registry](https://rbi.org.in/Scripts/BS_NBFCList.aspx)), mandi price signals ([eNAM](https://enam.gov.in/), [Agmarknet](https://www.enam.gov.in/web/dashboard/agmarknet)).
+
+For partnerships/licensing, contact: `prasad@prasadtilloo.com`.
+
 ### Current Productization Thinking
 
 | Layer | Now | Next 6 months | Commercial model |
 |---|---|---|---|
-| Core nudge engine | AWS-serverless reference | Deploy-in-a-day SAM package | Per-seat / per-farmer licensing |
-| Knowledge base | FAO + ICAR + NFSM | State-specific corpus per partner | Partner content + co-branded |
-| Integration | WhatsApp Business | + IVR, + state agri apps | White-label for NGOs/KVKs |
-| Analytics | CloudWatch + custom metrics | Farmer cohort analytics | Per-partner dashboards |
+| Core accountability engine | Trigger → confirm → follow-up loop (AWS serverless) | Packaged “accountability loop” with drop-in triggers/copy | Per-seat / per-beneficiary licensing |
+| Triggers & intelligence | Weather-gated spray window rules | + Mandi/price signals, crop-stage signals, risk scoring, personalization | Per-signal / per-region add-ons |
+| Knowledge base | FAO + ICAR + NFSM | State-/partner-specific corpus per deployment | Partner content + co-branded |
+| Channels & integrations | WhatsApp Business | + IVR, + state agri apps, + SMS where needed | White-label for NGOs/KVKs |
+| Analytics & outcomes | CloudWatch + custom metrics | Cohort analytics + outcome dashboards (follow-through rates) | Per-partner dashboards |
 
 **Commercial licensing:** see [License](#license) — source available for review; commercial use via [prasad@prasadtilloo.com](mailto:prasad@prasadtilloo.com).
 
