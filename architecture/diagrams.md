@@ -180,7 +180,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart TB
-    EventBridge[EventBridge\nSchedule (rate: 6 hours)] --> Poll[Weather Poller\nLambda]
+    EventBridge["EventBridge\nSchedule (rate: 6 hours)"] --> Poll[Weather Poller\nLambda]
     Poll --> Check{Weather OK\nfor district?}
     Check -->|No| End1[End]
     Check -->|Yes| SF[Step Functions\nNudge Workflow]
