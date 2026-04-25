@@ -80,6 +80,10 @@ NUDGE-*-REPORT.md
 VISION-QUALITY-GATE-ANALYSIS.md
 README-GAP-ANALYSIS.md
 README-POLISH-COMPLETE.md
+docs/reports/VIBE-CODING-VISION-JOURNEY.md
+
+# Local editor/backup artifacts
+*.backup
 
 # Old/unused templates and configs
 template-simple.yaml
