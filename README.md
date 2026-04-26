@@ -73,6 +73,7 @@ AgriNexus is a working system with full production observability — not a proto
 | --- | --- | --- |
 | WhatsApp Business number | ✅ Live | [wa.me/4915120105731](https://wa.me/4915120105731) |
 | Web demo (public) | ✅ Live | [demo.agrinexus-ai.farm](https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html) |
+| Product site (owned landing page) | ✅ Live | [agrinexus-ai.farm](https://agrinexus-ai.farm/) |
 | Webhook API (Meta verified) | ✅ Live | API Gateway + WAF |
 | Health endpoint (liveness) | ✅ Live | [health](https://h4bt24ycdl.execute-api.us-east-1.amazonaws.com/dev/health) |
 | Weather API integration | ✅ Live | OpenWeatherMap via Secrets Manager |
@@ -540,6 +541,8 @@ I designed AgriNexus to be deployed through partners (B2B2G2C / B2B2C): a cohort
 - **Private partners (B2B2C)**: MFIs, agri‑input suppliers, and contract farming programs can embed the accountability loop into their farmer engagement, with co‑branded knowledge + nudges and outcome tracking.
 
 Example ecosystems: KVKs ([ICAR directory](https://icar.org.in/sites/default/files/inline-files/KVK-TELEPHONE-Directory-2020.pdf)), MFIs/NBFCs ([RBI registry](https://rbi.org.in/Scripts/BS_NBFCList.aspx)), mandi price signals ([eNAM](https://enam.gov.in/), [Agmarknet](https://www.enam.gov.in/web/dashboard/agmarknet)).
+
+Pilot enquiries: [agrinexus-ai.farm](https://agrinexus-ai.farm/) (email CTA routes to `pilot@prasadtilloo.com`).
 
 For partnerships/licensing, contact: `prasad@prasadtilloo.com`.
 
