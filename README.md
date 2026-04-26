@@ -50,13 +50,14 @@
 - [Quick Start (Deploy)](#quick-start-deploy-your-own)
 - [Cost Breakdown](#cost-breakdown)
 - [Honest Tradeoffs](#honest-tradeoffs)
-- [Monitoring](#monitoring)
 - [Requirements Methodology: EARS](#requirements-methodology-ears)
 - [Productization Roadmap](#productization-roadmap)
   - [Partnerships & commercialization](#partnerships--commercialization)
 - [Acknowledgments](#acknowledgments)
 - [Documentation](#documentation)
 - [License](#license)
+
+**Ops:** [Troubleshooting](#troubleshooting) · [Monitoring](#monitoring)
 
 ---
 
@@ -542,6 +543,47 @@ Example ecosystems: KVKs ([ICAR directory](https://icar.org.in/sites/default/fil
 
 For partnerships/licensing, contact: `prasad@prasadtilloo.com`.
 
+## Requirements Methodology: EARS
+
+This project uses **EARS (Easy Approach to Requirements Syntax)** for all functional requirements. EARS provides a structured, unambiguous way to write requirements using five patterns:
+
+1. **Ubiquitous**: The [System] shall [Response]
+2. **Event-driven**: When [Event], the [System] shall [Response]
+3. **State-driven**: While [State], the [System] shall [Response]
+4. **Optional**: Where [Feature], the [System] shall [Response]
+5. **Unwanted**: If [Condition], then the [System] shall [Response]
+
+**Example mapping:**
+
+```
+Requirement (EARS):
+REQ-NUDGE-008: When a farmer responds with DONE keywords
+(Hindi: "ho gaya"), the system shall mark the task as
+completed in DynamoDB and delete pending reminders.
+
+Implementation (src/nudge/detector.py):
+if is_done_response(message_text):
+    update_nudge_status(phone_number, 'DONE')
+    delete_scheduled_reminders()
+
+Test (tests/test_nudge_flow.py):
+def test_done_response_marks_complete():
+    send_message("हो गया")
+    assert get_nudge_status() == 'DONE'
+    assert get_scheduled_reminders() == []
+```
+
+See [docs/requirements.md](docs/requirements.md) for the complete EARS specification (144 requirements covering all features).
+
+## Development Workflow: Kiro AI
+
+This project was developed using **Kiro AI**, which enabled requirements-driven development from EARS specs through to deployed Lambda functions. Kiro's steering documents (`.kiro/specs/`) defined feature specs, implementation plans, and acceptance criteria—keeping requirements, code, and tests traceable throughout the 4-week build.
+
+**Key metrics:**
+- 144 EARS requirements in [docs/requirements.md](docs/requirements.md)
+- ~6,000 lines of Python across 11 Lambda functions
+- Full test coverage: voice, vision, RAG, nudges
+
 ## Troubleshooting
 
 ### Check Logs
@@ -592,47 +634,6 @@ Use the [CloudWatch console](https://console.aws.amazon.com/cloudwatch/) for Lam
 **Custom metrics** (application code, if enabled in your deployment): `AgriNexus/NudgesSent`, `AgriNexus/NudgesCompleted`. You can build a CloudWatch dashboard (e.g. `AgriNexus-Operations-dev`) on top of these and standard Lambda/SQS metrics.
 
 **Traffic visibility vs. browser analytics:** **Web demo** and **WhatsApp** traffic are understood through **AWS**—CloudWatch metrics and logs (API Gateway and `agrinexus-web-chat` for the public `/chat` path; webhook, processor, queues, and DLQ for WhatsApp), optional **WAF** metrics and sampled requests on `/chat`, and the nudge custom metrics above. The **[`dashboards/cloudwatch-dashboard.json`](dashboards/cloudwatch-dashboard.json)** template includes **web demo** API and Lambda widgets plus an on-dashboard pointer to **CloudWatch RUM** for optional **page-view** telemetry. **Optional RUM** (off by default) is configured in **`docs/web-demo/assets/rum-config.js`**; there is no third-party page analytics (e.g. Google Analytics). Details: **[docs/web-demo/README.md#traffic-visibility-vs-browser-analytics](docs/web-demo/README.md#traffic-visibility-vs-browser-analytics)**.
-
-## Requirements Methodology: EARS
-
-This project uses **EARS (Easy Approach to Requirements Syntax)** for all functional requirements. EARS provides a structured, unambiguous way to write requirements using five patterns:
-
-1. **Ubiquitous**: The [System] shall [Response]
-2. **Event-driven**: When [Event], the [System] shall [Response]
-3. **State-driven**: While [State], the [System] shall [Response]
-4. **Optional**: Where [Feature], the [System] shall [Response]
-5. **Unwanted**: If [Condition], then the [System] shall [Response]
-
-**Example mapping:**
-
-```
-Requirement (EARS):
-REQ-NUDGE-008: When a farmer responds with DONE keywords
-(Hindi: "ho gaya"), the system shall mark the task as
-completed in DynamoDB and delete pending reminders.
-
-Implementation (src/nudge/detector.py):
-if is_done_response(message_text):
-    update_nudge_status(phone_number, 'DONE')
-    delete_scheduled_reminders()
-
-Test (tests/test_nudge_flow.py):
-def test_done_response_marks_complete():
-    send_message("हो गया")
-    assert get_nudge_status() == 'DONE'
-    assert get_scheduled_reminders() == []
-```
-
-See [docs/requirements.md](docs/requirements.md) for the complete EARS specification (144 requirements covering all features).
-
-## Development Workflow: Kiro AI
-
-This project was developed using **Kiro AI**, which enabled requirements-driven development from EARS specs through to deployed Lambda functions. Kiro's steering documents (`.kiro/specs/`) defined feature specs, implementation plans, and acceptance criteria—keeping requirements, code, and tests traceable throughout the 4-week build.
-
-**Key metrics:**
-- 144 EARS requirements in [docs/requirements.md](docs/requirements.md)
-- ~6,000 lines of Python across 11 Lambda functions
-- Full test coverage: voice, vision, RAG, nudges
 
 ## Acknowledgments
 
