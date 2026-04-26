@@ -475,7 +475,7 @@ Weather Poller → Step Functions → Nudge Sender → WhatsApp
 
 The **$0.54** figure is **not** a separate measurement—it is **($450 × 12) ÷ 10,000** from the §8.2 projection in `docs/architecture.md`. **Minimal economies of scale** (~16% lower per farmer vs 1K) because **Bedrock / Transcribe / Polly** scale roughly with usage; **S3 Vectors** stays a small slice.
 
-**How to read this:** **~$53/mo @ 1K** and **~$450/mo @ 10K** are **modeled** from AWS-style usage assumptions (see architecture §8), **not** audited Cost Explorer totals. **Validate** with your account before publishing hard commitments.
+**Note:** **\~$53/mo @ 1K** and **\~$450/mo @ 10K** are **modeled** from AWS-published pricing and the usage assumptions in architecture §8 — not audited Cost Explorer totals. Actual costs will vary by region, traffic patterns, and Bedrock model pricing changes.
 
 **100x cheaper than commercial agricultural advisory services** ($5-10/farmer/month)
 
