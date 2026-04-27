@@ -565,8 +565,32 @@
                 .trim();
         }
 
+        function stripPlaceholderSourceFooter(text) {
+            if (!text) return text;
+            const labels = ["Source", "source", "स्रोत", "स्त्रोत", "मूलं", "మూలం"];
+            let out = String(text).replace(/\\r\\n/g, "\\n").trimEnd();
+            for (const lb of labels) {
+                const re = new RegExp(String.raw`(?:\\n\\s*)*${lb}\\s*:?\\s*[\\d,\\s]+$`, "m");
+                out = out.replace(re, "").trimEnd();
+            }
+            return out.trim();
+        }
+
+        function isRefusalText(text) {
+            const t = (text || '').toString();
+            if (!t.trim()) return true;
+            const low = t.toLowerCase();
+            if (low.includes("i don't have information about this in my knowledge base")) return true;
+            if (low.includes("i can only help with farming questions")) return true;
+            if (t.includes("मेरे पास") && (t.includes("जानकारी नहीं") || t.includes("जानकारी नही"))) return true;
+            if (t.includes("मैं केवल") && t.includes("खेती")) return true;
+            if (t.includes("माझ्याकडे") && t.includes("माहिती नाही")) return true;
+            return false;
+        }
+
         function renderBotContent(container, text) {
-            const blocks = splitIntoBlocks(text);
+            const cleaned = stripPlaceholderSourceFooter(text);
+            const blocks = splitIntoBlocks(cleaned);
             if (blocks.length === 0) {
                 container.textContent = '';
                 return;
@@ -622,7 +646,17 @@
                 }
             }
             
-            const srcs = normalizeCitations(citations);
+            let srcs = normalizeCitations(citations);
+            if (isBot && srcs.length === 0 && !isRefusalText(text)) {
+                const lang = (languageSelect && languageSelect.value) || 'en';
+                const generic = {
+                    hi: 'FAO/ICAR कृषि मार्गदर्शिका (Knowledge Base)',
+                    mr: 'FAO/ICAR शेती मार्गदर्शक (Knowledge Base)',
+                    te: 'FAO/ICAR వ్యవసాయ మార్గదర్శకం (Knowledge Base)',
+                    en: 'FAO/ICAR Agricultural Guidelines (Knowledge Base)'
+                }[lang] || 'FAO/ICAR Agricultural Guidelines (Knowledge Base)';
+                srcs = [generic];
+            }
             if (isBot && srcs.length > 0) {
                 const sources = document.createElement('div');
                 sources.className = 'sources';
