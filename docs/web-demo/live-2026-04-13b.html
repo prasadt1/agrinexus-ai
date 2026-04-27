@@ -212,6 +212,22 @@
             padding-top: 6px;
         }
 
+        .bot-para { margin: 0 0 10px; }
+        .bot-para:last-child { margin-bottom: 0; }
+        .bot-list { margin: 0 0 10px 18px; padding: 0; }
+        .bot-list:last-child { margin-bottom: 0; }
+        .bot-list li { margin: 6px 0; }
+        .sources {
+            margin-top: 10px;
+            border-top: 1px solid rgba(255,255,255,0.2);
+            padding-top: 8px;
+            font-size: 11px;
+            opacity: 0.92;
+        }
+        .sources-title { font-weight: 800; font-style: normal; opacity: 0.95; }
+        .sources ul { margin: 6px 0 0 18px; padding: 0; }
+        .sources li { margin: 4px 0; font-style: italic; }
+
         .typing-indicator { display: none; padding: 14px 18px; background: linear-gradient(135deg, #2D8B4E 0%, #1a5c32 100%); border-radius: 18px; width: 60px; }
         .typing-indicator.active { display: block; }
         .typing-indicator span { height: 8px; width: 8px; background: white; border-radius: 50%; display: inline-block; margin-right: 3px; animation: bounce 1.4s infinite ease-in-out both; }
@@ -479,20 +495,115 @@
             }
         }
 
-        function addMessage(text, isBot = false, citation = null) {
+        function normalizeCitations(citations) {
+            if (!Array.isArray(citations)) return [];
+            const cleaned = citations
+                .map(x => (typeof x === 'string' ? x.trim() : ''))
+                .filter(Boolean);
+            // Deduplicate while preserving order
+            const seen = new Set();
+            const out = [];
+            for (const c of cleaned) {
+                const key = c.toLowerCase();
+                if (seen.has(key)) continue;
+                seen.add(key);
+                out.push(c);
+            }
+            return out;
+        }
+
+        function splitIntoBlocks(text) {
+            const t = (text || '').replace(/\r\n/g, '\n').trim();
+            if (!t) return [];
+            // Split by blank lines
+            return t.split(/\n\s*\n+/g).map(b => b.trim()).filter(Boolean);
+        }
+
+        function isBulletLine(line) {
+            const s = line.trim();
+            if (!s) return false;
+            // •, -, *, or numbered lists
+            return /^([•\-*]\s+|\d+[\.)]\s+)/.test(s);
+        }
+
+        function bulletText(line) {
+            const s = line.trim();
+            return s
+                .replace(/^([•\-*]\s+)/, '')
+                .replace(/^\d+[\.)]\s+/, '')
+                .trim();
+        }
+
+        function renderBotContent(container, text) {
+            const blocks = splitIntoBlocks(text);
+            if (blocks.length === 0) {
+                container.textContent = '';
+                return;
+            }
+
+            for (const block of blocks) {
+                const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+                const bulletLines = lines.filter(isBulletLine);
+                const bulletRatio = lines.length ? (bulletLines.length / lines.length) : 0;
+                const looksLikeList = bulletRatio >= 0.6 && bulletLines.length >= 2;
+
+                if (looksLikeList) {
+                    const ul = document.createElement('ul');
+                    ul.className = 'bot-list';
+                    for (const line of lines) {
+                        if (!isBulletLine(line)) continue;
+                        const li = document.createElement('li');
+                        li.textContent = bulletText(line);
+                        ul.appendChild(li);
+                    }
+                    container.appendChild(ul);
+                } else {
+                    const p = document.createElement('p');
+                    p.className = 'bot-para';
+                    p.textContent = block;
+                    container.appendChild(p);
+                }
+            }
+        }
+
+        function addMessage(text, isBot = false, citations = null) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isBot ? 'bot' : 'user'}`;
 
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
 
-            contentDiv.textContent = text;
+            if (isBot) {
+                renderBotContent(contentDiv, text);
+            } else {
+                contentDiv.textContent = text;
+            }
 
-            if (citation && isBot) {
-                const citationDiv = document.createElement('div');
-                citationDiv.className = 'citation';
-                citationDiv.textContent = `📚 ${citation}`;
-                contentDiv.appendChild(citationDiv);
+            const srcs = normalizeCitations(citations);
+            if (isBot && srcs.length > 0) {
+                const sources = document.createElement('div');
+                sources.className = 'sources';
+
+                const title = document.createElement('div');
+                title.className = 'sources-title';
+                title.textContent = '📚 Sources';
+                sources.appendChild(title);
+
+                const ul = document.createElement('ul');
+                const maxShow = 5;
+                for (const c of srcs.slice(0, maxShow)) {
+                    const li = document.createElement('li');
+                    li.textContent = c;
+                    ul.appendChild(li);
+                }
+                if (srcs.length > maxShow) {
+                    const li = document.createElement('li');
+                    li.textContent = `… +${srcs.length - maxShow} more`;
+                    ul.appendChild(li);
+                }
+
+                sources.appendChild(ul);
+                contentDiv.appendChild(sources);
             }
 
             messageDiv.appendChild(contentDiv);
@@ -626,8 +737,8 @@
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
                 const data = await response.json();
-                const citation = data.citations && data.citations.length > 0 ? data.citations.join(', ') : null;
-                addMessage(data.reply, true, citation);
+                const citations = Array.isArray(data.citations) ? data.citations : [];
+                addMessage(data.reply, true, citations);
                 if (data.remaining !== undefined) updateRateLimit(data.remaining);
                 if (data.reset_at) persistRateLimitState(Number(data.remaining), Number(data.reset_at));
                 if (data.reset_at && Number(data.remaining) <= 0) persistLockout(Number(data.reset_at));
