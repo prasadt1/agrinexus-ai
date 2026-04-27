@@ -17,7 +17,7 @@ AgriNexus AI demonstrates **production-grade implementation quality** across tes
 | Total test functions | **205+** unit/integration tests |
 | IaC resources | **34** (SAM/CloudFormation) |
 | Lambda functions | **11** |
-| ADRs | **11** |
+| ADRs | **10** |
 | EARS requirements | **144** |
 | CI/CD workflows | **2** (GitHub Actions) |
 | CloudWatch alarms | **8** |
