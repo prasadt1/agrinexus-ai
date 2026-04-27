@@ -588,6 +588,16 @@
             return false;
         }
 
+        function sourcesTitleForLang(lang) {
+            const l = (lang || 'en').toString().toLowerCase();
+            return {
+                hi: '📚 स्रोत',
+                mr: '📚 स्त्रोत',
+                te: '📚 మూలం',
+                en: '📚 Sources',
+            }[l] || '📚 Sources';
+        }
+
         function renderBotContent(container, text) {
             const cleaned = stripPlaceholderSourceFooter(text);
             const blocks = splitIntoBlocks(cleaned);
@@ -663,7 +673,7 @@
 
                 const title = document.createElement('div');
                 title.className = 'sources-title';
-                title.textContent = '📚 Sources';
+                title.textContent = sourcesTitleForLang((languageSelect && languageSelect.value) || 'en');
                 sources.appendChild(title);
 
                 const ul = document.createElement('ul');
