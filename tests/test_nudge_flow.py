@@ -58,8 +58,8 @@ class FakeResponse:
 
 
 def test_has_pending_nudge_detects_sent_and_reminded(monkeypatch):
-    # Production logic evaluates "today" in IST.
-    today = (datetime.utcnow() + sender.timedelta(hours=5, minutes=30)).date().isoformat()
+    # Open-nudge gate is not date-scoped; it suppresses duplicates until DONE/EXPIRED.
+    today = (datetime.utcnow()).date().isoformat()
     fake_table = FakeTable()
     fake_table.items = [
         {"SK": f"NUDGE#{today}T00:00:00#spray", "status": "SENT"},
@@ -67,7 +67,7 @@ def test_has_pending_nudge_detects_sent_and_reminded(monkeypatch):
     ]
     monkeypatch.setattr(sender, "table", fake_table)
 
-    assert sender.has_pending_nudge("+919876543210", "spray") is True
+    assert sender.has_open_nudge("+919876543210", "spray") is True
 
 
 def test_nudge_sends_context_aware_message_and_template_fallback(monkeypatch):
@@ -90,10 +90,12 @@ def test_nudge_sends_context_aware_message_and_template_fallback(monkeypatch):
             "crop": "Wheat",
             "location": "Latur",
             "dialect": "mr",
+            "onboarding_complete": True,
+            "consent": True,
         }
     }
     monkeypatch.setattr(sender, "table", fake_table)
-    monkeypatch.setattr(sender, "has_pending_nudge", lambda *args, **kwargs: False)
+    monkeypatch.setattr(sender, "has_open_nudge", lambda *args, **kwargs: False)
 
     captured_buttons = {}
     captured_template = {}
@@ -126,6 +128,33 @@ def test_nudge_sends_context_aware_message_and_template_fallback(monkeypatch):
     sender.lambda_handler({"location": "Latur", "weather": {"wind_speed": 8.5}, "activity": "spray"}, None)
     assert captured_template.get("template_name") == "weather_nudge_spray"
     assert captured_template.get("language_code") == "mr"
+
+
+def test_nudge_sender_skips_when_no_consent(monkeypatch):
+    os.environ.setdefault("REMINDER_LAMBDA_ARN", "arn:aws:lambda:us-east-1:123:function:reminder")
+    os.environ.setdefault("SCHEDULER_ROLE_ARN", "arn:aws:iam::123:role/scheduler")
+
+    fake_table = FakeTable()
+    fake_table.query_response = {"Items": [{"phone_number": "+911", "dialect": "hi"}]}
+    fake_table.get_item_response = {
+        "Item": {
+            "crop": "Cotton",
+            "location": "Latur",
+            "dialect": "hi",
+            "onboarding_complete": True,
+            "consent": False,
+        }
+    }
+    monkeypatch.setattr(sender, "table", fake_table)
+    monkeypatch.setattr(sender, "has_open_nudge", lambda *args, **kwargs: False)
+    monkeypatch.setattr(sender, "send_whatsapp_buttons", lambda *args, **kwargs: True)
+    monkeypatch.setattr(sender, "send_whatsapp_message", lambda *args, **kwargs: None)
+    monkeypatch.setattr(sender, "create_reminder_schedule", lambda *args, **kwargs: None)
+    monkeypatch.setattr(sender, "create_expiry_schedule", lambda *args, **kwargs: None)
+
+    out = sender.lambda_handler({"location": "Latur", "weather": {"wind_speed": 8.5}, "activity": "spray"}, None)
+    assert out["nudges_sent"] == 0
+    assert out["nudges_skipped"] == 1
 
 
 def test_reminder_sender_updates_status(monkeypatch):

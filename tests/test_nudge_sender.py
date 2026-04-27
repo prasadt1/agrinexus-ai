@@ -98,80 +98,70 @@ class TestConvertFloats:
 
 
 # ---------------------------------------------------------------------------
-# has_pending_nudge
+# has_open_nudge
 # ---------------------------------------------------------------------------
 
-class TestHasPendingNudge:
-    def _today(self):
-        # Keep tests aligned with the production "today" definition in IST.
-        from datetime import datetime, timedelta
-        return (datetime.utcnow() + timedelta(hours=5, minutes=30)).date().isoformat()
-
+class TestHasOpenNudge:
     def test_no_pending(self, sender, monkeypatch):
         mock_table = types.SimpleNamespace(
             query=lambda **kw: {"Items": []}
         )
         monkeypatch.setattr(sender, "table", mock_table)
-        assert sender.has_pending_nudge("491234", "spray") is False
+        assert sender.has_open_nudge("491234", "spray") is False
 
     def test_has_sent_nudge(self, sender, monkeypatch):
-        today = self._today()
         mock_table = types.SimpleNamespace(
             query=lambda **kw: {"Items": [
-                {"SK": f"NUDGE#{today}T10:00:00#spray", "status": "SENT"}
+                {"SK": "NUDGE#2026-04-25T10:00:00#spray", "status": "SENT"}
             ]}
         )
         monkeypatch.setattr(sender, "table", mock_table)
-        assert sender.has_pending_nudge("491234", "spray") is True
+        assert sender.has_open_nudge("491234", "spray") is True
 
     def test_has_reminded_nudge(self, sender, monkeypatch):
-        today = self._today()
         mock_table = types.SimpleNamespace(
             query=lambda **kw: {"Items": [
-                {"SK": f"NUDGE#{today}T10:00:00#spray", "status": "REMINDED"}
+                {"SK": "NUDGE#2026-04-25T10:00:00#spray", "status": "REMINDED"}
             ]}
         )
         monkeypatch.setattr(sender, "table", mock_table)
-        assert sender.has_pending_nudge("491234", "spray") is True
+        assert sender.has_open_nudge("491234", "spray") is True
 
     def test_done_nudge_not_pending(self, sender, monkeypatch):
-        today = self._today()
         mock_table = types.SimpleNamespace(
             query=lambda **kw: {"Items": [
-                {"SK": f"NUDGE#{today}T10:00:00#spray", "status": "DONE"}
+                {"SK": "NUDGE#2026-04-25T10:00:00#spray", "status": "DONE"}
             ]}
         )
         monkeypatch.setattr(sender, "table", mock_table)
-        assert sender.has_pending_nudge("491234", "spray") is False
+        assert sender.has_open_nudge("491234", "spray") is False
 
     def test_expired_nudge_not_pending(self, sender, monkeypatch):
-        today = self._today()
         mock_table = types.SimpleNamespace(
             query=lambda **kw: {"Items": [
-                {"SK": f"NUDGE#{today}T10:00:00#spray", "status": "EXPIRED"}
+                {"SK": "NUDGE#2026-04-25T10:00:00#spray", "status": "EXPIRED"}
             ]}
         )
         monkeypatch.setattr(sender, "table", mock_table)
-        assert sender.has_pending_nudge("491234", "spray") is False
+        assert sender.has_open_nudge("491234", "spray") is False
 
     def test_different_activity_not_pending(self, sender, monkeypatch):
-        today = self._today()
         mock_table = types.SimpleNamespace(
             query=lambda **kw: {"Items": [
-                {"SK": f"NUDGE#{today}T10:00:00#irrigate", "status": "SENT"}
+                {"SK": "NUDGE#2026-04-25T10:00:00#irrigate", "status": "SENT"}
             ]}
         )
         monkeypatch.setattr(sender, "table", mock_table)
-        assert sender.has_pending_nudge("491234", "spray") is False
+        assert sender.has_open_nudge("491234", "spray") is False
 
-    def test_yesterday_nudge_not_pending(self, sender, monkeypatch):
+    def test_old_stale_nudge_does_not_block_forever(self, sender, monkeypatch):
         mock_table = types.SimpleNamespace(
             query=lambda **kw: {"Items": [
                 {"SK": "NUDGE#2020-01-01T10:00:00#spray", "status": "SENT"}
             ]}
         )
         monkeypatch.setattr(sender, "table", mock_table)
-        assert sender.has_pending_nudge("491234", "spray") is False
+        assert sender.has_open_nudge("491234", "spray") is False
 
 
 # ---------------------------------------------------------------------------

@@ -142,14 +142,16 @@ def emit_metric(name: str, value: float = 1.0):
         print(f"Failed to emit metric {name}: {e}")
 
 
-def has_pending_nudge(phone_number: str, activity: str) -> bool:
-    """Check if user has a pending nudge for this activity today"""
-    # "Today" for nudges is evaluated in IST to avoid a UTC-midnight edge case where
-    # a farmer can receive two nudges within minutes (same India morning).
-    ist_offset = timedelta(hours=5, minutes=30)
-    today_ist = (datetime.utcnow() + ist_offset).date().isoformat()
-    
-    # Query nudges for this user
+def has_open_nudge(phone_number: str, activity: str, max_age_hours: int = 96) -> bool:
+    """
+    Check if user already has an OPEN nudge for this activity (SENT/REMINDED).
+
+    Rationale:
+    - The closed-loop should use reminders (T+24/T+48) rather than sending a fresh
+      "new nudge" the next day for the same pending action.
+    - Demo users may not get follow-ups; max_age_hours prevents a permanent lock
+      in those cases (e.g. stale SENT rows).
+    """
     response = table.query(
         KeyConditionExpression='PK = :pk AND begins_with(SK, :sk)',
         ExpressionAttributeValues={
@@ -157,27 +159,34 @@ def has_pending_nudge(phone_number: str, activity: str) -> bool:
             ':sk': 'NUDGE#'
         }
     )
-    
-    # Check if any nudge is pending and from today
+
+    now = datetime.utcnow()
+    max_age = timedelta(hours=max_age_hours)
+
     for item in response.get('Items', []):
         nudge_id = item.get('SK', '').replace('NUDGE#', '')
-        # Convert the nudge timestamp (stored as UTC in SK) into IST-local date.
-        # SK format: "{utc_iso_timestamp}#{activity}"
-        nudge_date = ''
+        nudge_activity = nudge_id.split('#')[-1] if '#' in nudge_id else ''
+        status = item.get('status', 'SENT')
+
+        if nudge_activity != activity:
+            continue
+        if status not in ['SENT', 'REMINDED']:
+            continue
+
+        # Try to parse the UTC timestamp prefix: "{utc_iso}#{activity}"
         try:
             ts = nudge_id.split('#', 1)[0]
             if 'T' in ts:
-                nudge_date = (datetime.fromisoformat(ts) + ist_offset).date().isoformat()
+                created_at = datetime.fromisoformat(ts)
+                if (now - created_at) > max_age:
+                    continue
         except Exception:
-            nudge_date = nudge_id.split('T')[0] if 'T' in nudge_id else ''
-        nudge_activity = nudge_id.split('#')[-1] if '#' in nudge_id else ''
-        status = item.get('status', 'SENT')  # Default to SENT if not set
-        
-        # Check if it's today's nudge for this activity and still pending (SENT or REMINDED, not DONE)
-        if nudge_date == today_ist and nudge_activity == activity and status in ['SENT', 'REMINDED']:
-            print(f"Found existing pending {activity} nudge for {phone_number}: {nudge_id} (status: {status})")
-            return True
-    
+            # If parsing fails, be conservative: treat it as open and skip duplicates.
+            pass
+
+        print(f"Found existing open {activity} nudge for {phone_number}: {nudge_id} (status: {status})")
+        return True
+
     return False
 
 
@@ -212,15 +221,27 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             print(f"Skipping {phone_number} - not allowlisted for nudges")
             nudges_skipped += 1
             continue
-        
-        # Check if user already has a pending nudge for this activity today
-        if has_pending_nudge(phone_number, activity):
-            print(f"Skipping {phone_number} - already has pending {activity} nudge today")
+
+        # Fetch full profile (consent + crop/district)
+        profile = table.get_item(Key={'PK': f'USER#{phone_number}', 'SK': 'PROFILE'}).get('Item') or {}
+
+        # Consent gate: nudges are proactive messages; only send if user opted in.
+        # Onboarding stores consent in profile['consent'].
+        if not profile.get('onboarding_complete'):
+            print(f"Skipping {phone_number} - onboarding incomplete")
             nudges_skipped += 1
             continue
-        
-        # Fetch crop + district from farmer profile
-        profile = table.get_item(Key={'PK': f'USER#{phone_number}', 'SK': 'PROFILE'}).get('Item') or {}
+        if profile.get('consent') is not True:
+            print(f"Skipping {phone_number} - consent not granted for nudges")
+            nudges_skipped += 1
+            continue
+
+        # Open-nudge gate: do not send a fresh nudge when one is still open.
+        if has_open_nudge(phone_number, activity):
+            print(f"Skipping {phone_number} - already has open {activity} nudge")
+            nudges_skipped += 1
+            continue
+
         crop = profile.get('crop', 'Cotton')
         district_key = profile.get('location') or location
 
