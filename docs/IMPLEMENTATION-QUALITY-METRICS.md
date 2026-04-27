@@ -71,7 +71,7 @@ AgriNexus AI demonstrates **production-grade implementation quality** across tes
 
 ### 1.4 Test Coverage Improvement Journey
 
-The test-to-code ratio was improved from **52% to 80%** on April 25, 2026 in a single focused session. The approach: add pure unit tests with mocks — no live AWS calls, no changes to production code.
+The test-to-code ratio was improved from **52% to 80%** in iterative and continuous manner. The approach: add pure unit tests with mocks — no live AWS calls, no changes to production code.
 
 **Batch 1 (52% → 61%): Core module coverage**
 
