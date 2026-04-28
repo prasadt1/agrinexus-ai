@@ -459,7 +459,8 @@
                     mr: "नज डेमो फ्लो (WhatsApp full tier):\n\n☀️ हवामान अनुकूल → 🔔 फवारणी नज पाठवला → शेतकरी 'झाला' किंवा 'अजून नाही' म्हणतो → 'अजून नाही' वर: T+24h आणि T+48h रिमाइंडर → 'झाला' वर: रिमाइंडर लगेच बंद।\n\nहा क्लोज्ड-लूप फक्त WhatsApp वर चालतो (व्हॉइस, फोटो, नज). पूर्ण अनुभवासाठी तिथे ट्राय करा.",
                     te: "నజ్ డెమో ఫ్లో (WhatsApp full tier):\n\n☀️ వాతావరణం అనుకూలం → 🔔 స్ప్రే నజ్ పంపబడింది → రైతు 'అయ్యింది' లేదా 'ఇంకా లేదు' అని చెప్తారు → 'ఇంకా లేదు' అయితే: T+24h మరియు T+48h రిమైండర్లు → 'అయ్యింది' అయితే: రిమైండర్లు వెంటనే ఆపబడతాయి.\n\nఈ క్లోజ్డ్-లూప్ WhatsApp లో మాత్రమే నడుస్తుంది (వాయిస్, ఫోటో, నజ్). పూర్తి అనుభవం కోసం అక్కడ ప్రయత్నించండి."
                 }[lang] || "Nudge demo flow: Weather → nudge → DONE/NOT YET → reminders → cancel on DONE.";
-                addMessage(msg, true);
+                // Local canned explainer (no KB/API call) — do not show Sources.
+                addMessage(msg, true, [], { suppressSources: true });
                 return;
             }
             messageInput.value = question;
@@ -601,7 +602,8 @@
             }
         }
 
-        function addMessage(text, isBot = false, citations = null) {
+        function addMessage(text, isBot = false, citations = null, opts = null) {
+            const options = (opts && typeof opts === 'object') ? opts : {};
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isBot ? 'bot' : 'user'}`;
 
@@ -615,7 +617,8 @@
             }
 
             let srcs = normalizeCitations(citations);
-            if (isBot && srcs.length === 0 && !isRefusalText(text)) {
+            const suppressSources = Boolean(options.suppressSources);
+            if (!suppressSources && isBot && srcs.length === 0 && !isRefusalText(text)) {
                 // UI fallback when API doesn't return doc filenames yet (ADR 0005 path).
                 const lang = (languageSelect && languageSelect.value) || 'en';
                 const generic = {
@@ -626,7 +629,7 @@
                 }[lang] || 'FAO/ICAR Agricultural Guidelines (Knowledge Base)';
                 srcs = [generic];
             }
-            if (isBot && srcs.length > 0) {
+            if (!suppressSources && isBot && srcs.length > 0) {
                 const sources = document.createElement('div');
                 sources.className = 'sources';
 

@@ -631,7 +631,8 @@
             }
         }
 
-        function addMessage(text, isBot = false, citations = null, imageData = null) {
+        function addMessage(text, isBot = false, citations = null, imageData = null, opts = null) {
+            const options = (opts && typeof opts === 'object') ? opts : {};
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isBot ? 'bot' : 'user'}`;
             
@@ -657,7 +658,8 @@
             }
             
             let srcs = normalizeCitations(citations);
-            if (isBot && srcs.length === 0 && !isRefusalText(text)) {
+            const suppressSources = Boolean(options.suppressSources);
+            if (!suppressSources && isBot && srcs.length === 0 && !isRefusalText(text)) {
                 const lang = (languageSelect && languageSelect.value) || 'en';
                 const generic = {
                     hi: 'FAO/ICAR कृषि मार्गदर्शिका (Knowledge Base)',
@@ -667,7 +669,7 @@
                 }[lang] || 'FAO/ICAR Agricultural Guidelines (Knowledge Base)';
                 srcs = [generic];
             }
-            if (isBot && srcs.length > 0) {
+            if (!suppressSources && isBot && srcs.length > 0) {
                 const sources = document.createElement('div');
                 sources.className = 'sources';
 
