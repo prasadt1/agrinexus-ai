@@ -231,7 +231,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             print(f"Skipping {phone_number} - onboarding incomplete")
             nudges_skipped += 1
             continue
-        if profile.get('consent') is not True:
+        if profile.get('consent') not in (True, 'granted'):
             print(f"Skipping {phone_number} - consent not granted for nudges")
             nudges_skipped += 1
             continue

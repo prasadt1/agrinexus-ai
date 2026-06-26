@@ -282,9 +282,12 @@ def update_user_profile(phone_number: str, updates: Dict[str, Any]):
     )
 
 
-def create_user_profile(phone_number: str, dialect: str, location: str, crop: str, consent: bool):
-    """Create complete user profile"""
+def create_user_profile(phone_number: str, dialect: str, location: str, crop: str, consent, consent_source: str = 'self'):
+    """Create complete user profile. `consent` may be a legacy bool or a state string
+    ('granted'/'declined'); it is stored as a state string."""
     coords = DISTRICT_COORDS.get(location)
+    consent_state = 'granted' if consent in (True, 'granted') else 'declined'
+    now = datetime.utcnow().isoformat()
     table.put_item(
         Item={
             'PK': f'USER#{phone_number}',
@@ -294,15 +297,61 @@ def create_user_profile(phone_number: str, dialect: str, location: str, crop: st
             'location': location,
             'location_coords': list(coords) if coords else None,
             'crop': crop,
-            'consent': consent,
+            'consent': consent_state,
+            'consentSource': consent_source,
+            'consentAt': now if consent_state == 'granted' else None,
             'onboarding_complete': True,
-            'created_at': datetime.utcnow().isoformat(),
+            'created_at': now,
             'GSI1PK': f'LOCATION#{location}',
             'GSI1SK': f'CROP#{crop}',
             # Public demo: one weather nudge only (no T+24h/T+48h). Set demo_tier to 'full' in Dynamo for pilot partners.
             'demo_tier': 'public',
         }
     )
+
+
+def auto_assign_cohort(phone_number: str, district: str, crop: str):
+    """On self-onboard, link the farmer to a single matching ACTIVE cohort by writing a
+    PHONE#/MEMBERSHIP row (mirrors the platform enrollment shape) so their outcomes roll
+    up to a partner program. Skips if zero or more than one active cohort matches the
+    district -- deterministic, no cross-tenant mis-assignment."""
+    if not district:
+        return
+    try:
+        resp = table.query(
+            IndexName='GSI2',
+            KeyConditionExpression='GSI2PK = :pk',
+            FilterExpression='district = :d',
+            ExpressionAttributeValues={':pk': 'STATUS#active', ':d': district},
+        )
+    except Exception as e:
+        print(f"auto_assign_cohort: query failed for {district}: {e}")
+        return
+    cohorts = resp.get('Items', [])
+    if len(cohorts) != 1:
+        print(f"auto_assign_cohort: {len(cohorts)} active cohorts for {district}; skipping")
+        return
+    cohort = cohorts[0]
+    cohort_id = cohort.get('cohortId')
+    tenant_id = cohort.get('tenantId')
+    norm = phone_number.replace(' ', '').lstrip('+')
+    try:
+        table.put_item(
+            Item={
+                'PK': f'PHONE#{norm}',
+                'SK': 'MEMBERSHIP',
+                'GSI1PK': f'COHORT#{cohort_id}',
+                'GSI1SK': f'MEMBER#{norm}',
+                'phone': norm,
+                'tenantId': tenant_id,
+                'cohortId': cohort_id,
+                'enrolledAt': datetime.utcnow().isoformat(),
+            },
+            ConditionExpression='attribute_not_exists(PK)',
+        )
+        print(f"auto_assign_cohort: linked {norm} -> cohort {cohort_id}")
+    except Exception as e:
+        print(f"auto_assign_cohort: membership exists or write failed for {norm}: {e}")
 
 
 def _parse_language_selection(message_text: str) -> Optional[str]:
@@ -590,6 +639,32 @@ Please choose your language / कृपया अपनी भाषा चु�
                 'content': f"{ONBOARDING_MESSAGES['ask_crop'][dialect]}\n\nOptions: {crop_names.get(dialect, crop_names['hi'])}"
             }
     
+    # State 4.5: Pending consent (partner-enrolled farmer's first contact)
+    elif state == 'pending_consent':
+        # Prompt for consent, then move to the consent state so the farmer's NEXT
+        # reply (Yes/No) is read as the answer -- their first "Hi" must not be.
+        dialect = profile.get('dialect', 'hi')
+        district = profile.get('location', '') or ''
+        crop = profile.get('crop', '') or ''
+        update_user_profile(phone_number, {'onboarding_state': 'consent'})
+        consent_buttons = {
+            'hi': ['हाँ ✅', 'नहीं ❌'],
+            'mr': ['होय ✅', 'नाही ❌'],
+            'te': ['అవును ✅', 'కాదు ❌'],
+            'en': ['Yes ✅', 'No ❌']
+        }
+        invite = {
+            'hi': f'आपको {district} में {crop} सलाह के लिए नामांकित किया गया है। मौसम आधारित खेती सलाह पाने के लिए "हाँ" भेजें।',
+            'mr': f'तुम्हाला {district} मध्ये {crop} सल्ल्यासाठी नोंदवले आहे. हवामान-आधारित सल्ला मिळवण्यासाठी "होय" पाठवा.',
+            'te': f'{district}లో {crop} సలహా కోసం మీరు నమోదు అయ్యారు. వాతావరణ సలహా కోసం "అవును" పంపండి.',
+            'en': f"You've been enrolled for {crop} advisories in {district}. Reply YES to start receiving weather-based farming advice."
+        }
+        return {
+            'type': 'buttons',
+            'content': invite.get(dialect, invite['en']),
+            'buttons': consent_buttons.get(dialect, consent_buttons['hi'])
+        }
+
     # State 5: Consent
     elif state == 'consent':
         dialect = profile.get('dialect', 'hi')
@@ -598,12 +673,21 @@ Please choose your language / कृपया अपनी भाषा चु�
         
         # Check for consent keywords (from button or text)
         text_lower = message_text.lower()
-        consent = False
-        if any(word in text_lower for word in ['yes', 'हाँ', 'हां', 'होय', 'అవును', '✅']):
-            consent = True
+        consent_source = profile.get('consentSource', 'self')
+        granted = any(word in text_lower for word in ['yes', 'हाँ', 'हां', 'होय', 'అవును', '✅'])
+        consent_state = 'granted' if granted else 'declined'
         
-        # Complete onboarding
-        create_user_profile(phone_number, dialect, location, crop, consent)
+        # Complete onboarding: record the consent state, link the cohort
+        if consent_source == 'partner':
+            # Partner pre-seeded this profile; the MEMBERSHIP already exists.
+            updates = {'consent': consent_state, 'onboarding_complete': True, 'onboarding_state': 'complete'}
+            if granted:
+                updates['consentAt'] = datetime.utcnow().isoformat()
+            update_user_profile(phone_number, updates)
+        else:
+            create_user_profile(phone_number, dialect, location, crop, consent_state, consent_source='self')
+            if granted:
+                auto_assign_cohort(phone_number, location, crop)
         return {
             'type': 'text',
             'content': ONBOARDING_MESSAGES['onboarding_complete'][dialect]
