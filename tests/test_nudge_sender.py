@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import types
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -110,18 +111,22 @@ class TestHasOpenNudge:
         assert sender.has_open_nudge("491234", "spray") is False
 
     def test_has_sent_nudge(self, sender, monkeypatch):
+        # Recent (within the 96h freshness window) so it counts as open.
+        recent = (datetime.utcnow() - timedelta(hours=1)).isoformat()
         mock_table = types.SimpleNamespace(
             query=lambda **kw: {"Items": [
-                {"SK": "NUDGE#2026-04-25T10:00:00#spray", "status": "SENT"}
+                {"SK": f"NUDGE#{recent}#spray", "status": "SENT"}
             ]}
         )
         monkeypatch.setattr(sender, "table", mock_table)
         assert sender.has_open_nudge("491234", "spray") is True
 
     def test_has_reminded_nudge(self, sender, monkeypatch):
+        # Recent (within the 96h freshness window) so it counts as open.
+        recent = (datetime.utcnow() - timedelta(hours=1)).isoformat()
         mock_table = types.SimpleNamespace(
             query=lambda **kw: {"Items": [
-                {"SK": "NUDGE#2026-04-25T10:00:00#spray", "status": "REMINDED"}
+                {"SK": f"NUDGE#{recent}#spray", "status": "REMINDED"}
             ]}
         )
         monkeypatch.setattr(sender, "table", mock_table)
