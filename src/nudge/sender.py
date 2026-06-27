@@ -303,7 +303,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         is_demo_user = profile.get('demo_tier') == 'public'
         
         if is_demo_user:
-            print(f"Demo user {phone_number} - sending one nudge only, no T+24h/T+48h follow-ups")
+            print(f"Demo user {phone_number} - sending one nudge only, no follow-up reminders")
             # Demo users get one nudge to see the flow, but no follow-up reminders
         else:
             # Production users get full closed-loop follow-ups.
