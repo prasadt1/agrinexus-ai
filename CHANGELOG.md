@@ -4,6 +4,30 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## June 27, 2026 — Removed duplicate vision package (single source of truth)
+
+### Summary
+Deleted the stale, undeployed **`src/vision/`** crop-diagnosis package and retargeted its unit tests at the deployed **`src/processor/`** copy, eliminating a silent-drift hazard where prompt/safety-gate fixes could land in one copy and miss production.
+
+### Issue
+The computer-vision crop-diagnosis code existed in two near-identical copies: `src/vision/{analyzer,heuristics,enforcement,messages}.py` (imported **only** by `tests/vision/` and `tests/test_vision.py`, never deployed) and `src/processor/{analyzer,…}.py` (deployed by `template.yaml` via `CodeUri: src/processor/` for both `MessageProcessor` and `BetaMessageProcessor`). The two had already diverged — `src/processor/` had the relevance gate, `pending_crop_confirm` flow, structured 4-section `enforce_message_safety`, and the `insects_visible` schema field; `src/vision/` had none of these. The test suite was therefore validating dead code while production behaved differently.
+
+### Fix
+- **Deleted** `src/vision/` (unreferenced by any production code or `template.yaml`; `import analyzer` in `src/processor/handler.py` resolves within the Lambda bundle).
+- **Retargeted** the orphaned tests to `src/processor/` using the repo's existing self-contained convention (`sys.path.insert(.../src/processor)` + flat imports, as in `tests/vision/test_structured_output.py`): `tests/test_vision.py`, `tests/vision/{test_messages,test_heuristics,test_enforcement,test_vision_schema,test_error_handling,test_integration}.py`.
+- **Updated 4 fixtures** to match deployed behavior the stale copy lacked: structured 4-section output from `enforce_message_safety` (high- and low/medium-confidence), and the now-required `insects_visible` list in `validate_vision_schema`.
+- **Why delete, not share a module**: `template.yaml` packages only `src/processor/`, so the Lambda cannot import a `src/vision/` shared module at runtime — the deployed copy is the canonical one.
+
+### Impact
+Single source of truth for crop diagnosis; the vision unit tests now guard production code. `tests/vision/` + `tests/test_vision.py` = **45 passed** standalone (no `PYTHONPATH` needed). No production source changed; no new test failures introduced.
+
+### Files
+- Removed: `src/vision/`
+- `tests/test_vision.py`, `tests/vision/test_messages.py`, `tests/vision/test_heuristics.py`, `tests/vision/test_enforcement.py`, `tests/vision/test_vision_schema.py`, `tests/vision/test_error_handling.py`, `tests/vision/test_integration.py`
+- Docs: `docs/CODE-WALKTHROUGH.md`, `docs/reports/VISION-RELIABILITY-REPORT.md`
+
+---
+
 ## April 25, 2026 — Vision relevance gate (Bedrock Haiku), CI/Pages, docs
 
 ### Summary

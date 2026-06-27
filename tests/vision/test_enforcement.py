@@ -1,9 +1,14 @@
 import pytest
-from src.vision.enforcement import enforce_message_safety
+import sys
+import os
+
+# Single source of truth: the deployed crop-diagnosis code in src/processor/.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../src/processor'))
+from enforcement import enforce_message_safety
 
 
-def test_high_confidence_allows_model_message():
-    """High confidence → allow model's message"""
+def test_high_confidence_preserves_model_content():
+    """High confidence → model's content is preserved (inside the structured 4-section output)."""
     vision = {
         'is_real_crop_photo': True,
         'crop_confidence': 'high',
@@ -12,7 +17,11 @@ def test_high_confidence_allows_model_message():
 
     result = enforce_message_safety(vision, 'cotton', 'en')
 
-    assert result == 'Cotton bollworm detected on leaves.'
+    # High confidence keeps the model's diagnosis (wrapped in the 4-section format),
+    # rather than replacing it with the safe template.
+    assert 'Cotton bollworm detected on leaves.' in result
+    assert '*Recommendations:*' in result
+    assert 'Cannot identify' not in result
 
 
 def test_low_confidence_blocks_crop_name():

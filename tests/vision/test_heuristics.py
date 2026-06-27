@@ -1,5 +1,10 @@
 import pytest
-from src.vision.heuristics import run_heuristics, _calculate_image_metrics
+import sys
+import os
+
+# Single source of truth: the deployed crop-diagnosis code in src/processor/.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../src/processor'))
+from heuristics import run_heuristics, _calculate_image_metrics
 
 
 def generate_dark_github_screenshot():

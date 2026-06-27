@@ -1,5 +1,10 @@
 import pytest
-from src.vision.messages import get_safe_retake_message, get_block_message, get_error_message
+import sys
+import os
+
+# Single source of truth: the deployed crop-diagnosis code in src/processor/.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../src/processor'))
+from messages import get_safe_retake_message, get_block_message, get_error_message
 
 
 def test_safe_retake_message_hindi():

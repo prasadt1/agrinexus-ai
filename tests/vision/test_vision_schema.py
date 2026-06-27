@@ -1,7 +1,12 @@
 # tests/vision/test_vision_schema.py
 import pytest
 import json
-from src.vision.analyzer import validate_vision_schema
+import sys
+import os
+
+# Single source of truth: the deployed crop-diagnosis code in src/processor/.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../src/processor'))
+from analyzer import validate_vision_schema
 
 
 def test_valid_schema_passes():
@@ -10,6 +15,7 @@ def test_valid_schema_passes():
         'is_real_crop_photo': True,
         'inferred_crop': 'Cotton',
         'crop_confidence': 'high',
+        'insects_visible': [],
         'visible_problem': True,
         'severity': 'medium',
         'recommendations': 'Bollworm detected.'
@@ -37,6 +43,7 @@ def test_invalid_crop_confidence_fails():
         'is_real_crop_photo': True,
         'inferred_crop': 'Cotton',
         'crop_confidence': 'maybe',  # Invalid
+        'insects_visible': [],
         'visible_problem': True,
         'severity': 'medium',
         'recommendations': 'Test'
@@ -54,6 +61,7 @@ def test_fence_stripping_works():
     "is_real_crop_photo": true,
     "inferred_crop": "Cotton",
     "crop_confidence": "high",
+    "insects_visible": [],
     "visible_problem": true,
     "severity": "medium",
     "recommendations": "Test message"

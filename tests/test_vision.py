@@ -5,10 +5,11 @@ Tests Claude 3 Sonnet Vision for crop pest/disease identification
 import sys
 import os
 
-# Add parent directory to path
+# Add parent directory to path, plus the deployed processor package (single source of truth).
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../src/processor'))
 
-from src.vision.analyzer import analyze_crop_image
+from analyzer import analyze_crop_image
 
 
 def run_vision_analysis(image_path, dialect, crop, description):

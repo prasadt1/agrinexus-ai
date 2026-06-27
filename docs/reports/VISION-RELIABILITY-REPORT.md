@@ -60,7 +60,7 @@ Key code locations:
 
 - `src/processor/analyzer.py`: image download, S3 save, deterministic gates, Vision call, crop prompt trigger
 - `src/processor/handler.py`: orchestrates WhatsApp message types, stores pending crop confirmation + last-image pointer
-- `src/vision/analyzer.py`: mirrored vision analyzer (kept consistent)
+- `tests/vision/` + `tests/test_vision.py`: unit tests for the analyzer modules, importing directly from `src/processor/` (single source of truth; the former `src/vision/` mirror was removed)
 
 ---
 
