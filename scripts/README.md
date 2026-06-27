@@ -7,6 +7,7 @@ This directory contains both **shared scripts** (tracked in git) and **personal/
 Scripts actually present in this repo (others may live under `scripts/local/` on your machine):
 
 - `e2e-smoke.sh` — SAM validate + fast pytest + optional KB + web chat curl (see script header)
+- `sqs-consumers.sh` — Enable/disable SQS-triggered Lambdas when not developing (saves SQS free-tier usage)
 - `reset-profile.sh` / `delete-user-data.sh` — Non-interactive or interactive DynamoDB user reset
 
 **Deploy:** use the SAM CLI from the repo root (see **README.md**): `sam build --template-file template.yaml` then `sam deploy --config-file samconfig-week2.toml`.
