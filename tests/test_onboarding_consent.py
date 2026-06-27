@@ -27,6 +27,9 @@ def _stub_modules():
     al.is_approved_user = lambda *a, **k: True
     al.allowlist_expiry_hint = lambda *a, **k: ""
     sys.modules["common.allowlist"] = al
+    ql = types.ModuleType("common.quota")
+    ql.check_feature_quota = lambda *a, **k: True
+    sys.modules["common.quota"] = ql
     hl = types.ModuleType("common.district_helplines")
     hl.maybe_append_helpline_footer = lambda text, *a, **k: text
     sys.modules["common.district_helplines"] = hl

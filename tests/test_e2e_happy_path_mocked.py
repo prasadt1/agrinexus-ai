@@ -38,6 +38,10 @@ def _install_common_stubs(sent_messages):
     allowlist.allowlist_expiry_hint = lambda *_args, **_kwargs: ""
     sys.modules["common.allowlist"] = allowlist
 
+    quota = types.ModuleType("common.quota")
+    quota.check_feature_quota = lambda *_args, **_kwargs: True
+    sys.modules["common.quota"] = quota
+
     helplines = types.ModuleType("common.district_helplines")
     helplines.maybe_append_helpline_footer = lambda text, *_args, **_kwargs: text
     sys.modules["common.district_helplines"] = helplines

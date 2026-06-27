@@ -20,7 +20,7 @@ import analyzer
 from common.whatsapp import send_whatsapp_message, send_whatsapp_list
 from common.whatsapp import send_whatsapp_buttons as _send_whatsapp_buttons
 from common.district_helplines import maybe_append_helpline_footer
-from common.allowlist import is_approved_user, allowlist_expiry_hint
+from common.quota import check_feature_quota
 
 
 def send_whatsapp_buttons(phone_number: str, body_text: str, buttons: list):
@@ -225,7 +225,7 @@ ONBOARDING_MESSAGES = {
         'hi': 'नमस्ते! AgriNexus AI में आपका स्वागत है।\n\nयह AWS 10,000 AIdeas प्रतियोगिता का डेमो है। Voice/Photo और Nudges allowlist पर हैं — और public demo में nudge follow-up reminders (T+24h/T+48h) सीमित हो सकते हैं। Full access के लिए GitHub issue खोलें।\n\nटिप: सुविधाओं की सूची के लिए “HELP” भेजें।\n\nकृपया अपनी भाषा चुनें:',
         'mr': 'नमस्कार! AgriNexus AI मध्ये आपले स्वागत आहे.\n\nहा AWS 10,000 AIdeas स्पर्धेसाठीचा डेमो आहे. Voice/Photo आणि Nudges allowlist वर आहेत — आणि public demo मध्ये nudge follow-up reminders (T+24h/T+48h) मर्यादित असू शकतात. Full access साठी GitHub issue उघडा.\n\nटिप: सुविधांची यादी पाहण्यासाठी “HELP” पाठवा.\n\nकृपया तुमची भाषा निवडा:',
         'te': 'నమస్కారం! AgriNexus AI కి స్వాగతం.\n\nఇది AWS 10,000 AIdeas పోటీ కోసం డెమో. Voice/Photo మరియు Nudges allowlist లో ఉన్నాయి — అలాగే public demo లో nudge follow-up reminders (T+24h/T+48h) పరిమితం అయ్యే అవకాశం ఉంది. Full access కోసం GitHub issue పెట్టండి.\n\nటిప్: ఫీచర్ల జాబితా కోసం “HELP” పంపండి.\n\nదయచేసి మీ భాషను ఎంచుకోండి:',
-        'en': 'Welcome to AgriNexus AI!\n\nThis is a demo built for AWS 10,000 AIdeas. Voice/photo and nudges are allowlisted — and on the public demo, nudge follow-up reminders (T+24h/T+48h) may be limited. Request full access via a GitHub issue.\n\nTip: send “HELP” for the capability list.\n\nPlease choose your language:'
+        'en': 'Welcome to AgriNexus AI!\n\nThis is a demo built for AWS 10,000 AIdeas. Voice, photo diagnosis, and nudges are all available — fair-use daily limits apply on the demo.\n\nTip: send “HELP” for the capability list.\n\nPlease choose your language:'
     },
     'ask_location': {
         'hi': 'बढ़िया! अब मुझे बताएं आप किस जिले में हैं?',
@@ -431,7 +431,7 @@ def handle_onboarding(phone_number: str, message_text: str, profile: Optional[Di
 नमस्कार! AgriNexus AI मध्ये आपले स्वागत आहे.
 నమస్కారం! AgriNexus AI కి స్వాగతం.
 
-Demo note: Built for AWS 10,000 AIdeas. Voice/photo and nudges are allowlisted (public demo may limit nudge follow-ups). Request full access via GitHub issues.
+Demo note: Built for AWS 10,000 AIdeas. Voice, photo diagnosis, and nudges are all available — fair-use daily limits apply on the demo.
 
 Tip: Send HELP / मदद / मदत / సహాయం for the capability list.
 
@@ -488,7 +488,7 @@ Please choose your language / कृपया अपनी भाषा चु�
 नमस्कार! AgriNexus AI मध्ये आपले स्वागत आहे.
 నమస్కారం! AgriNexus AI కి స్వాగతం.
 
-Demo note: Built for AWS 10,000 AIdeas. Voice/photo and nudges are allowlisted (public demo may limit nudge follow-ups). Request full access via GitHub issues.
+Demo note: Built for AWS 10,000 AIdeas. Voice, photo diagnosis, and nudges are all available — fair-use daily limits apply on the demo.
 
 Tip: Send HELP / मदद / मदत / సహాయం for the capability list.
 
@@ -994,7 +994,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 • "गेहूं में खाद कब डालें?"
 • "मौसम के अनुसार क्या करें?"
 
-🎤 वॉइस (allowlisted):
+🎤 वॉइस:
 • वॉइस नोट भेजें — मैं ट्रांसक्राइब करके जवाब दूंगा
 
 📸 फोटो भेजें:
@@ -1008,7 +1008,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
 बस अपना सवाल टाइप करें या फोटो भेजें!
 
-Full access (voice/photo/nudges): GitHub request → {request_url}''',
+Project & feedback: {request_url}''',
             'mr': '''🌾 AgriNexus AI - मदत
 
 मी तुमच्या शेतीत मदत करू शकतो:
@@ -1018,7 +1018,7 @@ Full access (voice/photo/nudges): GitHub request → {request_url}''',
 • "गहूमध्ये खत कधी घालावे?"
 • "हवामानानुसार काय करावे?"
 
-🎤 व्हॉइस (allowlisted):
+🎤 व्हॉइस:
 • व्हॉइस नोट पाठवा — मी ट्रान्सक्राइब करून उत्तर देईन
 
 📸 फोटो पाठवा:
@@ -1032,7 +1032,7 @@ Full access (voice/photo/nudges): GitHub request → {request_url}''',
 
 फक्त तुमचा प्रश्न टाइप करा किंवा फोटो पाठवा!
 
-Full access (voice/photo/nudges): GitHub request → {request_url}''',
+Project & feedback: {request_url}''',
             'te': '''🌾 AgriNexus AI - సహాయం
 
 నేను మీ వ్యవసాయంలో సహాయం చేయగలను:
@@ -1042,7 +1042,7 @@ Full access (voice/photo/nudges): GitHub request → {request_url}''',
 • "గోధుమలో ఎరువులు ఎప్పుడు వేయాలి?"
 • "వాతావరణం ప్రకారం ఏమి చేయాలి?"
 
-🎤 వాయిస్ (allowlisted):
+🎤 వాయిస్:
 • వాయిస్ నోట్ పంపండి — నేను ట్రాన్స్‌క్రైబ్ చేసి సమాధానం ఇస్తాను
 
 📸 ఫోటో పంపండి:
@@ -1056,7 +1056,7 @@ Full access (voice/photo/nudges): GitHub request → {request_url}''',
 
 మీ ప్రశ్న టైప్ చేయండి లేదా ఫోటో పంపండి!
 
-Full access (voice/photo/nudges): GitHub request → {request_url}''',
+Project & feedback: {request_url}''',
             'en': '''🌾 AgriNexus AI - Help
 
 I can help you with your farming:
@@ -1066,10 +1066,10 @@ I can help you with your farming:
 • "When to apply fertilizer to wheat?"
 • "What to do based on weather?"
 
-🎤 Voice (allowlisted):
+🎤 Voice:
 • Send a voice note — I’ll transcribe and reply
 
-📸 Photos (allowlisted):
+📸 Photos:
 • Leaf photos
 • Pest/disease photos
 • I'll identify and advise
@@ -1080,7 +1080,7 @@ I can help you with your farming:
 
 Just type your question or send a photo!
 
-Full access (voice/photo/nudges): GitHub request → {request_url}'''
+Project & feedback: {request_url}'''
         }
         send_whatsapp_message(
             from_number,
@@ -1160,7 +1160,7 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             continue
         
         dialect = profile.get('dialect', 'hi')
-        approved = is_approved_user(table, from_number)
+        approved = True  # demo is open; voice-output-for-text (below) stays gated by dialect + message rate-limit
         
         # Process based on message type
         if message_type in ('text', 'interactive'):
@@ -1329,12 +1329,12 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                 send_whatsapp_message(from_number, reply_text)
         
         elif message_type == 'image':
-            if not approved:
+            if not check_feature_quota(table, from_number, 'vision'):
                 gate_msg = {
-                    'hi': f'फोटो विश्लेषण सुविधा अभी बंद है। कृपया टेक्स्ट में प्रश्न भेजें। {allowlist_expiry_hint(dialect)}',
-                    'mr': f'फोटो विश्लेषण सुविधा सध्या बंद आहे. कृपया प्रश्न टेक्स्टमध्ये पाठवा. {allowlist_expiry_hint(dialect)}',
-                    'te': f'ఫోటో విశ్లేషణ ఫీచర్ ప్రస్తుతం అందుబాటులో లేదు. దయచేసి టెక్స్ట్‌లో ప్రశ్న అడగండి. {allowlist_expiry_hint(dialect)}',
-                    'en': f'Photo analysis is not enabled in the public demo. Please ask in text. {allowlist_expiry_hint(dialect)}',
+                    'hi': 'फोटो विश्लेषण सुविधा अभी बंद है। कृपया टेक्स्ट में प्रश्न भेजें।',
+                    'mr': 'फोटो विश्लेषण सुविधा सध्या बंद आहे. कृपया प्रश्न टेक्स्टमध्ये पाठवा.',
+                    'te': 'ఫోటో విశ్లేషణ ఫీచర్ ప్రస్తుతం అందుబాటులో లేదు. దయచేసి టెక్స్ట్‌లో ప్రశ్న అడగండి.',
+                    'en': "You've reached today's photo-analysis limit on the demo. Please ask in text — it resets tomorrow.",
                 }
                 send_whatsapp_message(from_number, gate_msg.get(dialect, gate_msg['en']))
                 continue
@@ -1387,12 +1387,12 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
         
         elif message_type == 'audio':
             # Audio messages are normally handled by VoiceProcessor Lambda (gated in webhook).
-            if not approved:
+            if not check_feature_quota(table, from_number, 'voice'):
                 gate_msg = {
-                    'hi': f'अभी वॉइस सुविधा बंद है। कृपया टेक्स्ट में प्रश्न भेजें। {allowlist_expiry_hint(dialect)}',
-                    'mr': f'सध्या व्हॉइस सुविधा बंद आहे. कृपया प्रश्न टेक्स्टमध्ये पाठवा. {allowlist_expiry_hint(dialect)}',
-                    'te': f'ప్రస్తుతం వాయిస్ ఫీచర్ అందుబాటులో లేదు. దయచేసి టెక్స్ట్‌లో ప్రశ్న అడగండి. {allowlist_expiry_hint(dialect)}',
-                    'en': f'Voice is not enabled in the public demo. Please ask in text. {allowlist_expiry_hint(dialect)}',
+                    'hi': 'अभी वॉइस सुविधा बंद है। कृपया टेक्स्ट में प्रश्न भेजें।',
+                    'mr': 'सध्या व्हॉइस सुविधा बंद आहे. कृपया प्रश्न टेक्स्टमध्ये पाठवा.',
+                    'te': 'ప్రస్తుతం వాయిస్ ఫీచర్ అందుబాటులో లేదు. దయచేసి టెక్స్ట్‌లో ప్రశ్న అడగండి.',
+                    'en': "You've reached today's voice limit on the demo. Please ask in text — it resets tomorrow.",
                 }
                 send_whatsapp_message(from_number, gate_msg.get(dialect, gate_msg['en']))
                 continue
