@@ -50,10 +50,12 @@ def check_feature_quota(table, phone_number: str, feature: str) -> bool:
         return True
     if phone_number in _bypass_phones():
         return True
-    limit = daily_limit(feature)
-    if limit <= 0:
-        return True
+    # Everything from here on is inside the fail-open guard, so any future
+    # edit to the limit/date/write logic still defaults to allowing the call.
     try:
+        limit = daily_limit(feature)
+        if limit <= 0:
+            return True
         now = datetime.now(timezone.utc)
         today = now.strftime("%Y-%m-%d")
         ttl = int(now.timestamp()) + 2 * 24 * 3600
@@ -64,6 +66,8 @@ def check_feature_quota(table, phone_number: str, feature: str) -> bool:
             ExpressionAttributeValues={":one": 1, ":ttl": ttl},
             ReturnValues="UPDATED_NEW",
         )
+        # ADD always returns `count` in UPDATED_NEW; default 1 is a conservative
+        # within-limit fallback if it were ever absent.
         count = int(resp.get("Attributes", {}).get("count", 1))
         return count <= limit
     except Exception:

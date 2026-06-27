@@ -108,6 +108,18 @@ class TestCheckFeatureQuota:
         assert result is True
         assert len(table.calls) == 0
 
+    def test_negative_limit_returns_true_no_db_call(self, monkeypatch):
+        """A negative limit is treated like 0 (no cap) → True, update_item never called."""
+        monkeypatch.delenv("FEATURE_QUOTA_DISABLED", raising=False)
+        monkeypatch.delenv("FEATURE_QUOTA_BYPASS_PHONES", raising=False)
+        monkeypatch.setenv("VISION_DAILY_LIMIT", "-1")
+
+        table = FakeTable(returned_count=999)
+        result = check_feature_quota(table, self.PHONE, "vision")
+
+        assert result is True
+        assert len(table.calls) == 0
+
     def test_table_error_fails_open(self, monkeypatch):
         """Any DynamoDB exception → True (fail-open, never break the demo)."""
         monkeypatch.delenv("FEATURE_QUOTA_DISABLED", raising=False)
