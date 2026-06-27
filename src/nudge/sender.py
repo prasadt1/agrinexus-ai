@@ -17,6 +17,7 @@ if _nudge_dir not in sys.path:
     sys.path.insert(0, _nudge_dir)
 from nudge_copy import build_nudge_message
 from bedrock_liner import invoke_nudge_focus_line
+from cadence import resolve_cadence
 
 dynamodb = boto3.resource('dynamodb')
 scheduler = boto3.client('scheduler')
@@ -195,7 +196,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     location = event.get('location')
     weather = convert_floats_to_decimal(event.get('weather', {}))
     activity = event.get('activity', 'spray')
-    
+    reminder_intervals, expiry_hours = resolve_cadence(event.get('rules'))
+
     # Query farmers in this location
     response = table.query(
         IndexName='GSI1',
@@ -304,14 +306,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             print(f"Demo user {phone_number} - sending one nudge only, no T+24h/T+48h follow-ups")
             # Demo users get one nudge to see the flow, but no follow-up reminders
         else:
-            # Production users get full closed-loop follow-ups
-            # Schedule reminders at T+24h and T+48h
-            create_reminder_schedule(phone_number, nudge_id, 24, dialect)
-            create_reminder_schedule(phone_number, nudge_id, 48, dialect)
-            
-            # Schedule auto-expiry at T+72h (24h after final reminder)
-            # This closes the nudge if farmer never responds
-            create_expiry_schedule(phone_number, nudge_id, 72)
+            # Production users get full closed-loop follow-ups.
+            # Cadence comes from the cohort's rules (or safe defaults).
+            for hours in reminder_intervals:
+                create_reminder_schedule(phone_number, nudge_id, hours, dialect)
+            create_expiry_schedule(phone_number, nudge_id, expiry_hours)
         
         nudges_sent += 1
     
