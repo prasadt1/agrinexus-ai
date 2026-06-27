@@ -222,9 +222,9 @@ DISTRICT_COORDS = {
 # Onboarding messages by dialect
 ONBOARDING_MESSAGES = {
     'welcome': {
-        'hi': 'नमस्ते! AgriNexus AI में आपका स्वागत है।\n\nयह AWS 10,000 AIdeas प्रतियोगिता का डेमो है। Voice/Photo और Nudges allowlist पर हैं — और public demo में nudge follow-up reminders (T+24h/T+48h) सीमित हो सकते हैं। Full access के लिए GitHub issue खोलें।\n\nटिप: सुविधाओं की सूची के लिए “HELP” भेजें।\n\nकृपया अपनी भाषा चुनें:',
-        'mr': 'नमस्कार! AgriNexus AI मध्ये आपले स्वागत आहे.\n\nहा AWS 10,000 AIdeas स्पर्धेसाठीचा डेमो आहे. Voice/Photo आणि Nudges allowlist वर आहेत — आणि public demo मध्ये nudge follow-up reminders (T+24h/T+48h) मर्यादित असू शकतात. Full access साठी GitHub issue उघडा.\n\nटिप: सुविधांची यादी पाहण्यासाठी “HELP” पाठवा.\n\nकृपया तुमची भाषा निवडा:',
-        'te': 'నమస్కారం! AgriNexus AI కి స్వాగతం.\n\nఇది AWS 10,000 AIdeas పోటీ కోసం డెమో. Voice/Photo మరియు Nudges allowlist లో ఉన్నాయి — అలాగే public demo లో nudge follow-up reminders (T+24h/T+48h) పరిమితం అయ్యే అవకాశం ఉంది. Full access కోసం GitHub issue పెట్టండి.\n\nటిప్: ఫీచర్ల జాబితా కోసం “HELP” పంపండి.\n\nదయచేసి మీ భాషను ఎంచుకోండి:',
+        'hi': 'नमस्ते! AgriNexus AI में आपका स्वागत है।\n\nयह AWS 10,000 AIdeas प्रतियोगिता का डेमो है। Voice, Photo और Nudges सभी उपलब्ध हैं (डेमो पर रोज़ाना उपयोग सीमा के साथ)। Public demo में nudge follow-up reminders (T+24h/T+48h) सीमित हो सकते हैं।\n\nटिप: सुविधाओं की सूची के लिए “HELP” भेजें।\n\nकृपया अपनी भाषा चुनें:',
+        'mr': 'नमस्कार! AgriNexus AI मध्ये आपले स्वागत आहे.\n\nहा AWS 10,000 AIdeas स्पर्धेसाठीचा डेमो आहे. Voice, Photo आणि Nudges सर्व उपलब्ध आहेत (डेमोवर दररोज वापर मर्यादेसह). Public demo मध्ये nudge follow-up reminders (T+24h/T+48h) मर्यादित असू शकतात.\n\nटिप: सुविधांची यादी पाहण्यासाठी “HELP” पाठवा.\n\nकृपया तुमची भाषा निवडा:',
+        'te': 'నమస్కారం! AgriNexus AI కి స్వాగతం.\n\nఇది AWS 10,000 AIdeas పోటీ కోసం డెమో. Voice, Photo మరియు Nudges అన్నీ అందుబాటులో ఉన్నాయి (డెమోలో రోజువారీ వినియోగ పరిమితులతో). Public demo లో nudge follow-up reminders (T+24h/T+48h) పరిమితం అయ్యే అవకాశం ఉంది.\n\nటిప్: ఫీచర్ల జాబితా కోసం “HELP” పంపండి.\n\nదయచేసి మీ భాషను ఎంచుకోండి:',
         'en': 'Welcome to AgriNexus AI!\n\nThis is a demo built for AWS 10,000 AIdeas. Voice, photo diagnosis, and nudges are all available — fair-use daily limits apply on the demo.\n\nTip: send “HELP” for the capability list.\n\nPlease choose your language:'
     },
     'ask_location': {
