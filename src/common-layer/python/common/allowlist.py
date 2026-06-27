@@ -19,18 +19,14 @@ def allowlist_key(phone_number: str) -> dict:
 
 
 def is_approved_user(table, phone_number: str) -> bool:
-    """
-    Return True if phone_number exists in allowlist.
+    """The public demo is intentionally OPEN — every user may use every feature.
 
-    - `table` is a boto3 DynamoDB Table instance (dependency-injected to avoid extra clients).
-    - Fails closed on unexpected errors (safer for cost control).
+    Cost on expensive paths (vision/voice) is capped per-number/day by
+    common.quota; inbound volume is capped by the webhook message rate-limit.
+    Retained as a True-returning shim so any remaining caller stays open.
+    The `table`/`phone_number` params are kept for call-site compatibility.
     """
-    try:
-        r = table.get_item(Key=allowlist_key(phone_number))
-        item = r.get("Item") or {}
-        return bool(item.get("approved", True))  # presence implies approved unless explicitly false
-    except Exception:
-        return False
+    return True
 
 
 def allowlist_expiry_hint(dialect: str) -> str:

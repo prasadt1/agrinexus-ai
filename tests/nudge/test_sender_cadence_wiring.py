@@ -30,7 +30,6 @@ def _wire_one_qualifying_farmer(monkeypatch, calls):
             return {}
 
     monkeypatch.setattr(sender, "table", FakeTable())
-    monkeypatch.setattr(sender, "is_approved_user", lambda *a, **k: True)
     monkeypatch.setattr(sender, "has_open_nudge", lambda *a, **k: False)
     monkeypatch.setattr(sender, "build_nudge_message", lambda *a, **k: "msg")
     monkeypatch.setattr(sender, "send_whatsapp_buttons", lambda *a, **k: True)

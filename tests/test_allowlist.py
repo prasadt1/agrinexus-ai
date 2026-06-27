@@ -30,36 +30,14 @@ class TestAllowlistKey:
 # ---------------------------------------------------------------------------
 
 class TestIsApprovedUser:
-    def test_approved_user(self):
-        table = types.SimpleNamespace(
-            get_item=lambda Key: {"Item": {"approved": True}}
-        )
-        assert is_approved_user(table, "491234") is True
-
-    def test_user_not_in_table(self):
-        """When get_item returns no Item, approved defaults to True (fail-open for missing rows)."""
-        table = types.SimpleNamespace(get_item=lambda Key: {})
-        # Code uses .get("approved", True) on empty dict → True
-        assert is_approved_user(table, "491234") is True
-
-    def test_explicitly_not_approved(self):
-        table = types.SimpleNamespace(
-            get_item=lambda Key: {"Item": {"approved": False}}
-        )
-        assert is_approved_user(table, "491234") is False
-
-    def test_item_present_no_approved_field(self):
-        """Presence in allowlist implies approved (default True)."""
-        table = types.SimpleNamespace(
-            get_item=lambda Key: {"Item": {"PK": "ALLOWLIST"}}
-        )
-        assert is_approved_user(table, "491234") is True
-
-    def test_exception_fails_closed(self):
-        def _raise(Key):
-            raise RuntimeError("DynamoDB error")
-        table = types.SimpleNamespace(get_item=_raise)
-        assert is_approved_user(table, "491234") is False
+    def test_open_demo_always_approved(self):
+        # The demo is intentionally open: returns True regardless of table contents.
+        for table in (
+            types.SimpleNamespace(get_item=lambda Key: {"Item": {"approved": False}}),
+            types.SimpleNamespace(get_item=lambda Key: {}),
+            None,
+        ):
+            assert is_approved_user(table, "491234") is True
 
 
 # ---------------------------------------------------------------------------

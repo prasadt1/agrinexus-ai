@@ -36,8 +36,6 @@ NUDGE_BUTTONS = {
     'en': [{"id": "done", "title": "Done"}, {"id": "not_yet", "title": "Not Yet"}],
 }
 
-from common.allowlist import is_approved_user
-
 
 def convert_floats_to_decimal(obj):
     """Convert float values to Decimal for DynamoDB"""
@@ -217,12 +215,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         phone_number = farmer.get('phone_number')
         dialect = farmer.get('dialect', 'hi')
         wind_speed = float(weather.get('wind_speed', 0))
-
-        # Gate nudges to approved users only (public WhatsApp is text-only)
-        if not is_approved_user(table, phone_number):
-            print(f"Skipping {phone_number} - not allowlisted for nudges")
-            nudges_skipped += 1
-            continue
 
         # Fetch full profile (consent + crop/district)
         profile = table.get_item(Key={'PK': f'USER#{phone_number}', 'SK': 'PROFILE'}).get('Item') or {}
