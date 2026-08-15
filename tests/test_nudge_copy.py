@@ -33,8 +33,15 @@ class TestNudgeMessage:
         assert "फवारणी" in msg
 
     def test_english_contains_wind_speed(self):
-        msg = get_nudge_message("en", "Latur", "Soybean", 9.2)
-        assert "9.2" in msg
+        msg = get_nudge_message("en", "Latur", "Soybean", 9.0)
+        assert "9 km/h" in msg
+
+    def test_wind_speed_rounded_to_whole_number(self):
+        # Regression: the raw m/s->km/h conversion upstream yields floats like
+        # 23.508000000000003; farmers must never see that — only a clean integer.
+        msg = get_nudge_message("hi", "Latur", "Cotton", 23.508000000000003)
+        assert "24 km/h" in msg
+        assert "23.5" not in msg
 
     def test_telugu_contains_spray(self):
         msg = get_nudge_message("te", "Nagpur", "Wheat", 6.0)
