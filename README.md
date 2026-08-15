@@ -20,7 +20,7 @@
 > 
 > One of **20 winners** selected from thousands of submissions across **115 countries**, over four months (December 2025 – April 2026) and four evaluation rounds: 1,000 selected to build → 300 semi-finalists (community voting) → 50 finalists (AWS expert panel) → 20 winners (final community vote + expert review).
 > 
-> **For judges, reviewers, and fellow builders — three fastest paths in:**
+> **For reviewers, partners, and fellow builders — three fastest paths in:**
 > 
 > | Path | Link | Time |
 > | --- | --- | --- |
@@ -56,6 +56,7 @@
 - [Honest Tradeoffs](#honest-tradeoffs)
 - [Requirements Methodology: EARS](#requirements-methodology-ears)
 - [Productization Roadmap](#productization-roadmap)
+  - [U.S. adaptation (open to pilot partners)](#us-adaptation-open-to-pilot-partners)
   - [Partnerships & commercialization](#partnerships--commercialization)
 - [Acknowledgments](#acknowledgments)
 - [Documentation](#documentation)
@@ -176,7 +177,7 @@ Real numbers from the running production stack — not projections.
 | Encryption in transit | ✅ Active | HTTPS only |
 | Data retention TTL | ✅ Active | Conversations 90d / MSG rows 7d / Nudges 180d / WAMID dedup 24h |
 
-### Judge Note
+### Verification Note
 
 > All numbers above are **verifiable in the repository and live CloudWatch dashboards** — see [SAM template](template.yaml), [ADRs](docs/adr/), [EARS requirements](docs/requirements.md), [CI workflows](.github/workflows/), and the [full metrics report](docs/METRICS-AND-MONITORING.md). 
 > 
@@ -507,12 +508,21 @@ The production build made deliberate tradeoffs for pilot sustainability. Calling
 
 AgriNexus is built as an **accountability engine**. The **trigger → confirm → follow-up** structure is domain-agnostic: only the trigger and message copy change; the accountability loop stays the same.
 
+### U.S. adaptation (open to pilot partners)
+
+The accountability loop is geography-agnostic; only the triggers, corpus, and channel mix change. U.S. Cooperative Extension faces the same structural gap AgriNexus was built against: too few specialists per producer, time-critical windows (spray intervals, frost, irrigation, pest flight), and no systematic measure of whether guidance was acted on. Extension programs also carry documentation obligations — NRCS conservation contracts, FSMA produce-safety records, organic certification — where a timestamped record of what was advised, when, and whether it was done has direct value.
+
+**What ports unchanged:** the trigger → confirm → follow-up engine, the audit trail, cohort analytics, and escalation to a human agent when a producer stops responding.
+
+**What gets swapped:** mandi/eNAM price signals → USDA AMS market news; ICAR/FAO corpus → Extension publications and NRCS practice standards; KVK partners → county Extension offices and land-grant programs; WhatsApp-first → SMS/voice where that is the prevailing channel.
+
+Open to a free single-crop, single-cohort, single-season pilot with a U.S. extension program. Contact: `pilot@prasadtilloo.com`.
+
 ### Beyond agriculture
 
 - **Irrigation scheduling** — reservoir level triggers, district-scoped reminders
-- **Medication adherence** — rural health worker follow-ups
-- **Micro-savings nudges** — financial literacy programs
-- **Vaccine schedule reminders** — maternal health networks
+- **Medication adherence** — care-team and community health worker follow-ups
+- **Accessibility and economic self-sufficiency** — see [L.E.N.S.](https://github.com/prasadt1/photography-coach-gemma4), an on-device assistant applying the same closed loop for blind and low-vision marketplace sellers
 
 ### Agriculture: nudge intelligence (next)
 
