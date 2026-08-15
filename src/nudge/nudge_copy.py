@@ -56,12 +56,19 @@ def get_nudge_message(dialect: str, district: str, crop: str, wind_speed: float)
     }
     
     crop_local = crop_names.get(crop, {}).get(dialect, crop)
-    
+
+    # Wind speed arrives as a raw float; the m/s->km/h conversion upstream can
+    # yield values like 23.508000000000003. Farmers see a clean whole number.
+    try:
+        wind = f"{round(float(wind_speed))}"
+    except (TypeError, ValueError):
+        wind = str(wind_speed)
+
     generic_messages = {
-        'hi': f'{district}: {crop_local} में स्प्रे के लिए मौसम अनुकूल है। हवा {wind_speed} km/h है। कृपया स्प्रे करें।',
-        'mr': f'{district}: {crop_local} मध्ये फवारणीसाठी हवामान अनुकूल आहे. वारा {wind_speed} km/h आहे. कृपया फवारणी करा.',
-        'te': f'{district}: {crop_local} లో స్ప్రే చేయడానికి వాతావరణం అనుకూలంగా ఉంది. గాలి {wind_speed} km/h. దయచేసి స్ప్రే చేయండి.',
-        'en': f'{district}: Weather is favorable for spraying {crop_local}. Wind: {wind_speed} km/h. Please spray.',
+        'hi': f'{district}: {crop_local} में स्प्रे के लिए मौसम अनुकूल है। हवा {wind} km/h है। कृपया स्प्रे करें।',
+        'mr': f'{district}: {crop_local} मध्ये फवारणीसाठी हवामान अनुकूल आहे. वारा {wind} km/h आहे. कृपया फवारणी करा.',
+        'te': f'{district}: {crop_local} లో స్ప్రే చేయడానికి వాతావరణం అనుకూలంగా ఉంది. గాలి {wind} km/h. దయచేసి స్ప్రే చేయండి.',
+        'en': f'{district}: Weather is favorable for spraying {crop_local}. Wind: {wind} km/h. Please spray.',
     }
     
     return generic_messages.get(dialect, generic_messages['en'])

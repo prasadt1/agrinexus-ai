@@ -16,7 +16,9 @@
 
 ---
 
-> ### 🏆 AWS Builder 10,000 AIdeas — Top 50 Finalist (EMEA · Social Impact)
+> ### 🏆 AWS Builder 10,000 AIdeas — Winner, Innovation Award (APJC)
+> 
+> One of **20 winners** selected from thousands of submissions across **115 countries**, over four months (December 2025 – April 2026) and four evaluation rounds: 1,000 selected to build → 300 semi-finalists (community voting) → 50 finalists (AWS expert panel) → 20 winners (final community vote + expert review).
 > 
 > **For judges, reviewers, and fellow builders — three fastest paths in:**
 > 
@@ -24,7 +26,9 @@
 > | --- | --- | --- |
 > | 🎥 **Watch the demo** | [youtu.be/Hr9EcblzkwI](https://youtu.be/Hr9EcblzkwI) | 3 min |
 > | 💬 **Try on WhatsApp** | [wa.me/4915120105731](https://wa.me/4915120105731) | 1 min |
-> | 📖 **Read the finalist article** | [AWS Builder Center](https://builder.aws.com/content/3C8hBRTcsRuQrHzE3Pq243yhXTF/aideas-finalist-agrinexus-ai) | 5 min |
+> | 📖 **Read the winner build-log** | [AWS Builder Center](https://builder.aws.com/content/3G8IptNFPtMXozconKnfo6WerAl/aideas-winner-how-i-built-agrinexus-ais-closed-loop-nudge-engine-and-how-you-can-too) | 8 min |
+> | 📄 **Read the finalist article** | [AWS Builder Center](https://builder.aws.com/content/3C8hBRTcsRuQrHzE3Pq243yhXTF/aideas-finalist-agrinexus-ai) | 5 min |
+> | 🏅 **Official winners announcement** | [AWS Builder Center](https://builder.aws.com/content/3D5gTWIjP2zvKncBZBCs849xRqn/aws-10000-aideas-competition-meet-the-winners) | 2 min |
 > 
 > **TL;DR:** The closed-loop nudge engine is the core differentiator against named peers (Farmer.Chat, iSDA, AgriChat.AI, Weather Impact). Weather-gated reminders that follow up at T+24h and T+48h, cancelled instantly when the farmer confirms action. 100% serverless. ~$0.54/farmer/year at 10K scale.
 
@@ -41,7 +45,7 @@
 
 ## Contents
 
-- [🏆 Finalist Quickstart](#-aws-builder-10000-aideas--top-50-finalist-emea--social-impact)
+- [🏆 Winner Quickstart](#-aws-builder-10000-aideas--winner-innovation-award-apjc)
 - [Production Evidence](#production-evidence)
 - [Try It Yourself](#try-it-yourself)
 - [Architecture](#architecture)
