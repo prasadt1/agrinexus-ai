@@ -18,6 +18,10 @@ Switched production RAG and vision from a retired Bedrock foundation-model ID to
 ### Docs
 - Updated current guides / architecture / requirements / RAG walkthrough / code walkthrough to point at **`BedrockModelId`** instead of a hardcoded model name
 - Historical CHANGELOG entries, dated design plans/specs, and `docs/legacy/` left unchanged
+- **Coverage honesty:** README and `docs/IMPLEMENTATION-QUALITY-METRICS.md` now headline **53%** pytest-cov line coverage; the old “80%” figure is labeled as a historical test-to-source **line-count ratio**, not executed-line coverage
+
+### Tests
+- **`tests/test_vision_quality_gate.py`**: two cases depended on machine-local image paths (`/tmp/wa_latest2.jpg` and a Cursor assets PNG). Those fail on a clean clone with `FileNotFoundError` — pre-existing since April 2026, not introduced by the model-ID edit. Replaced with in-test synthetic UI JPEGs so the suite is portable.
 
 ---
 

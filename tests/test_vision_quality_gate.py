@@ -1,7 +1,14 @@
 import io
 import os
+import sys
+from pathlib import Path
 
 import pytest
+
+_ROOT = Path(__file__).resolve().parents[1]
+_PROCESSOR = str(_ROOT / "src" / "processor")
+if _PROCESSOR not in sys.path:
+    sys.path.insert(0, _PROCESSOR)
 
 
 def _make_jpeg_bytes(w: int, h: int) -> bytes:
@@ -11,6 +18,7 @@ def _make_jpeg_bytes(w: int, h: int) -> bytes:
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=25)
     return buf.getvalue()
+
 
 def _make_white_dominant_ui_like_jpeg() -> bytes:
     from PIL import Image, ImageDraw
@@ -62,9 +70,8 @@ def test_quality_gate_blocks_tiny_images_before_model(monkeypatch):
 
 
 def test_ui_screenshot_is_rejected_before_model(monkeypatch):
-    # This is a real WhatsApp UI screenshot from the repo assets.
-    p = "/Users/prasadt1/.cursor/projects/Users-prasadt1-projects-AgriNexus-ai-push/assets/image-ec057046-890e-4dfd-a00b-3af1ebc7e182.png"
-    img_bytes = open(p, "rb").read()
+    # Synthetic UI-like image (repo-portable; previously depended on a machine-local Cursor asset path).
+    img_bytes = _make_white_dominant_ui_like_jpeg()
 
     from src.processor import analyzer
 
@@ -89,12 +96,12 @@ def test_white_dominant_ui_like_image_is_rejected(monkeypatch):
 
 
 def test_process_image_message_does_not_crop_prompt_on_screenshot(monkeypatch):
-    # Use the exact WhatsApp-downloaded JPEG screenshot shape that previously triggered
-    # the pest-macro crop prompt.
-    p = "/tmp/wa_latest2.jpg"
-    img_bytes = open(p, "rb").read()
+    # Synthetic WhatsApp-like UI JPEG that triggers screenshot rejection without a
+    # machine-local /tmp fixture (previously /tmp/wa_latest2.jpg).
+    img_bytes = _make_white_dominant_ui_like_jpeg()
 
     os.environ["VISION_QUALITY_GATE_ENABLED"] = "false"
+    monkeypatch.setenv("VISION_RELEVANCE_GATE_ENABLED", "false")
     from src.processor import analyzer
     monkeypatch.setattr(analyzer, "TEMP_BUCKET", "bucket", raising=False)
 
@@ -117,4 +124,3 @@ def test_process_image_message_does_not_crop_prompt_on_screenshot(monkeypatch):
     txt = (out.get("text") or "")
     assert out.get("non_photo") is True
     assert "फसल" not in txt or "Cotton / Wheat" not in txt
-

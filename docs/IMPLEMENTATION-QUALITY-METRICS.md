@@ -1,7 +1,7 @@
 # Implementation Quality Metrics
 
 **Project:** AgriNexus AI  
-**Last Updated:** April 25, 2026  
+**Last Updated:** 26 September 2026  
 **Purpose:** Evidence for competition submission — implementation quality assessment
 
 ---
@@ -12,7 +12,7 @@ AgriNexus AI demonstrates **production-grade implementation quality** across tes
 
 | Metric | Value |
 |---|---|
-| Test-to-code ratio | **80%** (4,100+ test lines / \~6,000 source lines) |
+| Line coverage (pytest-cov) | **53%** (`pytest --cov=src`, re-measured 26 Sept 2026) |
 | Test files | **22** Python test modules |
 | Total test functions | **205+** unit/integration tests |
 | IaC resources | **34** (SAM/CloudFormation) |
@@ -22,19 +22,22 @@ AgriNexus AI demonstrates **production-grade implementation quality** across tes
 | CI/CD workflows | **2** (GitHub Actions) |
 | CloudWatch alarms | **8** |
 
+> **Note:** An older headline figure of “80% (4,100+ test lines / ~6,000 source lines)” was a **test-to-source line-count ratio**, not executed-line coverage. That historical ratio is retained in §1.4 below and must not be read as pytest-cov coverage. See also [README — Production Evidence](../README.md#production-evidence).
+
 ---
 
 ## 1. Test Coverage
 
-### 1.1 Current State (April 25, 2026)
+### 1.1 Current State (26 September 2026)
 
 | Metric | Value |
 |---|---|
+| Line coverage (pytest-cov) | **53%** (`pytest tests/ --cov=src`) |
 | Test files | 22 |
 | Test functions | 205+ |
 | Test code | \~4,100 lines |
 | Source code | \~6,000 lines |
-| Test-to-code ratio | **80%** |
+| Test-to-code line ratio (historical) | **80%** — lines of test ÷ lines of source; **not** executed-line coverage |
 | Parametrized test scenarios | 50+ (golden questions) + 30+ (language matrix) |
 
 ### 1.2 Test Coverage by Module
@@ -69,9 +72,9 @@ AgriNexus AI demonstrates **production-grade implementation quality** across tes
 - `test_voice_*.py` — Amazon Transcribe + Polly
 - `test_vision.py` — Claude Vision
 
-### 1.4 Test Coverage Improvement Journey
+### 1.4 Test Coverage Improvement Journey (historical line-count ratio)
 
-The test-to-code ratio was improved from **52% to 80%** in iterative and continuous manner. The approach: add pure unit tests with mocks — no live AWS calls, no changes to production code.
+This section records how the **test-to-source line-count ratio** was improved from **52% to 80%**. That ratio counts lines of test code versus lines of source — it is **not** pytest-cov executed-line coverage (currently **53%**; see §1.1). The approach: add pure unit tests with mocks — no live AWS calls, no changes to production code.
 
 **Batch 1 (52% → 61%): Core module coverage**
 
@@ -196,7 +199,8 @@ CloudFormation change sets, automatic rollback on failure, parameter validation.
 
 | Category | Metric | Value | Evidence |
 |---|---|---|---|
-| **Test Coverage** | Test-to-code ratio | **80%** | 4,100 test lines / 6,000 source lines |
+| **Test Coverage** | Line coverage (pytest-cov) | **53%** | `pytest tests/ --cov=src` (26 Sept 2026) |
+| **Test Coverage** | Test-to-code line ratio (historical) | **80%** | 4,100 test lines / 6,000 source lines — not executed-line coverage |
 | **Test Coverage** | Test modules | 22 | `ls tests/test_*.py` |
 | **Test Coverage** | Test functions | 205+ | `pytest --co -q` |
 | **Test Coverage** | Language coverage | 4/4 | Hindi, Marathi, Telugu, English |
@@ -212,6 +216,6 @@ CloudFormation change sets, automatic rollback on failure, parameter validation.
 
 ---
 
-**Document Version:** 2.0  
-**Last Updated:** April 25, 2026  
+**Document Version:** 2.1  
+**Last Updated:** 26 September 2026  
 **Repository:** https://github.com/prasadt1/agrinexus-ai
