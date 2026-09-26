@@ -33,7 +33,7 @@
 > **TL;DR:** The closed-loop nudge engine is the core differentiator against named peers (Farmer.Chat, iSDA, AgriChat.AI, Weather Impact). Weather-gated reminders that follow up at T+24h and T+48h, cancelled instantly when the farmer confirms action. 100% serverless. ~$0.54/farmer/year at 10K scale.
 
 [![AWS Serverless](https://img.shields.io/badge/AWS-Serverless-232F3E?logo=amazonaws&logoColor=white)](https://aws.amazon.com/serverless/)
-[![Amazon Bedrock](https://img.shields.io/badge/Amazon%20Bedrock-Claude%203%20Sonnet-FF9900?logo=amazonaws&logoColor=white)](https://aws.amazon.com/bedrock/)
+[![Amazon Bedrock](https://img.shields.io/badge/Amazon%20Bedrock-Claude%20(BedrockModelId)-FF9900?logo=amazonaws&logoColor=white)](https://aws.amazon.com/bedrock/)
 [![WhatsApp Business Platform](https://img.shields.io/badge/WhatsApp-Business%20Platform-25D366?logo=whatsapp&logoColor=white)](https://www.whatsapp.com/business/platform/)
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![AWS SQS](https://img.shields.io/badge/AWS-SQS-232F3E?logo=amazonaws&logoColor=white)](https://aws.amazon.com/sqs/)
@@ -68,9 +68,9 @@
 
 ## Production Evidence
 
-> *Last verified: April 26, 2026 · 7-day rolling window from CloudWatch*
+> *Metrics below are from April 26, 2026. Between roughly 30 July and 26 Sept 2026, the RAG and vision paths were down (retired Bedrock model ID; fixed in [PR #7](https://github.com/prasadt1/agrinexus-ai/pull/7)). Not yet re-verified against current traffic.*
 
-AgriNexus is a working system with full production observability — not a prototype.
+AgriNexus is a deployed, functional prototype with production-grade observability — publicly reachable and instrumented, built to production standards on AWS and judged functional by AWS reviewers against a requirement that it not be staged. It has no farmer user base and is not in a pilot program.
 
 ### Live Endpoints
 
@@ -87,7 +87,7 @@ AgriNexus is a working system with full production observability — not a proto
 
 | Metric | Value |
 | --- | --- |
-| Test-to-code ratio | **80%** ([metrics](docs/IMPLEMENTATION-QUALITY-METRICS.md) · [how I got there](docs/IMPLEMENTATION-QUALITY-METRICS.md#14-test-coverage-improvement-journey)) |
+| Line coverage (pytest-cov) | **48%** — corrected 26 Sept 2026; the previous "80%" figure measured lines-of-test-code ÷ lines-of-source, not executed-line coverage. See [metrics](docs/IMPLEMENTATION-QUALITY-METRICS.md). |
 | Infrastructure-as-Code resources (SAM) | **34** ([template.yaml](template.yaml)) |
 | Architecture Decision Records (ADRs) | **10** ([docs/adr/](docs/adr/)) |
 | EARS requirements traced to code | **144** ([docs/requirements.md](docs/requirements.md)) |
@@ -170,8 +170,9 @@ Real numbers from the running production stack — not projections.
 | Control | Status | Evidence |
 | --- | --- | --- |
 | Meta HMAC-SHA256 signature verification | ✅ Always on | No bypass possible |
-| Per-user rate limiting | ✅ Active | **25**/hour WhatsApp (`RATE_LIMIT_MESSAGES` in `template.yaml` **Globals**; handler defaults to **10** only if env unset) |
-| PII redaction in logs | ✅ Active | Phone numbers shown as `491***` |
+| Per-user rate limiting (WhatsApp) | ✅ Active | **25**/hour WhatsApp (`RATE_LIMIT_MESSAGES` in `template.yaml` **Globals**; handler defaults to **10** only if env unset) |
+| Per-IP rate limiting (public web chat) | ✅ Active (fixed 26 Sept 2026) | Keys on `requestContext.identity.sourceIp`. Previously trusted the client-supplied `X-Forwarded-For` header, which could be spoofed to bypass the limit — corrected in [PR #7](https://github.com/prasadt1/agrinexus-ai/pull/7). |
+| PII redaction in logs | ✅ Active (fixed 26 Sept 2026) | Phone numbers shown as `491***`. Before that date, 12 log call sites printed raw numbers. |
 | IAM least-privilege | ✅ Enforced | DynamoDB / S3 / Bedrock resource-scoped |
 | Encryption at rest | ✅ Active | DynamoDB default encryption |
 | Encryption in transit | ✅ Active | HTTPS only |
@@ -209,7 +210,7 @@ Pick the web demo or WhatsApp experience.
 
 - **Onboarding**: language → district (**Latur**, **Jalna**, **Nagpur**) → crop → nudge consent (`src/processor/handler.py`).
 - **Serverless**: Lambda, DynamoDB, SQS, EventBridge Scheduler, Step Functions
-- **AI**: Amazon Bedrock (Claude 3 Sonnet + Knowledge Base RAG), Transcribe, Polly, Claude Vision
+- **AI**: Amazon Bedrock (Claude, model set by the `BedrockModelId` SAM parameter, + Knowledge Base RAG), Transcribe, Polly, Claude vision
 - **Messaging**: WhatsApp Business Platform (Cloud API)
 - **Storage**: DynamoDB single-table design, S3 for knowledge base sources + temp audio/images
 - **Abuse / cost controls**:
@@ -463,7 +464,7 @@ Weather Poller → Step Functions → Nudge Sender → WhatsApp
 ### Variable Costs (~3K queries + 500 voice min/month for 1K farmers)
 | Service | Usage (1K users) | Monthly Cost |
 |---------|------------------|--------------|
-| Bedrock Claude 3 Sonnet (RAG) | 3K queries (3M input + 1.5M output tokens) | ~$32 |
+| Bedrock Claude RAG (`BedrockModelId`) | 3K queries (3M input + 1.5M output tokens) | ~$32 |
 | Bedrock Claude Vision | 100 images | ~$5 |
 | Transcribe | 500 voice minutes | ~$12 |
 | Polly (neural TTS) | 200 min voice output | ~$2 |

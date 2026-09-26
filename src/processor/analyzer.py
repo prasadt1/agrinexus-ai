@@ -1,6 +1,6 @@
 """
 Vision Analyzer
-Uses Claude 3 Sonnet Vision for pest/disease identification from images
+Uses Claude vision on Bedrock (model set by BEDROCK_MODEL_ID) for pest/disease identification from images
 """
 import boto3
 import json
@@ -704,8 +704,8 @@ REMEMBER:
 - ALWAYS check for insects/pests - they are often the main issue farmers send photos about
 """
     
-    # Call Claude 3 Sonnet Vision
-    print(f"Analyzing image with Claude 3 Sonnet Vision (dialect: {dialect}, crop: {crop})")
+    # Call Claude vision (BEDROCK_MODEL_ID)
+    print(f"Analyzing image with Claude vision (dialect: {dialect}, crop: {crop})")
     
     try:
         response = bedrock.invoke_model(

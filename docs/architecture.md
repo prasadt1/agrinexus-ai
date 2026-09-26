@@ -9,7 +9,7 @@
 
 AgriNexus AI is a behavioral intervention engine and behavioral AI extension agent designed to close the "last mile" gap in agricultural extension for smallholder farmers. Unlike reactive information systems, AgriNexus utilizes a proactive, weather-timed behavioral nudge engine with closed-loop accountability to ensure agronomic advice translates into field action. The system prioritizes trust through dialect-native voice interactions (Hindi, Marathi, Telugu) and evidence-backed citations from validated FAO sources.
 
-The architecture is a serverless system with pay-as-you-go Bedrock. Estimated cost: approximately $53/month for 1,000 farmers, with S3 vectors ($1.30) and Bedrock ($39 variable) as the primary cost drivers. The system leverages Amazon Bedrock (Claude 3 Sonnet) for dialect-aware conversations, S3 for vector storage (migrated from OpenSearch Serverless on April 4, 2026 for 75% cost reduction), EventBridge Scheduler for behavioral nudges, Claude 3 Vision for pest diagnosis, and Amazon Transcribe + Polly for voice accessibility.
+The architecture is a serverless system with pay-as-you-go Bedrock. Estimated cost: approximately $53/month for 1,000 farmers, with S3 vectors ($1.30) and Bedrock ($39 variable) as the primary cost drivers. The system leverages Amazon Bedrock (Claude on Bedrock; model set by the `BedrockModelId` SAM parameter) for dialect-aware conversations, S3 for vector storage (migrated from OpenSearch Serverless on April 4, 2026 for 75% cost reduction), EventBridge Scheduler for behavioral nudges, Claude vision on Bedrock for pest diagnosis, and Amazon Transcribe + Polly for voice accessibility.
 
 ## 2. Architecture Principles
 
@@ -119,7 +119,7 @@ The architecture is a serverless system with pay-as-you-go Bedrock. Estimated co
 **Components**: Amazon Bedrock Agent **Runtime** (`retrieve_and_generate`) + Knowledge Base + S3
 
 **Responsibilities**:
-- Process messages using Claude 3 Sonnet
+- Process messages using a configured Claude model on Bedrock (`BedrockModelId`)
 - Retrieve relevant agronomic knowledge using RAG (`bedrock-agent-runtime` retrieve and generate)
 - Generate contextually appropriate responses in Hindi, Marathi, or Telugu
 - Apply guardrails for agricultural safety
@@ -143,7 +143,7 @@ s3://agrinexus-knowledge-base/
 **Note**: English-only FAO manuals. Bedrock translates to user's dialect at response time.
 
 **Bedrock Configuration**:
-- Model: Claude 3 Sonnet (cost-effective, multilingual)
+- Model: Claude on Bedrock via `BedrockModelId` (multilingual; default is a cross-region Sonnet inference profile)
 - Knowledge Base: S3 for document storage + S3 vectors for embeddings (approximately $1.30/month, pay-per-query)
 - Guardrails: Block banned pesticides (Paraquat, Endosulfan), escalate medical/veterinary queries to KVK, include label disclaimers
 - Agent Instructions: "You are an agricultural extension agent. Provide practical, actionable advice grounded in FAO data. Handle code-switching (e.g., Hinglish - mixed Hindi/English) naturally. Respond in the farmer's preferred language (Hindi, Marathi, or Telugu). Include simplified source citations."
@@ -155,9 +155,9 @@ s3://agrinexus-knowledge-base/
 - Amazon Bedrock (Agent + Knowledge Base with S3 vectors)
 - S3 (document storage + vector embeddings)
 
-### 4.3 Visual Verification (Claude 3 Vision)
+### 4.3 Visual Verification (Claude vision on Bedrock)
 
-**Components**: Lambda + Claude 3 Vision + S3
+**Components**: Lambda + Claude vision (`BedrockModelId`) + S3
 
 **Responsibilities**:
 - Extract images from WhatsApp messages
@@ -168,7 +168,7 @@ s3://agrinexus-knowledge-base/
 
 **Processing Flow**:
 1. Image received → Store in S3 (temp bucket)
-2. Invoke Bedrock with Claude 3 Vision
+2. Invoke Bedrock with the configured Claude vision model (`BedrockModelId`)
 3. Prompt: "Analyze this crop image. Identify any pests, diseases, or health issues. Provide diagnosis and recommended actions."
 4. Parse response for structured output
 5. Delete image from S3
@@ -185,7 +185,7 @@ s3://agrinexus-temp-images/
 
 **AWS Services**:
 - Lambda (vision-processor function)
-- Amazon Bedrock (Claude 3 Vision)
+- Amazon Bedrock (Claude vision via `BedrockModelId`)
 - S3 (temporary image storage)
 
 ### 4.4 User State Management (DynamoDB Single Table)
@@ -574,7 +574,7 @@ Policies:
 - **NudgeCompletionRate** (Percentage) - (NudgesCompleted / NudgesSent) × 100
 - **MessageVolume** (Count) - Messages received per hour
 - **ResponseTime** (Milliseconds) - End-to-end latency (p50, p95, p99)
-- **ModelLatency** (Milliseconds) - Claude 3 Sonnet latency (p95)
+- **ModelLatency** (Milliseconds) - configured Bedrock Claude model latency (p95)
 - **BedrockTokens** (Count) - Token usage for cost tracking
 - **DLQDepth** (Count) - Messages in Dead Letter Queue
 
@@ -590,7 +590,7 @@ Policies:
 
 **Widget 1**: NudgesSent vs NudgesCompleted (Time Series)  
 **Widget 2**: Nudge Completion Rate Trend (Metric Math: (NudgesCompleted / NudgesSent) × 100)  
-**Widget 3**: ModelLatency p95 for Claude 3 Sonnet (conversations + vision)  
+**Widget 3**: ModelLatency p95 for the configured Bedrock Claude model (conversations + vision)  
 **Widget 4**: DLQDepth (Alert if > 5)  
 **Widget 5**: Message Volume (last 24 hours)  
 **Widget 6**: Response Time p50, p95, p99  
@@ -738,8 +738,8 @@ jobs:
 | S3 Storage | 5 GB | 5 GB free | $0 |
 | S3 Requests | 50,000 PUT | 2,000 free | approximately $0.24 |
 | S3 Vectors | 300K queries | Pay-per-query | approximately $1.30 |
-| Bedrock (Claude 3 Sonnet RAG) | 3M input + 1.5M output tokens | Pay-as-you-go | approximately $32 |
-| Bedrock (Claude 3 Vision) | 100 images | Pay-as-you-go | approximately $5 |
+| Bedrock (Claude RAG via `BedrockModelId`) | 3M input + 1.5M output tokens | Pay-as-you-go | approximately $32 |
+| Bedrock (Claude vision via `BedrockModelId`) | 100 images | Pay-as-you-go | approximately $5 |
 | Transcribe | 500 voice minutes | $0.024/min | approximately $12 |
 | Polly | 200 min output | $4/1M chars | approximately $2 |
 | Step Functions | 10,000 transitions | 4,000 free | approximately $0.15 |
@@ -816,7 +816,7 @@ jobs:
 **Tasks**:
 - [ ] Conversation Lambda with RAG and source citations
 - [ ] Transcribe + Polly integration
-- [ ] Vision Processor (Claude 3 Vision via invoke_model)
+- [ ] Vision Processor (Claude vision via `invoke_model` and `BedrockModelId`)
 - [ ] DLQ + dlq-handler (apology in user's dialect)
 - [ ] Test all three dialects for conversation quality
 - [ ] Implement 20 guardrail test scenarios

@@ -1,10 +1,12 @@
 # AgriNexus AI — Production Metrics & Monitoring
 
-> **For judges, reviewers, and operators.** This document captures the observability posture of the live AgriNexus AI stack: what's instrumented, what's alarmed, what the system is actually doing in production right now, and what's on the roadmap. Numbers are from the running environment, not projections.
+> **For judges, reviewers, and operators.** This document captures the observability posture of the live AgriNexus AI stack: what's instrumented, what's alarmed, what the system is actually doing in production right now, and what's on the roadmap.
 >
 > **See also:** [README — Production Evidence](../README.md#production-evidence) · [Operations Runbook](operations/RUNBOOK-ALERTS.md) · [FinOps breakdown](finops-public.md)
 
 **Last updated:** April 23, 2026 · **Rolling window:** 7 days · **Environment:** dev (production) · **Stack:** `agrinexus-week2`
+
+> These numbers predate an ~8-week outage (roughly 30 July – 26 Sept 2026) caused by a retired Bedrock model ID; fixed in [PR #7](https://github.com/prasadt1/agrinexus-ai/pull/7). Not yet re-verified against current traffic. They also reflect this system's actual usage level honestly: **Active Users (last 7 days) was 1** at the time of capture — this is a deployed prototype with no farmer user base, not a system under load.
 
 ---
 

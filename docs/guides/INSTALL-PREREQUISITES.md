@@ -97,11 +97,16 @@ aws sts get-caller-identity
 # Go to AWS Console
 # Navigate to: Bedrock → Model access
 # Request access to:
-# - Claude 3 Sonnet
-# - Titan Embeddings
+# - The Claude model(s) you intend to use (see BedrockModelId in template.yaml /
+#   samconfig.example.toml — typically a Claude Sonnet inference profile)
+# - Titan Embeddings (for the Knowledge Base)
+# Console: https://console.aws.amazon.com/bedrock/ → Model access
 
 # Or use CLI:
-aws bedrock list-foundation-models --region us-east-1
+aws bedrock list-foundation-models --region us-east-1 --by-provider anthropic
+aws bedrock list-inference-profiles --region us-east-1 \
+  --query 'inferenceProfileSummaries[?contains(inferenceProfileId, `claude`)].[inferenceProfileId,status]' \
+  --output table
 ```
 
 ## 6.5 WhatsApp Webhook Secret (Week 2)
@@ -137,7 +142,7 @@ Ensure `MOCK_WEATHER` is false on the Weather poller for production when you wan
 ### Issue: "Bedrock model not available"
 **Solution**: 
 1. Go to AWS Console → Bedrock → Model access
-2. Request access to Claude 3 Sonnet and Titan Embeddings
+2. Request access to the Claude model(s) you intend to use (match `BedrockModelId` in `template.yaml`) and Titan Embeddings
 3. Wait for approval (usually instant)
 
 ### Issue: "Region not supported"

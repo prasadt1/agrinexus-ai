@@ -50,7 +50,7 @@ def run_heuristics(image_bytes: bytes) -> Dict[str, Any]:
 
 **Purpose**: Analyze real crop photos with calibrated confidence levels
 
-**Technology**: Claude 3 Sonnet Vision via AWS Bedrock
+**Technology**: Claude vision on AWS Bedrock (model set by `BedrockModelId`)
 
 **Key Changes**:
 1. **Enforced JSON schema** with validated enums (no free-form text hallucinations)

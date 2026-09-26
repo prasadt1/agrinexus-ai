@@ -25,12 +25,12 @@ if COMMON_LAYER not in sys.path:
 
 
 # ---------------------------------------------------------------------------
-# 1) Model ID — no literal retired Claude 3 Sonnet in active source
+# 1) Model ID — no retired foundation-model ID substring in active source
 # ---------------------------------------------------------------------------
 
 class TestNoRetiredModelLiteral:
     def test_no_claude_3_sonnet_in_active_source(self):
-        """Assert no source file (excluding stale src/vision/) contains claude-3-sonnet."""
+        """Assert no source file (excluding stale src/vision/) contains the retired model id substring."""
         offenders = []
         vision_root = (REPO / "src" / "vision").resolve()
         scan_roots = [REPO / "src", REPO / "template.yaml"]
