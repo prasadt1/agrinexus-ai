@@ -28,6 +28,10 @@ def dlq_module(monkeypatch):
     mock_boto3.client = lambda svc, **kw: mock_secrets
     monkeypatch.setitem(sys.modules, "boto3", mock_boto3)
 
+    layer = os.path.join(os.path.dirname(__file__), "..", "src", "common-layer", "python")
+    if layer not in sys.path:
+        sys.path.insert(0, layer)
+
     spec = importlib.util.spec_from_file_location(
         "dlq_handler",
         os.path.join(os.path.dirname(__file__), "..", "src", "dlq", "handler.py"),

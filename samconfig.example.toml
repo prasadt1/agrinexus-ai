@@ -1,0 +1,46 @@
+# Example SAM deploy config for agrinexus-week2.
+#
+# Copy to samconfig.toml (gitignored) and fill in account-specific values:
+#   cp samconfig.example.toml samconfig.toml
+#
+# Why this file exists: the live stack's parameters previously lived only in
+# CloudFormation and someone's head. When a deploy was needed after the Bedrock
+# model outage, there was no in-repo record of KnowledgeBaseId / stream ARN /
+# stack name. Keep non-secret deploy knobs visible here; keep secrets in
+# Secrets Manager (never as parameter_overrides).
+#
+# Reconstruct missing values from the live stack when needed:
+#   aws cloudformation describe-stacks --stack-name agrinexus-week2 \
+#     --query 'Stacks[0].Parameters' --region us-east-1
+
+version = 0.1
+
+[default.global.parameters]
+stack_name = "agrinexus-week2"
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.deploy.parameters]
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND"
+confirm_changeset = true
+fail_on_empty_changeset = false
+region = "us-east-1"
+resolve_s3 = true
+s3_prefix = "agrinexus-week2"
+stack_name = "agrinexus-week2"
+
+# Non-secret parameters matching the production/dev demo stack.
+# Omit GuardrailId to use the template default (empty string) — SAM rejects GuardrailId=
+# Leave RateLimitBypassPhones / BetaPhones out of overrides unless set; empty "Key=" breaks CLI parsing.
+# Replace YOUR_ACCOUNT / STREAM_LABEL before first deploy of a new account.
+parameter_overrides = [
+  "Environment=dev",
+  "TableName=agrinexus-data",
+  "TableStreamArn=arn:aws:dynamodb:us-east-1:YOUR_ACCOUNT:table/agrinexus-data/stream/STREAM_LABEL",
+  "KnowledgeBaseId=ARZ4XQEBCU",
+  "GuardrailVersion=1",
+  "BedrockModelId=us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+  "RateLimitDisabled=false",
+]

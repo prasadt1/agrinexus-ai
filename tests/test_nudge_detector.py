@@ -38,10 +38,21 @@ def det(monkeypatch):
     # Also stub common layer
     common_mod = types.ModuleType("common")
     common_mod.whatsapp = types.ModuleType("common.whatsapp")
-    common_mod.whatsapp.send_whatsapp_message = lambda **kw: None
-    common_mod.whatsapp.send_whatsapp_buttons = lambda **kw: None
+    common_mod.whatsapp.send_whatsapp_message = lambda *a, **kw: None
+    common_mod.whatsapp.send_whatsapp_buttons = lambda *a, **kw: None
     monkeypatch.setitem(sys.modules, "common", common_mod)
     monkeypatch.setitem(sys.modules, "common.whatsapp", common_mod.whatsapp)
+
+    # Real redact + keyword helpers (needed by detector)
+    layer = os.path.join(os.path.dirname(__file__), "..", "src", "common-layer", "python")
+    if layer not in sys.path:
+        sys.path.insert(0, layer)
+    import common.redact as redact_mod  # noqa: E402
+    import common.nudge_keywords as nk_mod  # noqa: E402
+    monkeypatch.setitem(sys.modules, "common.redact", redact_mod)
+    monkeypatch.setitem(sys.modules, "common.nudge_keywords", nk_mod)
+    common_mod.redact = redact_mod
+    common_mod.nudge_keywords = nk_mod
 
     spec = importlib.util.spec_from_file_location(
         "nudge_detector",
@@ -88,7 +99,13 @@ class TestDetectKeyword:
         assert det.detect_keyword("How to grow wheat?", det.DONE_KEYWORDS["en"]) is False
 
     def test_partial_match_in_sentence(self, det):
-        assert det.detect_keyword("I am done with spraying", det.DONE_KEYWORDS["en"]) is True
+        # Substring matches must NOT count — fall through to normal handler
+        assert det.detect_keyword("I am done with spraying", det.DONE_KEYWORDS["en"]) is False
+        assert det.detect_keyword("what to do after spraying?", det.NOT_YET_KEYWORDS["en"]) is False
+
+    def test_exact_short_done_still_matches(self, det):
+        assert det.detect_keyword("done", det.DONE_KEYWORDS["en"]) is True
+        assert det.detect_keyword(" later ", det.NOT_YET_KEYWORDS["en"]) is True
 
 
 # ---------------------------------------------------------------------------

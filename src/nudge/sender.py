@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, Any
 from common.whatsapp import send_whatsapp_message, send_whatsapp_template, send_whatsapp_buttons
+from common.redact import redact_phone
+from common.allowlist import is_approved_user
 
 # Lambda uses Handler sender.lambda_handler (flat zip); tests use src.nudge.sender
 _nudge_dir = os.path.dirname(os.path.abspath(__file__))
@@ -34,8 +36,6 @@ NUDGE_BUTTONS = {
     'te': [{"id": "done", "title": "అయ్యింది"}, {"id": "not_yet", "title": "ఇంకా లేదు"}],
     'en': [{"id": "done", "title": "Done"}, {"id": "not_yet", "title": "Not Yet"}],
 }
-
-from common.allowlist import is_approved_user
 
 
 def convert_floats_to_decimal(obj):
@@ -184,7 +184,7 @@ def has_open_nudge(phone_number: str, activity: str, max_age_hours: int = 96) ->
             # If parsing fails, be conservative: treat it as open and skip duplicates.
             pass
 
-        print(f"Found existing open {activity} nudge for {phone_number}: {nudge_id} (status: {status})")
+        print(f"Found existing open {activity} nudge for {redact_phone(phone_number)}: {nudge_id} (status: {status})")
         return True
 
     return False
@@ -218,7 +218,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         # Gate nudges to approved users only (public WhatsApp is text-only)
         if not is_approved_user(table, phone_number):
-            print(f"Skipping {phone_number} - not allowlisted for nudges")
+            print(f"Skipping {redact_phone(phone_number)} - not allowlisted for nudges")
             nudges_skipped += 1
             continue
 
@@ -228,17 +228,17 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Consent gate: nudges are proactive messages; only send if user opted in.
         # Onboarding stores consent in profile['consent'].
         if not profile.get('onboarding_complete'):
-            print(f"Skipping {phone_number} - onboarding incomplete")
+            print(f"Skipping {redact_phone(phone_number)} - onboarding incomplete")
             nudges_skipped += 1
             continue
         if profile.get('consent') is not True:
-            print(f"Skipping {phone_number} - consent not granted for nudges")
+            print(f"Skipping {redact_phone(phone_number)} - consent not granted for nudges")
             nudges_skipped += 1
             continue
 
         # Open-nudge gate: do not send a fresh nudge when one is still open.
         if has_open_nudge(phone_number, activity):
-            print(f"Skipping {phone_number} - already has open {activity} nudge")
+            print(f"Skipping {redact_phone(phone_number)} - already has open {activity} nudge")
             nudges_skipped += 1
             continue
 
@@ -301,7 +301,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         is_demo_user = profile.get('demo_tier') == 'public'
         
         if is_demo_user:
-            print(f"Demo user {phone_number} - sending one nudge only, no T+24h/T+48h follow-ups")
+            print(f"Demo user {redact_phone(phone_number)} - sending one nudge only, no T+24h/T+48h follow-ups")
             # Demo users get one nudge to see the flow, but no follow-up reminders
         else:
             # Production users get full closed-loop follow-ups

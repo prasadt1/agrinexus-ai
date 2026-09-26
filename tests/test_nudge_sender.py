@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import types
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -42,16 +43,32 @@ def sender(monkeypatch):
     mock_boto3.client = _client
     monkeypatch.setitem(sys.modules, "boto3", mock_boto3)
 
+    layer = os.path.join(os.path.dirname(__file__), "..", "src", "common-layer", "python")
+    if layer not in sys.path:
+        sys.path.insert(0, layer)
+    # Drop any prior stub so real common.redact can load from the layer path
+    for name in list(sys.modules):
+        if name == "common" or name.startswith("common."):
+            sys.modules.pop(name, None)
+    import importlib
+    redact_mod = importlib.import_module("common.redact")
+
     common_mod = types.ModuleType("common")
+    common_mod.__path__ = []  # mark as package for submodule imports
     common_mod.whatsapp = types.ModuleType("common.whatsapp")
     common_mod.whatsapp.send_whatsapp_message = lambda **kw: True
     common_mod.whatsapp.send_whatsapp_buttons = lambda **kw: True
     common_mod.whatsapp.send_whatsapp_template = lambda **kw: True
     common_mod.allowlist = types.ModuleType("common.allowlist")
     common_mod.allowlist.is_approved_user = lambda table, phone: True
+    common_mod.redact = redact_mod
     monkeypatch.setitem(sys.modules, "common", common_mod)
     monkeypatch.setitem(sys.modules, "common.whatsapp", common_mod.whatsapp)
     monkeypatch.setitem(sys.modules, "common.allowlist", common_mod.allowlist)
+    monkeypatch.setitem(sys.modules, "common.redact", redact_mod)
+
+    # Avoid importing a cached sender from a previous test
+    sys.modules.pop("nudge_sender", None)
 
     spec = importlib.util.spec_from_file_location(
         "nudge_sender",
@@ -110,36 +127,52 @@ class TestHasOpenNudge:
         assert sender.has_open_nudge("491234", "spray") is False
 
     def test_has_sent_nudge(self, sender, monkeypatch):
+        # Relative timestamp — absolute April 2026 dates go stale past max_age_hours=96
+        ts = (datetime.utcnow() - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S")
         mock_table = types.SimpleNamespace(
             query=lambda **kw: {"Items": [
-                {"SK": "NUDGE#2026-04-25T10:00:00#spray", "status": "SENT"}
+                {"SK": f"NUDGE#{ts}#spray", "status": "SENT"}
             ]}
         )
         monkeypatch.setattr(sender, "table", mock_table)
         assert sender.has_open_nudge("491234", "spray") is True
 
     def test_has_reminded_nudge(self, sender, monkeypatch):
+        ts = (datetime.utcnow() - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S")
         mock_table = types.SimpleNamespace(
             query=lambda **kw: {"Items": [
-                {"SK": "NUDGE#2026-04-25T10:00:00#spray", "status": "REMINDED"}
+                {"SK": f"NUDGE#{ts}#spray", "status": "REMINDED"}
             ]}
         )
         monkeypatch.setattr(sender, "table", mock_table)
         assert sender.has_open_nudge("491234", "spray") is True
 
     def test_done_nudge_not_pending(self, sender, monkeypatch):
+        ts = (datetime.utcnow() - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S")
         mock_table = types.SimpleNamespace(
             query=lambda **kw: {"Items": [
-                {"SK": "NUDGE#2026-04-25T10:00:00#spray", "status": "DONE"}
+                {"SK": f"NUDGE#{ts}#spray", "status": "DONE"}
             ]}
         )
         monkeypatch.setattr(sender, "table", mock_table)
         assert sender.has_open_nudge("491234", "spray") is False
 
     def test_expired_nudge_not_pending(self, sender, monkeypatch):
+        ts = (datetime.utcnow() - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S")
         mock_table = types.SimpleNamespace(
             query=lambda **kw: {"Items": [
-                {"SK": "NUDGE#2026-04-25T10:00:00#spray", "status": "EXPIRED"}
+                {"SK": f"NUDGE#{ts}#spray", "status": "EXPIRED"}
+            ]}
+        )
+        monkeypatch.setattr(sender, "table", mock_table)
+        assert sender.has_open_nudge("491234", "spray") is False
+
+    def test_stale_sent_nudge_past_max_age_not_open(self, sender, monkeypatch):
+        """Production rule: SENT older than 96h is not 'open' (demo lock escape)."""
+        ts = (datetime.utcnow() - timedelta(hours=120)).strftime("%Y-%m-%dT%H:%M:%S")
+        mock_table = types.SimpleNamespace(
+            query=lambda **kw: {"Items": [
+                {"SK": f"NUDGE#{ts}#spray", "status": "SENT"}
             ]}
         )
         monkeypatch.setattr(sender, "table", mock_table)

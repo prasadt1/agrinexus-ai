@@ -34,6 +34,13 @@ Parameters:
     Default: "1"
     Description: Bedrock Guardrail Version from Week 1 (optional)
 
+  BedrockModelId:
+    Type: String
+    Default: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+    Description: >-
+      Bedrock inference profile ID for RAG (RetrieveAndGenerate) and vision
+      (InvokeModel). Use an active profile from list-inference-profiles.
+
   RateLimitBypassPhones:
     Type: String
     Default: ""
@@ -325,7 +332,10 @@ Resources:
         Variables:
           WEB_RATE_LIMIT: "5"  # 5 queries per hour per IP
           WEB_RATE_LIMIT_WINDOW: "3600"  # 1 hour
-          MODEL_ARN: arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0
+          BEDROCK_MODEL_ID: !Ref BedrockModelId
+          ACCOUNT_ID: !Ref AWS::AccountId
+          WEB_IMAGE_MAX_BYTES: "5242880"
+          WEB_MAX_IMAGES: "1"
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TableName
@@ -333,6 +343,9 @@ Resources:
             - Effect: Allow
               Action:
                 - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
+                - bedrock:GetInferenceProfile
+                - bedrock:ListInferenceProfiles
                 - bedrock:RetrieveAndGenerate
                 - bedrock:Retrieve
                 - bedrock-agent:Retrieve
@@ -394,7 +407,8 @@ Resources:
           ACCESS_TOKEN_SECRET: agrinexus/whatsapp/access-token
           PHONE_NUMBER_ID_SECRET: agrinexus/whatsapp/phone-number-id
           TEMP_AUDIO_BUCKET: !Ref TempAudioBucket
-          MODEL_ARN: arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0
+          BEDROCK_MODEL_ID: !Ref BedrockModelId
+          ACCOUNT_ID: !Ref AWS::AccountId
           APPEND_DISTRICT_HELPLINE: "true"
           # Shorter Polly audio; full reply always sent as text first (see output.truncate_for_voice)
           VOICE_TTS_MAX_CHARS: "700"
@@ -409,6 +423,8 @@ Resources:
               Action:
                 - bedrock:InvokeModel
                 - bedrock:InvokeModelWithResponseStream
+                - bedrock:GetInferenceProfile
+                - bedrock:ListInferenceProfiles
                 - bedrock:RetrieveAndGenerate
                 - bedrock:Retrieve
                 - bedrock-agent:Retrieve
@@ -450,7 +466,8 @@ Resources:
           ACCESS_TOKEN_SECRET: agrinexus/whatsapp/access-token
           PHONE_NUMBER_ID_SECRET: agrinexus/whatsapp/phone-number-id
           TEMP_AUDIO_BUCKET: !Ref TempAudioBucket
-          MODEL_ARN: arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0
+          BEDROCK_MODEL_ID: !Ref BedrockModelId
+          ACCOUNT_ID: !Ref AWS::AccountId
           APPEND_DISTRICT_HELPLINE: "true"
           VOICE_TTS_MAX_CHARS: "700"
           IMAGE_MAX_BYTES: "5242880"
@@ -469,6 +486,8 @@ Resources:
               Action:
                 - bedrock:InvokeModel
                 - bedrock:InvokeModelWithResponseStream
+                - bedrock:GetInferenceProfile
+                - bedrock:ListInferenceProfiles
                 - bedrock:RetrieveAndGenerate
                 - bedrock:Retrieve
                 - bedrock-agent:Retrieve
@@ -942,6 +961,194 @@ Resources:
       Dimensions:
         - Name: QueueName
           Value: !GetAtt MessageDLQ.QueueName
+      AlarmActions:
+        - !Ref AlertTopic
+
+  # ============================================================================
+  # API Gateway 5XX alarm (web chat) — catches handler failures that return 5xx
+  # ============================================================================
+  WebChatApi5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub agrinexus-web-chat-api-5xx-${Environment}
+      AlarmDescription: Web chat API Gateway 5XXError count
+      Namespace: AWS/ApiGateway
+      MetricName: 5XXError
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      Dimensions:
+        - Name: ApiName
+          Value: !Sub agrinexus-web-chat-${Environment}
+        - Name: Stage
+          Value: !Ref Environment
+      AlarmActions:
+        - !Ref AlertTopic
+
+  # ============================================================================
+  # Synthetic canary: POST /chat with a fixed prompt; alarm on non-success
+  # ============================================================================
+  WebChatCanaryBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub agrinexus-canary-${Environment}-${AWS::AccountId}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireCanaryArtifacts
+            Status: Enabled
+            ExpirationInDays: 31
+
+  WebChatCanaryRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub AgriNexus-WebChat-Canary-${Environment}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              Service: synthetics.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: WebChatCanaryAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:GetBucketLocation
+                Resource:
+                  - !GetAtt WebChatCanaryBucket.Arn
+                  - !Sub ${WebChatCanaryBucket.Arn}/*
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !GetAtt WebChatCanaryBucket.Arn
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/cwsyn-*
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    cloudwatch:namespace: CloudWatchSynthetics
+              - Effect: Allow
+                Action:
+                  - xray:PutTraceSegments
+                Resource: '*'
+
+  WebChatCanary:
+    Type: AWS::Synthetics::Canary
+    Properties:
+      Name: !Sub agnx-chat-${Environment}
+      ArtifactS3Location: !Sub s3://${WebChatCanaryBucket}/canary
+      ExecutionRoleArn: !GetAtt WebChatCanaryRole.Arn
+      RuntimeVersion: syn-nodejs-puppeteer-9.1
+      Schedule:
+        Expression: rate(15 minutes)
+        DurationInSeconds: 0
+      RunConfig:
+        TimeoutInSeconds: 60
+        EnvironmentVariables:
+          CHAT_URL: !Sub https://${WebChatApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/chat
+      StartCanaryAfterCreation: true
+      SuccessRetentionPeriod: 2
+      FailureRetentionPeriod: 14
+      Code:
+        Handler: index.handler
+        Script: |
+          const synthetics = require('Synthetics');
+          const log = require('SyntheticsLogger');
+          const https = require('https');
+          const { URL } = require('url');
+
+          const postChat = async function () {
+            const chatUrl = process.env.CHAT_URL;
+            if (!chatUrl) {
+              throw new Error('CHAT_URL env var is required');
+            }
+            const payload = JSON.stringify({
+              message: 'How to control cotton pests?',
+              language: 'en'
+            });
+            const url = new URL(chatUrl);
+            const options = {
+              hostname: url.hostname,
+              path: url.pathname + url.search,
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(payload)
+              },
+              timeout: 45000
+            };
+            const statusCode = await new Promise((resolve, reject) => {
+              const req = https.request(options, (res) => {
+                let body = '';
+                res.on('data', (chunk) => { body += chunk; });
+                res.on('end', () => {
+                  log.info(`Canary status=${res.statusCode} body=${body.slice(0, 200)}`);
+                  resolve(res.statusCode);
+                });
+              });
+              req.on('error', reject);
+              req.on('timeout', () => {
+                req.destroy();
+                reject(new Error('Canary request timed out'));
+              });
+              req.write(payload);
+              req.end();
+            });
+            if (statusCode !== 200) {
+              throw new Error(`Web chat canary expected 200, got ${statusCode}`);
+            }
+          };
+
+          exports.handler = async () => {
+            return await synthetics.executeStep('postChat', postChat);
+          };
+
+  WebChatCanaryAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub agrinexus-web-chat-canary-${Environment}
+      AlarmDescription: Synthetic canary POST /chat SuccessPercent below 100
+      Namespace: CloudWatchSynthetics
+      MetricName: SuccessPercent
+      Statistic: Average
+      Period: 900
+      EvaluationPeriods: 1
+      Threshold: 100
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      Dimensions:
+        - Name: CanaryName
+          Value: !Sub agnx-chat-${Environment}
       AlarmActions:
         - !Ref AlertTopic
 

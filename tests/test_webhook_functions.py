@@ -68,6 +68,15 @@ class TestShouldSkipRag:
     def test_normal_question_not_skipped(self, wh):
         assert wh.should_skip_rag("How to grow wheat?") is False
 
+    def test_after_spraying_question_not_skipped(self, wh):
+        assert wh.should_skip_rag("what to do after spraying?") is False
+
+    def test_substring_later_in_sentence_not_skipped(self, wh):
+        assert wh.should_skip_rag("I will spray later today") is False
+
+    def test_exact_later_is_skipped(self, wh):
+        assert wh.should_skip_rag("later") is True
+
     def test_empty_string(self, wh):
         assert wh.should_skip_rag("") is False
 

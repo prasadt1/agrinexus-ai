@@ -62,6 +62,16 @@ def _install_common_stubs(sent_messages):
     allowlist.allowlist_expiry_hint = lambda *_args, **_kwargs: ""
     sys.modules["common.allowlist"] = allowlist
 
+    layer = str(Path(__file__).resolve().parents[1] / "src" / "common-layer" / "python")
+    if layer not in sys.path:
+        sys.path.insert(0, layer)
+    import common.redact as redact_mod  # noqa: E402
+    import common.nudge_keywords as nk_mod  # noqa: E402
+    sys.modules["common.redact"] = redact_mod
+    sys.modules["common.nudge_keywords"] = nk_mod
+    common_pkg.redact = redact_mod
+    common_pkg.nudge_keywords = nk_mod
+
     helplines = types.ModuleType("common.district_helplines")
     helplines.maybe_append_helpline_footer = lambda text, *_args, **_kwargs: text
     sys.modules["common.district_helplines"] = helplines
