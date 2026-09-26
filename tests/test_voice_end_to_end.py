@@ -139,7 +139,7 @@ def step3_rag_query(question, dialect):
             'type': 'KNOWLEDGE_BASE',
             'knowledgeBaseConfiguration': {
                 'knowledgeBaseId': KB_ID,
-                'modelArn': 'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0',
+                'modelArn': 'arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0',
                 'generationConfiguration': {
                     'promptTemplate': {
                         'textPromptTemplate': f'''You are an agricultural extension agent helping smallholder farmers in India with FARMING questions ONLY.

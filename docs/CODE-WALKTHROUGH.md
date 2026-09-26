@@ -73,7 +73,7 @@ Key responsibilities:
 
 Key responsibilities:
 - Download image from WhatsApp
-- Invoke Claude 3 Sonnet Vision
+- Invoke Claude vision on Bedrock (model set by the `BedrockModelId` SAM parameter)
 - Return diagnosis in local language
 
 ### 3.5 Weather Poller (`src/weather/handler.py`)

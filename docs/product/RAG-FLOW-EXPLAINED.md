@@ -55,8 +55,8 @@
 │    │    Answer in Hindi: Cotton mein aphids ka control        │
 │    │    kaise karein?"                                         │
 │    │                                                            │
-│    └── Send to the foundation model (default Claude 3 Sonnet   │
-│        in code; override with MODEL_ARN env if set)            │
+│    └── Send to the foundation / inference-profile model        │
+│        (BedrockModelId SAM parameter; Claude on Bedrock)       │
 │                                                                 │
 │    Step C: GENERATE (LLM creates response)                     │
 │    ├── Claude reads FAO content                                │
@@ -119,7 +119,7 @@
 ### 1. **Multilingual Magic**
 - FAO PDFs are in **English**
 - Question is in **Hindi/Marathi/Telugu**
-- Claude 3 Sonnet automatically:
+- The configured Claude model on Bedrock (`BedrockModelId`) automatically:
   - Understands the question language
   - Reads English FAO content
   - Generates response in the question's language
@@ -169,7 +169,7 @@ aws bedrock-agent-runtime retrieve-and-generate \
     "type": "KNOWLEDGE_BASE",
     "knowledgeBaseConfiguration": {
       "knowledgeBaseId": "'$KB_ID'",
-      "modelArn": "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0"
+      "modelArn": "arn:aws:bedrock:us-east-1:ACCOUNT_ID:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0"
     }
   }'
 ```

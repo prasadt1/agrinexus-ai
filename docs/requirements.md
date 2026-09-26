@@ -67,7 +67,7 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 ### 2.2 Dialect-Native Conversation (Tier 1 - Full Depth)
 
-**REQ-CONV-001**: When a farmer sends a message via WhatsApp, the system shall process it using Amazon Bedrock Agent with Claude 3 Sonnet.
+**REQ-CONV-001**: When a farmer sends a message via WhatsApp, the system shall process it using Amazon Bedrock Agent Runtime (`retrieve_and_generate`) with the Claude model configured by the `BedrockModelId` SAM parameter.
 
 **REQ-CONV-002**: When the Bedrock agent receives a query, the system shall retrieve relevant agronomic knowledge from the S3-backed knowledge base using RAG (Retrieval Augmented Generation).
 
@@ -325,7 +325,7 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **REQ-MON-003**: The system shall emit custom metric for Nudge Completion Rate: (NudgesCompleted / NudgesSent) × 100.
 
-**REQ-MON-004**: The system shall track ModelLatency (p95) for Claude 3 Sonnet only.
+**REQ-MON-004**: The system shall track ModelLatency (p95) for the configured Bedrock Claude model (the model referenced by `BedrockModelId`) used for conversations and vision.
 
 **REQ-MON-005**: The system shall monitor DLQ depth and alert if > 5 messages.
 

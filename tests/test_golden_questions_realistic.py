@@ -106,7 +106,7 @@ def query_knowledge_base(question: str, kb_id: str) -> Dict:
                 'type': 'KNOWLEDGE_BASE',
                 'knowledgeBaseConfiguration': {
                     'knowledgeBaseId': kb_id,
-                    'modelArn': 'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0',
+                    'modelArn': 'arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0',
                     'generationConfiguration': {
                         'inferenceConfig': {
                             'textInferenceConfig': {

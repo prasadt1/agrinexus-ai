@@ -1,6 +1,6 @@
 """
 Vision Test
-Tests Claude 3 Sonnet Vision for crop pest/disease identification
+Tests Claude vision for crop pest/disease identification
 """
 import sys
 import os
@@ -29,7 +29,7 @@ def run_vision_analysis(image_path, dialect, crop, description):
         print(f"\n1. Image loaded: {len(image_bytes)} bytes")
         
         # Analyze
-        print(f"\n2. Analyzing with Claude 3 Sonnet Vision...")
+        print(f"\n2. Analyzing with Claude vision...")
         result = analyze_crop_image(image_bytes, dialect, crop)
         
         # Display results

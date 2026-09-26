@@ -132,7 +132,7 @@ Limit: 300  # 300 requests / 5 minutes per IP
 ## 4. Bedrock Capacity
 
 ### 4.1 Service Quotas
-**Claude 3 Sonnet** (us-east-1):
+**Claude on Bedrock** (`BedrockModelId`, us-east-1):
 - Tokens per minute: 200,000 (default)
 - Requests per minute: Varies by account
 
@@ -180,7 +180,7 @@ Limit: 300  # 300 requests / 5 minutes per IP
 **Projected Costs**:
 | Service | Usage | Monthly Cost |
 |---------|-------|--------------|
-| Bedrock Claude 3 Sonnet | 105K queries (105M input + 52.5M output tokens) | ~$1,120 |
+| Bedrock Claude (`BedrockModelId`) | 105K queries (105M input + 52.5M output tokens) | ~$1,120 |
 | S3 Vectors (Knowledge Base) | Storage + 105K queries | ~$45 |
 | DynamoDB (on-demand) | 3.5M reads, 1.75M writes | ~$32 |
 | Lambda | 105K invocations, 60s avg | ~$5 |

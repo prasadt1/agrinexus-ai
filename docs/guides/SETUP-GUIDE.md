@@ -148,8 +148,8 @@ Bedrock models require manual approval before you can use them.
    - Click "Model access" in the left sidebar
    - Click "Manage model access" (orange button)
    - Find and enable these models:
-     - ✓ **Claude 3 Sonnet** (anthropic.claude-3-sonnet-20240229-v1:0)
-     - ✓ **Titan Embeddings G1 - Text** (amazon.titan-embed-text-v1)
+     - ✓ **The Claude model(s) you intend to use** — set via the `BedrockModelId` SAM parameter in `template.yaml` (default is a cross-region Claude Sonnet inference profile; enable that model / profile in Model access, not a retired ID)
+     - ✓ **Titan Embeddings G1 - Text** (amazon.titan-embed-text-v1) for the Knowledge Base
    - Click "Request model access"
    - Wait for approval (usually instant)
 
@@ -163,10 +163,18 @@ Bedrock models require manual approval before you can use them.
 # List available models
 aws bedrock list-foundation-models --region us-east-1
 
-# Check if you have access
+# List Claude-related foundation models (then enable the one matching BedrockModelId)
 aws bedrock list-foundation-models \
   --region us-east-1 \
-  --query 'modelSummaries[?contains(modelId, `claude-3-sonnet`)]'
+  --by-provider anthropic \
+  --query 'modelSummaries[?contains(modelId, `claude`)].[modelId,modelLifecycle.status]' \
+  --output table
+
+# Prefer inference profiles for deployed RAG/vision (matches BedrockModelId style)
+aws bedrock list-inference-profiles \
+  --region us-east-1 \
+  --query 'inferenceProfileSummaries[?contains(inferenceProfileId, `claude`)].[inferenceProfileId,status]' \
+  --output table
 ```
 
 ## Step 8: Install Python Dependencies
@@ -295,7 +303,7 @@ bash scripts/setup-week1.sh agrinexus-dev us-east-1
 # Go to Bedrock Console
 # https://console.aws.amazon.com/bedrock/
 # Click "Model access" → "Manage model access"
-# Enable Claude 3 Sonnet and Titan Embeddings
+# Enable the Claude model(s) matching BedrockModelId, plus Titan Embeddings
 ```
 
 ### Issue: "Region not supported"

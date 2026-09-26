@@ -4,6 +4,23 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 26 September 2026 — Bedrock model parameterization and docs accuracy
+
+### Summary
+Switched production RAG and vision from a retired Bedrock foundation-model ID to a SAM **`BedrockModelId`** parameter (default: Claude Sonnet 4.5 cross-region inference profile). Deployed in [PR #7](https://github.com/prasadt1/agrinexus-ai/pull/7). This entry also records a docs pass so setup guides and architecture no longer name the retired model as current.
+
+### Runtime (PR #7)
+- **`BedrockModelId`** parameter + `BEDROCK_MODEL_ID` env on web-chat and processor Lambdas
+- IAM: `bedrock:GetInferenceProfile` (and related) for RetrieveAndGenerate against inference profiles
+- Web-chat error surfacing, `sourceIp` rate limiting, image caps, exact DONE/NOT YET matching, phone redaction in logs
+- API Gateway 5xx alarm + chat Synthetics canary; `samconfig.example.toml` for non-secret deploy knobs
+
+### Docs
+- Updated current guides / architecture / requirements / RAG walkthrough / code walkthrough to point at **`BedrockModelId`** instead of a hardcoded model name
+- Historical CHANGELOG entries, dated design plans/specs, and `docs/legacy/` left unchanged
+
+---
+
 ## April 25, 2026 — Vision relevance gate (Bedrock Haiku), CI/Pages, docs
 
 ### Summary
