@@ -87,7 +87,7 @@ AgriNexus is a deployed, functional prototype with production-grade observabilit
 
 | Metric | Value |
 | --- | --- |
-| Line coverage (pytest-cov) | **48%** — corrected 26 Sept 2026; the previous "80%" figure measured lines-of-test-code ÷ lines-of-source, not executed-line coverage. See [metrics](docs/IMPLEMENTATION-QUALITY-METRICS.md). |
+| Line coverage (pytest-cov) | **53%** — re-measured 26 Sept 2026 after model-ID test edits (`pytest --cov=src`); the previous "80%" figure measured lines-of-test-code ÷ lines-of-source, not executed-line coverage. See [metrics](docs/IMPLEMENTATION-QUALITY-METRICS.md). |
 | Infrastructure-as-Code resources (SAM) | **34** ([template.yaml](template.yaml)) |
 | Architecture Decision Records (ADRs) | **10** ([docs/adr/](docs/adr/)) |
 | EARS requirements traced to code | **144** ([docs/requirements.md](docs/requirements.md)) |
