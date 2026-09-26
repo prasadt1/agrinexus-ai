@@ -1,3 +1,4 @@
 boto3>=1.28.0
 requests>=2.31.0
-pillow>=10.0.0
+# Cap below 12: Pillow 12+ needs Python>=3.10; local sam build uses host pip (3.9).
+pillow>=10.0.0,<12

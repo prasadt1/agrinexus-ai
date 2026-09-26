@@ -6,13 +6,17 @@ Reuses existing Bedrock RAG logic from processor.
 import json
 import os
 import re
+import logging
 import boto3
 import base64
-from typing import Dict, Any
+from typing import Dict, Any, List, Tuple
 from datetime import datetime
 from decimal import Decimal
 import hashlib
 from botocore.exceptions import ClientError
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 dynamodb = boto3.resource('dynamodb')
 bedrock_agent = boto3.client('bedrock-agent-runtime')
@@ -24,8 +28,26 @@ GUARDRAIL_ID = os.environ.get('GUARDRAIL_ID', '')
 GUARDRAIL_VERSION = os.environ.get('GUARDRAIL_VERSION', '1')
 RATE_LIMIT = int(os.environ.get('WEB_RATE_LIMIT', '5'))  # 5 queries per hour
 RATE_LIMIT_WINDOW = int(os.environ.get('WEB_RATE_LIMIT_WINDOW', '3600'))  # 1 hour
+BEDROCK_MODEL_ID = os.environ.get(
+    'BEDROCK_MODEL_ID',
+    'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+)
+WEB_IMAGE_MAX_BYTES = int(os.environ.get('WEB_IMAGE_MAX_BYTES', str(5 * 1024 * 1024)))
+WEB_MAX_IMAGES = int(os.environ.get('WEB_MAX_IMAGES', '1'))
 
 table = dynamodb.Table(TABLE_NAME)
+
+
+def _bedrock_model_arn() -> str:
+    """Build modelArn for RetrieveAndGenerate from BEDROCK_MODEL_ID."""
+    mid = BEDROCK_MODEL_ID
+    if mid.startswith('arn:'):
+        return mid
+    region = os.environ.get('AWS_REGION') or os.environ.get('AWS_DEFAULT_REGION') or 'us-east-1'
+    account = os.environ.get('ACCOUNT_ID', '')
+    if mid.startswith(('us.', 'eu.', 'ap.', 'global.', 'jp.', 'au.', 'ca.')):
+        return f'arn:aws:bedrock:{region}:{account}:inference-profile/{mid}'
+    return f'arn:aws:bedrock:{region}::foundation-model/{mid}'
 
 def is_rag_refusal_response(text: str) -> bool:
     """
@@ -103,17 +125,63 @@ def effective_dialect(message: str, ui_language: str) -> str:
 
 
 def get_client_ip(event: Dict[str, Any]) -> str:
-    """Extract client IP from API Gateway event"""
-    # Try X-Forwarded-For first (if behind CloudFront/ALB)
-    headers = event.get('headers', {})
-    forwarded = headers.get('X-Forwarded-For', headers.get('x-forwarded-for', ''))
-    if forwarded:
-        return forwarded.split(',')[0].strip()
-    
-    # Fall back to requestContext
-    request_context = event.get('requestContext', {})
-    identity = request_context.get('identity', {})
-    return identity.get('sourceIp', 'unknown')
+    """Client IP from API Gateway identity — never trust X-Forwarded-For (client-controlled)."""
+    request_context = event.get('requestContext', {}) or {}
+    identity = request_context.get('identity', {}) or {}
+    return identity.get('sourceIp') or 'unknown'
+
+
+def _decode_image_payload(raw: str) -> Tuple[str, str, bytes]:
+    """
+    Return (media_type, base64_payload, raw_bytes) for a data-URI or bare base64 image.
+    Raises ValueError on invalid / oversized input.
+    """
+    media_type = "image/jpeg"
+    payload = raw
+    if raw.startswith('data:image/'):
+        header, _, rest = raw.partition(',')
+        payload = rest
+        if 'image/png' in header:
+            media_type = "image/png"
+        elif 'image/webp' in header:
+            media_type = "image/webp"
+        elif 'image/gif' in header:
+            media_type = "image/gif"
+        elif 'image/jpeg' in header or 'image/jpg' in header:
+            media_type = "image/jpeg"
+    elif ',' in raw:
+        payload = raw.split(',', 1)[1]
+
+    try:
+        raw_bytes = base64.b64decode(payload, validate=False)
+    except Exception as e:
+        raise ValueError(f"Invalid base64 image: {e}") from e
+
+    if len(raw_bytes) > WEB_IMAGE_MAX_BYTES:
+        raise ValueError(
+            f"Image too large ({len(raw_bytes)} bytes; max {WEB_IMAGE_MAX_BYTES})"
+        )
+    if not raw_bytes:
+        raise ValueError("Empty image payload")
+    return media_type, payload, raw_bytes
+
+
+def collect_images(body: Dict[str, Any]) -> List[str]:
+    """Gather image fields from the request; enforce per-request count cap."""
+    images: List[str] = []
+    if body.get('image'):
+        images.append(str(body['image']))
+    extra = body.get('images')
+    if isinstance(extra, list):
+        images.extend(str(x) for x in extra if x)
+    elif extra:
+        images.append(str(extra))
+
+    if len(images) > WEB_MAX_IMAGES:
+        raise ValueError(
+            f"Too many images ({len(images)}); max {WEB_MAX_IMAGES} per request"
+        )
+    return images
 
 def _peek_rate_limit(identifier: str) -> Dict[str, Any]:
     """
@@ -378,11 +446,7 @@ REMEMBER: If the Context above does not contain information to answer the Questi
             'guardrailVersion': GUARDRAIL_VERSION
         }
     
-    # Get model ARN from environment
-    model_arn = os.environ.get(
-        'MODEL_ARN',
-        'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0'
-    )
+    model_arn = _bedrock_model_arn()
     
     # Build retrieve_and_generate configuration
     rag_config = {
@@ -408,32 +472,12 @@ REMEMBER: If the Context above does not contain information to answer the Questi
 
 def analyze_image(image_base64: str, dialect: str = 'en') -> str:
     """
-    Analyze crop image using Claude 3 Sonnet vision
-    
-    Args:
-        image_base64: Base64 encoded image (with or without data URI prefix)
-        dialect: Language for response
-    
-    Returns:
-        Analysis text
-    """
-    # Detect media type from data URI (if present)
-    raw = image_base64
-    media_type = "image/jpeg"
-    if raw.startswith('data:image/'):
-        if raw.startswith('data:image/png'):
-            media_type = "image/png"
-        elif raw.startswith('data:image/webp'):
-            media_type = "image/webp"
-        elif raw.startswith('data:image/gif'):
-            media_type = "image/gif"
-        elif raw.startswith('data:image/jpeg') or raw.startswith('data:image/jpg'):
-            media_type = "image/jpeg"
+    Analyze crop image using Bedrock vision (BEDROCK_MODEL_ID).
 
-    # Remove data URI prefix if present
-    if ',' in raw:
-        image_base64 = raw.split(',')[1]
-    
+    Raises on Bedrock/model failures so Lambda Errors increments.
+    """
+    media_type, image_payload, _ = _decode_image_payload(image_base64)
+
     # Language-specific prompts
     prompts = {
         'hi': '''आप एक कृषि विशेषज्ञ हैं जो भारतीय किसानों की मदद करते हैं। इस तस्वीर को देखें और बताएं:
@@ -469,10 +513,9 @@ def analyze_image(image_base64: str, dialect: str = 'en') -> str:
 
 Provide a brief and practical answer. If the image doesn't show a crop, describe what you see.'''
     }
-    
+
     prompt = prompts.get(dialect, prompts['en'])
-    
-    # Call Claude 3 Sonnet with vision
+
     request_body = {
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": 1000,
@@ -485,7 +528,7 @@ Provide a brief and practical answer. If the image doesn't show a crop, describe
                         "source": {
                             "type": "base64",
                             "media_type": media_type,
-                            "data": image_base64
+                            "data": image_payload
                         }
                     },
                     {
@@ -496,25 +539,14 @@ Provide a brief and practical answer. If the image doesn't show a crop, describe
             }
         ]
     }
-    
-    try:
-        response = bedrock_runtime.invoke_model(
-            modelId='anthropic.claude-3-sonnet-20240229-v1:0',
-            body=json.dumps(request_body)
-        )
-        
-        response_body = json.loads(response['body'].read())
-        return response_body['content'][0]['text']
-    except Exception as e:
-        print(f"Error analyzing image: {e}")
-        # Return a helpful error message
-        error_messages = {
-            'hi': 'क्षमा करें, तस्वीर का विश्लेषण करने में समस्या हुई। कृपया फिर से प्रयास करें या एक अलग तस्वीर अपलोड करें।',
-            'mr': 'माफ करा, फोटोचे विश्लेषण करताना समस्या आली. कृपया पुन्हा प्रयत्न करा किंवा वेगळा फोटो अपलोड करा.',
-            'te': 'క్షమించండి, ఫోటో విశ్లేషణలో సమస్య వచ్చింది. దయచేసి మళ్లీ ప్రయత్నించండి లేదా వేరే ఫోటో అప్‌లోడ్ చేయండి.',
-            'en': 'Sorry, there was a problem analyzing the image. Please try again or upload a different image.'
-        }
-        return error_messages.get(dialect, error_messages['en'])
+
+    response = bedrock_runtime.invoke_model(
+        modelId=BEDROCK_MODEL_ID,
+        body=json.dumps(request_body)
+    )
+
+    response_body = json.loads(response['body'].read())
+    return response_body['content'][0]['text']
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -551,14 +583,21 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         }
     
     try:
-        # Parse request body
         body = json.loads(event.get('body', '{}'))
         message = body.get('message', '').strip()
         language = body.get('language', 'en')
-        image = body.get('image')  # Base64 encoded image
-        
+
+        try:
+            images = collect_images(body)
+        except ValueError as ve:
+            return {
+                'statusCode': 400,
+                'headers': headers,
+                'body': json.dumps({'error': str(ve)})
+            }
+
         # Validate input
-        if not message and not image:
+        if not message and not images:
             return {
                 'statusCode': 400,
                 'headers': headers,
@@ -566,7 +605,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'error': 'Message or image is required'
                 })
             }
-        
+
         if message and len(message) > 500:
             return {
                 'statusCode': 400,
@@ -575,10 +614,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'error': 'Message too long (max 500 characters)'
                 })
             }
-        
+
         if language not in ['en', 'hi', 'mr', 'te']:
             language = 'en'
-        
+
         # Check rate limit (enforce strictest of IP + anonymous client_id, if provided)
         client_ip = get_client_ip(event)
         client_id = str(body.get('client_id', '')).strip()
@@ -613,7 +652,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'reset_at': max(int(s.get('reset_at', 0)) for s in statuses),
             'current_count': max(int(s.get('current_count', 0)) for s in statuses),
         }
-        
+
         if not rate_limit_status['allowed']:
             return {
                 'statusCode': 429,
@@ -624,14 +663,24 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'reset_at': rate_limit_status['reset_at']
                 })
             }
-        
+
         dialect = effective_dialect(message or '', language)
 
         # Process image if provided
-        if image:
-            print(f"Processing image analysis request")
-            analysis = analyze_image(image, dialect)
-            
+        if images:
+            print("Processing image analysis request")
+            # Validate size before Bedrock (raises ValueError → 400)
+            try:
+                for img in images:
+                    _decode_image_payload(img)
+            except ValueError as ve:
+                return {
+                    'statusCode': 400,
+                    'headers': headers,
+                    'body': json.dumps({'error': str(ve)})
+                }
+            analysis = analyze_image(images[0], dialect)
+
             return {
                 'statusCode': 200,
                 'headers': headers,
@@ -642,10 +691,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'reset_at': rate_limit_status['reset_at']
                 })
             }
-        
+
         # Query Bedrock for text
         result = query_bedrock(message, dialect)
-        
+
         # Clean model output: remove placeholder "Source: 3" style leaks.
         reply_text = result.get('text') or ''
         reply_text = strip_llm_xml_citation_tags(reply_text)
@@ -675,7 +724,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'en': 'FAO/ICAR Agricultural Guidelines (Knowledge Base)',
             }.get(dialect, 'FAO/ICAR Agricultural Guidelines (Knowledge Base)')
             citations = [generic]
-        
+
         # Return response
         return {
             'statusCode': 200,
@@ -687,13 +736,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'reset_at': rate_limit_status['reset_at']
             })
         }
-    
-    except Exception as e:
-        print(f"Error processing request: {e}")
-        return {
-            'statusCode': 500,
-            'headers': headers,
-            'body': json.dumps({
-                'error': 'Internal server error. Please try again.'
-            })
-        }
+
+    except Exception:
+        # Log full stack and re-raise so Lambda Errors increments (and API GW 5XX fires).
+        logger.exception("Web chat handler failed")
+        raise

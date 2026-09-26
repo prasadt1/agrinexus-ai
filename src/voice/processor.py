@@ -9,6 +9,7 @@ import time
 import urllib.request
 from typing import Dict, Any, Optional
 from common.whatsapp import get_whatsapp_credentials, send_whatsapp_message
+from common.redact import redact_phone
 
 transcribe = boto3.client('transcribe')
 s3 = boto3.client('s3')
@@ -105,7 +106,7 @@ def process_voice_note(message: Dict[str, Any], user_profile: Dict[str, Any]) ->
     timestamp = message['timestamp']
     dialect = user_profile.get('dialect', 'hi')
     
-    print(f"Processing voice note from {phone}, audio_id: {audio_id}")
+    print(f"Processing voice note from {redact_phone(phone)}, audio_id: {audio_id}")
     
     try:
         # Voice "received" ACK is sent in webhook handler (before SQS) for minimal delay.

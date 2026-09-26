@@ -6,8 +6,14 @@ import json
 import os
 import boto3
 from typing import Dict, Any, List
-import re
 from common.whatsapp import send_whatsapp_message
+from common.redact import redact_phone
+from common.nudge_keywords import (
+    DONE_KEYWORDS,
+    NOT_YET_KEYWORDS,
+    is_done_reply,
+    is_not_yet_reply,
+)
 
 dynamodb = boto3.resource('dynamodb')
 scheduler = boto3.client('scheduler')
@@ -15,21 +21,6 @@ cloudwatch = boto3.client('cloudwatch')
 
 TABLE_NAME = os.environ['TABLE_NAME']
 table = dynamodb.Table(TABLE_NAME)
-
-# DONE keywords by dialect
-DONE_KEYWORDS = {
-    'hi': ['हो गया', 'कर दिया', 'हो गया है', 'कर लिया', 'done', 'completed'],
-    'mr': ['झाला', 'केला', 'पूर्ण झाला', 'done'],
-    'te': ['అయ్యింది', 'చేశాను', 'పూర్తయింది', 'done'],
-    'en': ['done', 'completed', 'finished']
-}
-
-NOT_YET_KEYWORDS = {
-    'hi': ['अभी नहीं', 'बाद में', 'नहीं किया', 'not yet', 'later'],
-    'mr': ['नाही झाला', 'नंतर', 'अजून नाही', 'not yet'],
-    'te': ['ఇంకా లేదు', 'తర్వాత', 'చేయలేదు', 'not yet'],
-    'en': ['not yet', 'later', 'not done', 'not now']
-}
 
 # Confirmation messages by dialect
 CONFIRMATION_MESSAGES = {
@@ -74,9 +65,9 @@ def emit_metric(name: str, value: float = 1.0):
 
 
 def detect_keyword(text: str, keywords: List[str]) -> bool:
-    """Check if text contains any of the keywords"""
-    text_lower = text.lower()
-    return any(keyword.lower() in text_lower for keyword in keywords)
+    """Exact match on normalized short messages only (no substring)."""
+    from common.nudge_keywords import is_exact_keyword_match
+    return is_exact_keyword_match(text, keywords)
 
 
 def get_active_nudges(phone_number: str) -> List[Dict[str, Any]]:
@@ -111,7 +102,7 @@ def get_user_dialect(phone_number: str) -> str:
             }
         )
         return response.get('Item', {}).get('dialect', 'hi')
-    except:
+    except Exception:
         return 'hi'  # Default to Hindi
 
 
@@ -165,7 +156,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         pk = new_image.get('PK', {}).get('S', '')
         phone_number = pk.replace('USER#', '')
-        print(f"Processing message for user: {phone_number}")
+        print(f"Processing message for user: {redact_phone(phone_number)}")
         
         # Extract message text from DynamoDB Stream format
         # The 'message' field is a Map (M) in DynamoDB Streams, not a String (S)
@@ -192,21 +183,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             print("No text found in message")
             continue
         
-        # Check for NOT YET keywords FIRST (more specific than DONE)
-        all_not_yet_keywords = []
-        for keywords in NOT_YET_KEYWORDS.values():
-            all_not_yet_keywords.extend(keywords)
-        
-        # Check for DONE keywords
-        all_done_keywords = []
-        for keywords in DONE_KEYWORDS.values():
-            all_done_keywords.extend(keywords)
-        
         print(f"Checking keywords in: {text}")
         
-        # Check NOT YET first (more specific)
-        if detect_keyword(text, all_not_yet_keywords):
-            print(f"NOT YET keyword detected!")
+        # Exact short-message match only — otherwise fall through (no ack / no status change)
+        if is_not_yet_reply(text):
+            print("NOT YET keyword detected!")
             
             # Get active nudges to check reminder status
             active_nudges = get_active_nudges(phone_number)
@@ -253,9 +234,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             send_whatsapp_message(phone_number, acknowledgment)
         
-        # Only check DONE if NOT YET wasn't detected
-        elif detect_keyword(text, all_done_keywords):
-            print(f"DONE keyword detected!")
+        elif is_done_reply(text):
+            print("DONE keyword detected!")
             
             # Get active nudges
             active_nudges = get_active_nudges(phone_number)
@@ -284,12 +264,15 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 # Delete scheduled reminders
                 delete_scheduled_reminders(nudge_id)
                 
-                print(f"Marked nudge {nudge_id} as DONE for {phone_number}")
+                print(f"Marked nudge {nudge_id} as DONE for {redact_phone(phone_number)}")
                 
                 # Send confirmation message
                 dialect = get_user_dialect(phone_number)
                 confirmation = CONFIRMATION_MESSAGES.get(dialect, CONFIRMATION_MESSAGES['hi'])
                 send_whatsapp_message(phone_number, confirmation)
                 emit_metric('NudgesCompleted', 1)
+        else:
+            # Not an exact short DONE/NOT YET reply — leave for normal RAG / other handlers
+            print("No exact DONE/NOT YET match — falling through")
     
     return {'statusCode': 200}

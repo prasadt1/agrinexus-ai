@@ -22,6 +22,10 @@ secrets = boto3.client('secretsmanager', region_name='us-east-1')
 
 TEMP_BUCKET = os.environ.get('TEMP_AUDIO_BUCKET')
 
+BEDROCK_MODEL_ID = os.environ.get(
+    "BEDROCK_MODEL_ID",
+    "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+)
 RELEVANCE_MODEL_ID = os.environ.get("VISION_RELEVANCE_MODEL_ID") or "anthropic.claude-3-haiku-20240307-v1:0"
 
 
@@ -705,7 +709,7 @@ REMEMBER:
     
     try:
         response = bedrock.invoke_model(
-            modelId='anthropic.claude-3-sonnet-20240229-v1:0',  # Stable legacy model (best cost/performance)
+            modelId=BEDROCK_MODEL_ID,
             body=json.dumps({
                 "anthropic_version": "bedrock-2023-05-31",
                 "max_tokens": 2000,

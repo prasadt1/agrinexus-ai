@@ -21,6 +21,8 @@ from common.whatsapp import send_whatsapp_message, send_whatsapp_list
 from common.whatsapp import send_whatsapp_buttons as _send_whatsapp_buttons
 from common.district_helplines import maybe_append_helpline_footer
 from common.allowlist import is_approved_user, allowlist_expiry_hint
+from common.redact import redact_phone
+from common.nudge_keywords import is_nudge_reply
 
 
 def send_whatsapp_buttons(phone_number: str, body_text: str, buttons: list):
@@ -42,8 +44,24 @@ TABLE_NAME = os.environ['TABLE_NAME']
 KB_ID = os.environ['KNOWLEDGE_BASE_ID']
 GUARDRAIL_ID = os.environ['GUARDRAIL_ID']
 GUARDRAIL_VERSION = os.environ['GUARDRAIL_VERSION']
+BEDROCK_MODEL_ID = os.environ.get(
+    'BEDROCK_MODEL_ID',
+    'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+)
 
 table = dynamodb.Table(TABLE_NAME)
+
+
+def _bedrock_model_arn() -> str:
+    """Build modelArn for RetrieveAndGenerate from BEDROCK_MODEL_ID."""
+    mid = BEDROCK_MODEL_ID
+    if mid.startswith('arn:'):
+        return mid
+    region = os.environ.get('AWS_REGION') or os.environ.get('AWS_DEFAULT_REGION') or 'us-east-1'
+    account = os.environ.get('ACCOUNT_ID', '')
+    if mid.startswith(('us.', 'eu.', 'ap.', 'global.', 'jp.', 'au.', 'ca.')):
+        return f'arn:aws:bedrock:{region}:{account}:inference-profile/{mid}'
+    return f'arn:aws:bedrock:{region}::foundation-model/{mid}'
 
 _PENDING_CROP_CONFIRM_SK = "PENDING#CROP_CONFIRM"
 _PENDING_TTL_SECONDS = int(os.environ.get("PENDING_CROP_CONFIRM_TTL_SECONDS", "600"))
@@ -841,11 +859,7 @@ REMEMBER: If the Context above does not contain information to answer the Questi
             'guardrailVersion': GUARDRAIL_VERSION
         }
     
-    # Get model ARN from environment variable (with fallback to Claude 3 Sonnet)
-    model_arn = os.environ.get(
-        'MODEL_ARN',
-        'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0'
-    )
+    model_arn = _bedrock_model_arn()
     
     # Build retrieve_and_generate configuration
     rag_config = {
@@ -1140,26 +1154,16 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                         _delete_last_image_pointer(from_number)
                     continue
             
-            # Check for DONE/NOT YET keywords - these are handled by response detector
-            done_keywords = ['हो गया', 'कर दिया', 'हो गया है', 'कर लिया', 'done', 'completed',
-                           'झाला', 'केला', 'पूर्ण झाला', 'అయ్యింది', 'చేశాను', 'పూర్తయింది']
-            not_yet_keywords = ['अभी नहीं', 'बाद में', 'नहीं किया', 'not yet', 'later',
-                              'नाही झाला', 'नंतर', 'अजून नाही', 'ఇంకా లేదు', 'తర్వాత', 'చేయలేదు']
-            
-            text_lower = text.lower()
-            is_done_or_not_yet = any(keyword.lower() in text_lower for keyword in done_keywords + not_yet_keywords)
-            
-            if is_done_or_not_yet:
-                print(f"Skipping DONE/NOT YET message - handled by response detector")
+            # Exact short DONE/NOT YET replies are handled by response detector.
+            # Longer messages that merely contain those tokens fall through to RAG.
+            if is_nudge_reply(text):
+                print("Skipping DONE/NOT YET message - handled by response detector")
                 continue
             
             # Check for HELP command
             if text.strip().upper() in ['HELP', 'मदद', 'मदत', 'సహాయం']:
                 _send_help(from_number, dialect)
                 continue
-            
-            # Check for DONE/NOT YET keywords (handled by response detector)
-            # Just process as normal query
             
             # Immediate text-query ack only (voice already got VOICE_RECEIVED_ACK in VoiceProcessor)
             voice_source = message.get('_source')
@@ -1256,7 +1260,7 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                 continue
 
             # Process image with Claude Vision
-            print(f"Processing image message from {from_number}")
+            print(f"Processing image message from {redact_phone(from_number)}")
             
             # Send acknowledgment
             ack_messages = {

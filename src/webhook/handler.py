@@ -13,6 +13,8 @@ from datetime import datetime, timedelta
 
 from common.whatsapp import send_whatsapp_message, VOICE_RECEIVED_ACK
 from common.allowlist import is_approved_user, allowlist_expiry_hint
+from common.redact import redact_phone
+from common.nudge_keywords import is_nudge_reply
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -37,19 +39,6 @@ _secrets_cache: Dict[str, Any] = {
     'expires_at': None
 }
 CACHE_TTL_SECONDS = 300
-
-# DONE/NOT YET keywords - skip RAG processing for these
-SKIP_RAG_KEYWORDS = [
-    # Hindi
-    'हो गया', 'कर दिया', 'हो गया है', 'कर लिया', 'done', 'completed',
-    'अभी नहीं', 'बाद में', 'नहीं किया', 'not yet', 'later',
-    # Marathi
-    'झाला', 'केला', 'पूर्ण झाला',
-    'नाही झाला', 'नंतर', 'अजून नाही',
-    # Telugu
-    'అయ్యింది', 'చేశాను', 'పూర్తయింది',
-    'ఇంకా లేదు', 'తర్వాత', 'చేయలేదు'
-]
 
 # Rate limiting: max messages per user per hour
 RATE_LIMIT_MESSAGES = int(os.environ.get('RATE_LIMIT_MESSAGES', '10'))
@@ -112,7 +101,8 @@ def check_rate_limit(phone_number: str) -> bool:
             message_count += response.get('Count', 0)
             if message_count >= RATE_LIMIT_MESSAGES:
                 logger.warning(
-                    f"Rate limit exceeded for {phone_number}: {message_count} messages in window"
+                    f"Rate limit exceeded for {redact_phone(phone_number)}: "
+                    f"{message_count} messages in window"
                 )
                 return False
             lek = response.get('LastEvaluatedKey')
@@ -127,11 +117,8 @@ def check_rate_limit(phone_number: str) -> bool:
 
 
 def should_skip_rag(text: str) -> bool:
-    """Check if message contains DONE/NOT YET keywords that should skip RAG"""
-    if not text:
-        return False
-    text_lower = text.lower().strip()
-    return any(keyword.lower() in text_lower for keyword in SKIP_RAG_KEYWORDS)
+    """Skip RAG only for exact short DONE/NOT YET replies (not substrings)."""
+    return is_nudge_reply(text)
 
 
 def _refresh_secrets_cache() -> None:
@@ -188,13 +175,6 @@ def verify_signature(payload: str, signature: str) -> bool:
     except Exception as e:
         logger.error(f"Signature verification error: {e}")
         return False
-
-
-def redact_phone(phone: str) -> str:
-    """Redact phone number for logging (show only first 3 digits)"""
-    if not phone or len(phone) < 3:
-        return "***"
-    return f"{phone[:3]}***"
 
 
 def get_user_dialect(phone: str) -> str:

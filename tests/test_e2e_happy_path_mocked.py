@@ -42,6 +42,16 @@ def _install_common_stubs(sent_messages):
     helplines.maybe_append_helpline_footer = lambda text, *_args, **_kwargs: text
     sys.modules["common.district_helplines"] = helplines
 
+    layer = str(Path(__file__).resolve().parents[1] / "src" / "common-layer" / "python")
+    if layer not in sys.path:
+        sys.path.insert(0, layer)
+    import common.redact as redact_mod  # noqa: E402
+    import common.nudge_keywords as nk_mod  # noqa: E402
+    sys.modules["common.redact"] = redact_mod
+    sys.modules["common.nudge_keywords"] = nk_mod
+    common_pkg.redact = redact_mod
+    common_pkg.nudge_keywords = nk_mod
+
     # Processor imports these at import time; stub to keep test lightweight.
     output = types.ModuleType("output")
     output.text_to_speech = lambda *_args, **_kwargs: None
