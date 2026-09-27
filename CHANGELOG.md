@@ -20,6 +20,11 @@ Switched production RAG and vision from a retired Bedrock foundation-model ID to
 - Historical CHANGELOG entries, dated design plans/specs, and `docs/legacy/` left unchanged
 - **Coverage honesty:** README and `docs/IMPLEMENTATION-QUALITY-METRICS.md` now headline **53%** pytest-cov line coverage; the old “80%” figure is labeled as a historical test-to-source **line-count ratio**, not executed-line coverage
 
+### Log redaction follow-up (27 Sept 2026)
+- **Issue**: Four log paths still wrote full phone numbers after the 26 Sept redaction pass: the processor's `DEBUG: profile=` dump (`USER#<number>` key), every WhatsApp send-success line (Meta's response echoes the recipient in `contacts.input` / `wa_id`), and the voice Lambda's S3 key and Transcribe job name/failure dump.
+- **Fix**: Send-success lines log only message IDs; profile line logs redacted number, dialect, and onboarding state; voice logs redacted number and failure reason only. Deployed to `agrinexus-week2`.
+- **Test**: `TestPhoneRedaction.test_whatsapp_send_success_log_omits_recipient` in `tests/test_ops_hardening.py`.
+
 ### Tests
 - **`tests/test_vision_quality_gate.py`**: two cases depended on machine-local image paths (`/tmp/wa_latest2.jpg` and a Cursor assets PNG). Those fail on a clean clone with `FileNotFoundError` — pre-existing since April 2026, not introduced by the model-ID edit. Replaced with in-test synthetic UI JPEGs so the suite is portable.
 

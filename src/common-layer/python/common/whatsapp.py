@@ -21,6 +21,14 @@ _credentials_cache = {
 
 CACHE_TTL_SECONDS = 300  # 5 minutes
 
+
+def _sent_message_ids(response) -> list:
+    """Message IDs from a Graph API send response; its contacts block echoes the full recipient number."""
+    try:
+        return [m.get('id') for m in response.json().get('messages', [])]
+    except Exception:
+        return []
+
 # Shown right after inbound voice is accepted (webhook path, before SQS → Voice Lambda)
 VOICE_RECEIVED_ACK = {
     'hi': 'आपका संदेश मिल गया। जवाब तैयार कर रहे हैं…',
@@ -124,7 +132,7 @@ def send_whatsapp_message(phone_number: str, message: str, audio_url: Optional[s
             time.sleep(0.5 * (2 ** attempt))
         
         if response and response.status_code == 200:
-            print(f"Message sent successfully: {response.json()}")
+            print(f"Message sent successfully: {_sent_message_ids(response)}")
             return True
         else:
             status = response.status_code if response else 'no_response'
@@ -181,7 +189,7 @@ def send_whatsapp_template(phone_number: str, template_name: str, language_code:
             time.sleep(0.5 * (2 ** attempt))
         
         if response and response.status_code == 200:
-            print(f"Template sent successfully: {response.json()}")
+            print(f"Template sent successfully: {_sent_message_ids(response)}")
             return True
         
         status = response.status_code if response else 'no_response'
@@ -243,7 +251,7 @@ def send_whatsapp_buttons(phone_number: str, body_text: str, buttons: list) -> b
             time.sleep(0.5 * (2 ** attempt))
 
         if response and response.status_code == 200:
-            print(f"Button message sent successfully: {response.json()}")
+            print(f"Button message sent successfully: {_sent_message_ids(response)}")
             return True
 
         status = response.status_code if response else 'no_response'
@@ -306,7 +314,7 @@ def send_whatsapp_list(phone_number: str, body_text: str, button_text: str, sect
             time.sleep(0.5 * (2 ** attempt))
         
         if response and response.status_code == 200:
-            print(f"List message sent successfully: {response.json()}")
+            print(f"List message sent successfully: {_sent_message_ids(response)}")
             return True
         
         status = response.status_code if response else 'no_response'

@@ -169,7 +169,7 @@ AgriNexus is a deployed, functional prototype with production-grade observabilit
 | Meta HMAC-SHA256 signature verification | ✅ Always on | No bypass possible |
 | Per-user rate limiting (WhatsApp) | ✅ Active | **25**/hour WhatsApp (`RATE_LIMIT_MESSAGES` in `template.yaml` **Globals**; handler defaults to **10** only if env unset) |
 | Per-IP rate limiting (public web chat) | ✅ Active (fixed 26 Sept 2026) | Keys on `requestContext.identity.sourceIp`. Previously trusted the client-supplied `X-Forwarded-For` header, which could be spoofed to bypass the limit — corrected in [PR #7](https://github.com/prasadt1/agrinexus-ai/pull/7). |
-| PII redaction in logs | ✅ Active (fixed 26 Sept 2026) | Phone numbers shown as `491***`. Before that date, 12 log call sites printed raw numbers. |
+| PII redaction in logs | ✅ Active (fixed 26–27 Sept 2026) | Phone numbers shown as `491***`. On 26 Sept, 12 log call sites that printed raw numbers were masked; on 27 Sept, the remaining ones were masked too: a processor profile dump, the WhatsApp send-success lines that echoed Meta's response, and voice S3/Transcribe paths. Logs written before these dates still contain full numbers. |
 | IAM least-privilege | ✅ Enforced | DynamoDB / S3 / Bedrock resource-scoped |
 | Encryption at rest | ✅ Active | DynamoDB default encryption |
 | Encryption in transit | ✅ Active | HTTPS only |

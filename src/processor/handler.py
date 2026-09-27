@@ -1027,7 +1027,11 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
         
         # Get user profile
         profile = get_user_profile(from_number)
-        print(f"DEBUG: profile={profile}, onboarding_complete={profile.get('onboarding_complete') if profile else None}")
+        print(
+            f"Profile for {redact_phone(from_number)}: found={bool(profile)}, "
+            f"dialect={profile.get('dialect') if profile else None}, "
+            f"onboarding_complete={profile.get('onboarding_complete') if profile else None}"
+        )
         
         # Check if onboarding is complete
         if not profile or not profile.get('onboarding_complete', False):

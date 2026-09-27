@@ -122,13 +122,13 @@ def process_voice_note(message: Dict[str, Any], user_profile: Dict[str, Any]) ->
         # 2. Upload to S3
         s3_key = f"voice/{phone}/{timestamp}.ogg"
         s3.put_object(Bucket=TEMP_BUCKET, Key=s3_key, Body=audio_bytes, ContentType='audio/ogg')
-        print(f"Uploaded to S3: s3://{TEMP_BUCKET}/{s3_key}")
+        print(f"Uploaded voice note to S3 ({len(audio_bytes)} bytes)")
         
         # 3. Start transcription
         job_name = f"agrinexus-{phone}-{timestamp}".replace('+', '')
         language_code = get_transcribe_language(dialect)
         
-        print(f"Starting transcription job: {job_name}, language: {language_code}")
+        print(f"Starting transcription job for {redact_phone(phone)}, language: {language_code}")
         transcribe.start_transcription_job(
             TranscriptionJobName=job_name,
             Media={'MediaFileUri': f's3://{TEMP_BUCKET}/{s3_key}'},
@@ -149,7 +149,7 @@ def process_voice_note(message: Dict[str, Any], user_profile: Dict[str, Any]) ->
         if status == 'COMPLETED':
             return _finalize_transcription(result, job_name, s3_key)
         if status == 'FAILED':
-            print(f"Transcription failed: {result}")
+            print(f"Transcription failed: {result['TranscriptionJob'].get('FailureReason')}")
             s3.delete_object(Bucket=TEMP_BUCKET, Key=s3_key)
             return {'success': False, 'error': 'transcription_failed'}
 
@@ -171,7 +171,7 @@ def process_voice_note(message: Dict[str, Any], user_profile: Dict[str, Any]) ->
             if status == 'COMPLETED':
                 return _finalize_transcription(result, job_name, s3_key)
             if status == 'FAILED':
-                print(f"Transcription failed: {result}")
+                print(f"Transcription failed: {result['TranscriptionJob'].get('FailureReason')}")
                 s3.delete_object(Bucket=TEMP_BUCKET, Key=s3_key)
                 return {'success': False, 'error': 'transcription_failed'}
 

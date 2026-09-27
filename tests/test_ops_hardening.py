@@ -352,3 +352,27 @@ class TestPhoneRedaction:
         out = capsys.readouterr().out
         assert phone not in out
         assert "919***" in out
+
+    def test_whatsapp_send_success_log_omits_recipient(self, monkeypatch, capsys):
+        import common.whatsapp as wa
+
+        phone = "919876543210"
+
+        class _Resp:
+            status_code = 200
+
+            def json(self):
+                return {
+                    "messaging_product": "whatsapp",
+                    "contacts": [{"input": phone, "wa_id": phone}],
+                    "messages": [{"id": "wamid.TEST"}],
+                }
+
+        monkeypatch.setattr(wa, "get_whatsapp_credentials", lambda: ("tok", "pnid"))
+        monkeypatch.setattr(wa.requests, "post", lambda *a, **k: _Resp())
+
+        assert wa.send_whatsapp_message(phone, "hello") is True
+        assert wa.send_whatsapp_buttons(phone, "pick", [{"id": "a", "title": "A"}]) is True
+        out = capsys.readouterr().out
+        assert phone not in out
+        assert "wamid.TEST" in out
