@@ -24,6 +24,7 @@ Switched production RAG and vision from a retired Bedrock foundation-model ID to
 - **Issue**: Four log paths still wrote full phone numbers after the 26 Sept redaction pass: the processor's `DEBUG: profile=` dump (`USER#<number>` key), every WhatsApp send-success line (Meta's response echoes the recipient in `contacts.input` / `wa_id`), and the voice Lambda's S3 key and Transcribe job name/failure dump.
 - **Fix**: Send-success lines log only message IDs; profile line logs redacted number, dialect, and onboarding state; voice logs redacted number and failure reason only. Deployed to `agrinexus-week2`.
 - **Test**: `TestPhoneRedaction.test_whatsapp_send_success_log_omits_recipient` in `tests/test_ops_hardening.py`.
+- **Log retention**: All 13 AgriNexus Lambda and canary log groups were set to never expire, so pre-fix logs with full numbers were kept indefinitely. Set to 90 days; `scripts/set-log-retention.sh` reapplies it (Lambda-created log groups are outside the SAM template).
 
 ### Tests
 - **`tests/test_vision_quality_gate.py`**: two cases depended on machine-local image paths (`/tmp/wa_latest2.jpg` and a Cursor assets PNG). Those fail on a clean clone with `FileNotFoundError` — pre-existing since April 2026, not introduced by the model-ID edit. Replaced with in-test synthetic UI JPEGs so the suite is portable.
