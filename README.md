@@ -8,9 +8,9 @@
 
 **Why it matters.** India has [~126 million](https://www.fao.org/fileadmin/templates/ess/ess_test_folder/World_Census_Agriculture/WCA_2020/WCA_2020_new_doc/IND_REP_ENG_2015_2016.pdf) smallholder farmers. They don't lose crops because advice doesn't exist — they lose crops because advice arrives after the spray window closes. Extension officers are stretched [1:5,000 against a guideline norm of 1:750](https://m.thewire.in/article/agriculture/from-data-to-decisions-what-bharat-vistaar-needs-to-transform-indian-agriculture). The knowledge is there; the follow-through isn't.
 
-**What I built.** A 1:1 advisor on every farmer's phone — accessible on the WhatsApp they already use, no app install, grounded in [ICAR](https://icar.org.in/) + [FAO](https://www.fao.org/) research, responsive in Hindi / Marathi / Telugu / English, and most importantly — a closed accountability loop that follows up until the farmer confirms "हो गया" (done) or opts out.
+**What I built.** An advisor that runs on the WhatsApp a farmer already has, no app install, grounded in [ICAR](https://icar.org.in/) + [FAO](https://www.fao.org/) research, responsive in Hindi / Marathi / Telugu / English, and most importantly — a closed accountability loop that follows up until the farmer confirms "हो गया" (done) or opts out.
 
-**Designed for scale.** Modeled at **[~$0.54 per farmer per year at 10,000 active farmers](#cost-breakdown)** on fully serverless AWS. Currently running production at **~$53/month / ~$1.70/day**. Zero adoption friction: WhatsApp is installed on 500M+ Indian phones. Zero training: tap buttons in your dialect, onboard in under 60 seconds.
+**Designed for scale.** Modeled at **[~$0.54 per farmer per year at 10,000 active farmers](#cost-breakdown)** on fully serverless AWS. Measured running cost in April 2026: about $1.70 a day. No app to install; onboarding is a few button taps in the farmer's language.
 
 **The differentiator.** The closed-loop nudge engine. Most agri-AI tools stop at delivering advice. AgriNexus tracks whether the advice was acted on — advice plus accountability, not just information.
 
@@ -20,7 +20,7 @@
 > 
 > One of **20 winners** selected from thousands of submissions across **115 countries**, over four months (December 2025 – April 2026) and four evaluation rounds: 1,000 selected to build → 300 semi-finalists (community voting) → 50 finalists (AWS expert panel) → 20 winners (final community vote + expert review).
 > 
-> **For reviewers, partners, and fellow builders — three fastest paths in:**
+> **For reviewers and fellow builders — three fastest paths in:**
 > 
 > | Path | Link | Time |
 > | --- | --- | --- |
@@ -56,7 +56,6 @@
 - [Honest Tradeoffs](#honest-tradeoffs)
 - [Requirements Methodology: EARS](#requirements-methodology-ears)
 - [Productization Roadmap](#productization-roadmap)
-  - [U.S. adaptation (open to pilot partners)](#us-adaptation-open-to-pilot-partners)
   - [Partnerships & commercialization](#partnerships--commercialization)
 - [Acknowledgments](#acknowledgments)
 - [Documentation](#documentation)
@@ -72,16 +71,16 @@
 
 AgriNexus is a deployed, functional prototype with production-grade observability — publicly reachable and instrumented, built to production standards on AWS and judged functional by AWS reviewers against a requirement that it not be staged. It has no farmer user base and is not in a pilot program.
 
-### Live Endpoints
+### Deployed endpoints (checked 27 September 2026)
 
 | Endpoint | Status | URL |
 | --- | --- | --- |
-| WhatsApp Business number | ✅ Live | [wa.me/4915120105731](https://wa.me/4915120105731) |
-| Web demo (public) | ✅ Live | [demo.agrinexus-ai.farm](https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html) |
-| Product site (owned landing page) | ✅ Live | [agrinexus-ai.farm](https://agrinexus-ai.farm/) |
-| Webhook API (Meta verified) | ✅ Live | API Gateway + WAF |
-| Health endpoint (liveness) | ✅ Live | [health](https://h4bt24ycdl.execute-api.us-east-1.amazonaws.com/dev/health) |
-| Weather API integration | ✅ Live | OpenWeatherMap via Secrets Manager |
+| WhatsApp Business number | ✅ Reachable | [wa.me/4915120105731](https://wa.me/4915120105731) |
+| Web demo (public) | ✅ Reachable | [demo.agrinexus-ai.farm](https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html) |
+| Product site (owned landing page) | ✅ Reachable | [agrinexus-ai.farm](https://agrinexus-ai.farm/) |
+| Webhook API (Meta verified) | ✅ Reachable | API Gateway + WAF |
+| Health endpoint (liveness) | ✅ Reachable | [health](https://h4bt24ycdl.execute-api.us-east-1.amazonaws.com/dev/health) |
+| Weather API integration | ✅ Reachable | OpenWeatherMap via Secrets Manager |
 
 ### Engineering Quality
 
@@ -95,9 +94,7 @@ AgriNexus is a deployed, functional prototype with production-grade observabilit
 | CI/CD workflows | **2** ([ci.yml](.github/workflows/ci.yml) + [aws-smoke.yml](.github/workflows/aws-smoke.yml)) |
 | Lines of Python | **~6,000** across 11 services |
 
-### Live Production Metrics (rolling 7-day snapshot)
-
-Real numbers from the running production stack — not projections.
+### Metrics snapshot, April 2026 (competition judging period)
 
 **Reliability**
 
@@ -132,8 +129,8 @@ Real numbers from the running production stack — not projections.
 
 | Metric | Value |
 | --- | --- |
-| Daily cost (current) | **~$1.70/day** |
-| Monthly cost (current) | **~$53/month** |
+| Daily cost (measured, April 2026) | **~$1.70/day** |
+| Monthly cost at 1K farmers (modeled) | **~$53/month** |
 | Cost alarm threshold | $5/day (never tripped) |
 | Cost at 10K farmers (modeled) | **~$0.54/farmer/year** |
 | Savings vs. Step Functions Wait State approach | **~67× cheaper** |
@@ -182,7 +179,7 @@ Real numbers from the running production stack — not projections.
 
 > All numbers above are **verifiable in the repository and live CloudWatch dashboards** — see [SAM template](template.yaml), [ADRs](docs/adr/), [EARS requirements](docs/requirements.md), [CI workflows](.github/workflows/), and the [full metrics report](docs/METRICS-AND-MONITORING.md). 
 > 
-> Cost figures at scale (~$0.54/farmer/year at 10K) are **modeled**; current production costs (~$1.70/day, ~$53/month) are **real** — see [finops-public.md](docs/finops-public.md) for assumptions.
+> Cost figures at scale (~$0.54/farmer/year at 10K) are **modeled**; ~$53/month is **modeled** for 1,000 farmers; the ~$1.70/day running cost was **measured** in April 2026 — see [finops-public.md](docs/finops-public.md) for assumptions.
 
 ---
 
@@ -484,21 +481,19 @@ The **$0.54** figure is **not** a separate measurement—it is **($450 × 12) ÷
 
 **Note:** **\~$53/mo @ 1K** and **\~$450/mo @ 10K** are **modeled** from AWS-published pricing and the usage assumptions in architecture §8 — not audited Cost Explorer totals. Actual costs will vary by region, traffic patterns, and Bedrock model pricing changes.
 
-**100x cheaper than commercial agricultural advisory services** ($5-10/farmer/month)
-
 ### Historical Context
 - **Before April 4, 2026**: OpenSearch Serverless **~$174/month fixed** (plus variable services → **~$214/month** all-in)
 - **After April 4, 2026**: S3 Vectors + pay-per-use stack → **~$53/month** modeled @ 1K farmers (**~75%** reduction vs the old **~$214** all-in figure)
 
 ## Honest Tradeoffs
 
-The production build made deliberate tradeoffs for pilot sustainability. Calling them out explicitly:
+The production build made deliberate tradeoffs to keep running costs low. Calling them out explicitly:
 
 1. **Voice latency ~20–34s (batch Transcribe).** The tradeoff was cost vs. latency. Batch Transcribe at current volumes costs ~$12/month; streaming STT would be 3-5× that. For farmers sending a voice note and continuing fieldwork, the async delay is acceptable — the farmer gets an immediate ack from the webhook (~1-3s) and the response arrives while they're working. Streaming STT is on the roadmap for Phase 2.
 
 2. **Telugu voice output unavailable**: Amazon Polly doesn't currently offer a native Telugu neural voice. Text-only responses are returned for Telugu users; escalation path documented in [docs/architecture.md](docs/architecture.md).
 
-3. **Single-region deployment**: Multi-region is architected but deployed single-region (us-east-1) for cost efficiency during pilot. Failover and multi-region deployment patterns are documented in [docs/architecture.md](docs/architecture.md).
+3. **Single-region deployment**: Multi-region is architected but deployed single-region (us-east-1) for cost efficiency while it is a prototype. Failover and multi-region deployment patterns are documented in [docs/architecture.md](docs/architecture.md).
 
 4. **Weather API with demo fallback**: Production uses OpenWeatherMap via Secrets Manager. The `MOCK_WEATHER=true` flag exists for demo reliability and is explicitly logged so test traffic is never confused with production readings.
    - **Setup**: Store the OpenWeatherMap API key in Secrets Manager (`WEATHER_API_KEY_SECRET`, e.g. `agrinexus/weather/api-key`) — never in `samconfig` or git. Set `MOCK_WEATHER=true` on the Weather Lambda only for deterministic demo weather. See [docs/guides/WEATHER-API-SETUP.md](docs/guides/WEATHER-API-SETUP.md).
@@ -508,22 +503,6 @@ The production build made deliberate tradeoffs for pilot sustainability. Calling
 ## Productization Roadmap
 
 AgriNexus is built as an **accountability engine**. The **trigger → confirm → follow-up** structure is domain-agnostic: only the trigger and message copy change; the accountability loop stays the same.
-
-### U.S. adaptation (open to pilot partners)
-
-The accountability loop is geography-agnostic; only the triggers, corpus, and channel mix change. U.S. Cooperative Extension faces the same structural gap AgriNexus was built against: too few specialists per producer, time-critical windows (spray intervals, frost, irrigation, pest flight), and no systematic measure of whether guidance was acted on. Extension programs also carry documentation obligations — NRCS conservation contracts, FSMA produce-safety records, organic certification — where a timestamped record of what was advised, when, and whether it was done has direct value.
-
-**What ports unchanged:** the trigger → confirm → follow-up engine, the audit trail, cohort analytics, and escalation to a human agent when a producer stops responding.
-
-**What gets swapped:** mandi/eNAM price signals → USDA AMS market news; ICAR/FAO corpus → Extension publications and NRCS practice standards; KVK partners → county Extension offices and land-grant programs; WhatsApp-first → SMS/voice where that is the prevailing channel.
-
-Open to a free single-crop, single-cohort, single-season pilot with a U.S. extension program. Contact: `pilot@prasadtilloo.com`.
-
-### Beyond agriculture
-
-- **Irrigation scheduling** — reservoir level triggers, district-scoped reminders
-- **Medication adherence** — care-team and community health worker follow-ups
-- **Accessibility and economic self-sufficiency** — see [L.E.N.S.](https://github.com/prasadt1/photography-coach-gemma4), an on-device assistant applying the same closed loop for blind and low-vision marketplace sellers
 
 ### Agriculture: nudge intelligence (next)
 
@@ -663,7 +642,7 @@ Use the [CloudWatch console](https://console.aws.amazon.com/cloudwatch/) for Lam
 - **Anthropic Claude** for retrieval-augmented generation and structured vision diagnosis
 - The community of **AWS Heroes and Community Builders** whose architectural posts informed the EventBridge Scheduler vs Step Functions decision
 
-Special thanks to the smallholder farmers whose real-world challenges inspired this work — and whose feedback continues to shape it.
+The timing and follow-through problems smallholder farmers face inspired this work.
 
 ## Documentation
 
