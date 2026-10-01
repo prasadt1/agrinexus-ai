@@ -132,9 +132,12 @@
         <p>
           Operated by Prasad Tilloo. When you message the demo WhatsApp number we store your
           phone number and message content so we can reply and measure the demo. Visitor demo
-          records expire after <strong>7 days</strong>. Data is stored in
+          records expire after <strong>7 days</strong>. Uploaded photos and voice notes are
+          stored under your number in AWS S3 and are removed when you send
+          <strong>DELETE</strong>, or otherwise expire with the demo TTL. Data is stored in
           <strong>AWS us-east-1</strong>. WhatsApp / Meta carries the messages as the messaging
-          channel. To delete your demo data, send <strong>DELETE</strong> in the chat.
+          channel. To delete your demo data (profile, conversation, and media), send
+          <strong>DELETE</strong> in the chat.
         </p>
         <p>
           Legal notice:

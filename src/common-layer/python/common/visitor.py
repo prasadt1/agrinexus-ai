@@ -23,7 +23,8 @@ CAP_MSG = (
 
 DELETE_CONFIRM_MSG = (
     "Your AgriNexus demo data for this number has been deleted "
-    "(profile and conversation history). Send a new message anytime to start again."
+    "(profile, conversation history, and any photos or voice notes we stored). "
+    "Send a new message anytime to start again."
 )
 
 VISITOR_WELCOME = (
@@ -197,6 +198,35 @@ def delete_user_conversation_data(table, phone_number: str) -> int:
     table.delete_item(
         Key={"PK": f"COUNTER#visitor#{phone_number}", "SK": f"DAY#{day}"},
     )
+    return deleted
+
+
+def delete_user_media_objects(s3_client, bucket: str, phone_number: str) -> int:
+    """
+    Delete S3 objects under images/{phone}/ and voice/{phone}/ prefixes.
+    Returns number of objects deleted. No-op if bucket or phone is empty.
+    """
+    if not bucket or not phone_number:
+        return 0
+    phone = str(phone_number).lstrip("+")
+    deleted = 0
+    for prefix in (f"images/{phone}/", f"voice/{phone}/"):
+        continuation = None
+        while True:
+            kwargs: Dict[str, Any] = {"Bucket": bucket, "Prefix": prefix}
+            if continuation:
+                kwargs["ContinuationToken"] = continuation
+            resp = s3_client.list_objects_v2(**kwargs)
+            keys = [{"Key": obj["Key"]} for obj in (resp.get("Contents") or []) if obj.get("Key")]
+            if keys:
+                # delete_objects accepts up to 1000 keys
+                for i in range(0, len(keys), 1000):
+                    chunk = keys[i : i + 1000]
+                    s3_client.delete_objects(Bucket=bucket, Delete={"Objects": chunk, "Quiet": True})
+                    deleted += len(chunk)
+            if not resp.get("IsTruncated"):
+                break
+            continuation = resp.get("NextContinuationToken")
     return deleted
 
 

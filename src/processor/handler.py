@@ -848,6 +848,11 @@ def _run_visitor_sample_vision(from_number: str, profile: Dict[str, Any], wamid:
 
 def _handle_delete_command(from_number: str) -> None:
     visitor_mod.delete_user_conversation_data(table, from_number)
+    media_bucket = os.environ.get("TEMP_AUDIO_BUCKET") or ""
+    try:
+        visitor_mod.delete_user_media_objects(s3, media_bucket, from_number)
+    except Exception as e:
+        print(f"Visitor media delete failed for {redact_phone(from_number)}: {e}")
     visitor_mod.emit_visitor_metric(cloudwatch, "visitor_delete")
     send_whatsapp_message(from_number, visitor_mod.DELETE_CONFIRM_MSG)
 

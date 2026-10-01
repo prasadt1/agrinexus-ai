@@ -88,7 +88,22 @@ class TestDelete:
         assert n == 2
         assert table.delete_item.call_count >= 2
 
-
+    def test_delete_user_media_objects(self):
+        s3 = MagicMock()
+        s3.list_objects_v2.side_effect = [
+            {
+                "Contents": [
+                    {"Key": "images/15551234567/a.jpg"},
+                    {"Key": "images/15551234567/b.jpg"},
+                ]
+            },
+            {"Contents": [{"Key": "voice/15551234567/c.ogg"}]},
+        ]
+        n = visitor_mod.delete_user_media_objects(s3, "bucket", "15551234567")
+        assert n == 3
+        assert s3.delete_objects.call_count == 2
+        assert s3.list_objects_v2.call_args_list[0][1]["Prefix"] == "images/15551234567/"
+        assert s3.list_objects_v2.call_args_list[1][1]["Prefix"] == "voice/15551234567/"
 
 
 class TestVisitorMetrics:
@@ -184,6 +199,7 @@ class TestVisitorMetrics:
 
         mod._handle_delete_command("15550001111")
         assert "visitor_delete" in emitted
+        mock_s3.list_objects_v2.assert_called()
 
 
 class TestNudgeExclusion:
