@@ -114,7 +114,11 @@ def enforce_message_safety(
 
     # Gate 2: Low/medium confidence → structured safe template
     if crop_confidence != "high":
-        return get_safe_structured_template(dialect)
+        return get_safe_structured_template(
+            dialect,
+            visible_problem=bool(visible_problem),
+            quality_flagged=bool(vision_result.get("quality_flagged", False)),
+        )
 
     # Gate 3: High confidence → format model's structured output
     diagnosis = vision_result.get('diagnosis') or ""

@@ -155,36 +155,78 @@ def get_error_message(error_type: str, dialect: str) -> str:
     return messages.get(error_type, messages['unknown']).get(dialect, messages['unknown']['en'])
 
 
-def get_safe_structured_template(dialect: str) -> str:
+def get_safe_structured_template(
+    dialect: str,
+    *,
+    visible_problem: bool = False,
+    quality_flagged: bool = False,
+) -> str:
     """
-    Structured 4-section template for low/medium confidence cases.
-    Acknowledges the farmer's question without making unreliable claims.
+    Structured 4-section template for low/medium crop-confidence cases.
 
-    Returns professional format matching high-confidence output:
-    **निदान (Diagnosis):** [what we can/can't see]
-    **गंभीरता (Severity):** unknown
-    **सिफ़ारिशें (Recommendations):** [send better photo]
-    **विश्वास (Confidence):** [why confidence is low]
+    Does not attribute failure to photo quality unless heuristics flagged it.
+    When a problem is visible, steer the user to the crop-confirm buttons.
     """
-    templates = {
-        'hi': """*निदान (Diagnosis):* पौधे की पहचान स्पष्ट नहीं है
-*गंभीरता (Severity):* अज्ञात
-*सिफ़ारिशें (Recommendations):* कृपया प्रभावित पत्ती या हिस्से का करीब से स्पष्ट फोटो भेजें
-*विश्वास (Confidence):* कम - फोटो की गुणवत्ता या कोण के कारण स्पष्ट विश्लेषण नहीं कर सकते""",
+    d = (dialect or "en").strip().lower() or "en"
 
-        'mr': """*निदान (Diagnosis):* रोपाची ओळख स्पष्ट नाही
+    if quality_flagged:
+        templates = {
+            "hi": """*निदान (Diagnosis):* पौधे की पहचान स्पष्ट नहीं है
 *गंभीरता (Severity):* अज्ञात
-*सिफ़ारिशें (Recommendations):* कृपया प्रभावित पानाचा किंवा भागाचा जवळून स्पष्ट फोटो पाठवा
-*विश्वास (Confidence):* कम - फोटोची गुणवत्ता किंवा कोनामुळे स्पष्ट विश्लेषण करू शकत नाही""",
-
-        'te': """*నిర్ధారణ (Diagnosis):* మొక్క గుర్తింపు స్పష్టంగా లేదు
+*सिफ़ारिशें (Recommendations):* फोटो की गुणवत्ता कम है। कृपया प्रभावित पत्ती या हिस्से का साफ़, नज़दीक से लिया फोटो भेजें
+*विश्वास (Confidence):* कम - फोटो की गुणवत्ता के कारण विश्लेषण अधूरा है""",
+            "mr": """*निदान (Diagnosis):* रोपाची ओळख स्पष्ट नाही
+*गंभीरता (Severity):* अज्ञात
+*सिफ़ारिशें (Recommendations):* फोटोची गुणवत्ता कमी आहे. कृपया प्रभावित पान किंवा भागाचा स्पष्ट, जवळून घेतलेला फोटो पाठवा
+*विश्वास (Confidence):* कमी - फोटोच्या गुणवत्तेमुळे विश्लेषण अपूर्ण आहे""",
+            "te": """*నిర్ధారణ (Diagnosis):* మొక్క గుర్తింపు స్పష్టంగా లేదు
 *తీవ్రత (Severity):* తెలియదు
-*సిఫార్సులు (Recommendations):* దయచేసి ప్రభావిత ఆకు లేదా భాగం యొక్క దగ్గరి స్పష్ట ఫోటో పంపండి
-*విశ్వాసం (Confidence):* తక్కువ - ఫోటో నాణ్యత లేదా కోణం కారణంగా స్పష్ట విశ్లేషణ చేయలేము""",
-
-        'en': """*Diagnosis:* Cannot identify the plant clearly
+*సిఫార్సులు (Recommendations):* ఫోటో నాణ్యత తక్కువగా ఉంది. దయచేసి ప్రభావిత ఆకు లేదా భాగం యొక్క స్పష్టమైన దగ్గరి ఫోటో పంపండి
+*విశ్వాసం (Confidence):* తక్కువ - ఫోటో నాణ్యత వల్ల విశ్లేషణ అసంపూర్ణం""",
+            "en": """*Diagnosis:* Cannot identify the plant clearly
 *Severity:* Unknown
-*Recommendations:* Please send a closer, clearer photo of the affected leaf or part
-*Confidence:* Low - Cannot provide clear analysis due to photo quality or angle"""
+*Recommendations:* Photo quality is too low. Please send a clear close-up of the affected leaf or part
+*Confidence:* Low - analysis incomplete due to photo quality""",
+        }
+        return templates.get(d, templates["en"])
+
+    if visible_problem:
+        templates = {
+            "hi": """*निदान (Diagnosis):* पौधे की पहचान पक्की नहीं है, लेकिन समस्या दिख रही है
+*गंभीरता (Severity):* अज्ञात
+*सिफ़ारिशें (Recommendations):* कृपया नीचे दिए बटन से अपनी फसल चुनें, ताकि सही सलाह दी जा सके
+*विश्वास (Confidence):* कम - फसल की पहचान पक्की नहीं होने के कारण""",
+            "mr": """*निदान (Diagnosis):* रोपाची ओळख खात्रीशीर नाही, पण समस्या दिसत आहे
+*गंभीरता (Severity):* अज्ञात
+*सिफ़ारिशें (Recommendations):* कृपया खालील बटणांतून तुमचे पीक निवडा, जेणेकरून योग्य सल्ला देता येईल
+*विश्वास (Confidence):* कमी - पिकाची ओळख खात्रीशीर नसल्यामुळे""",
+            "te": """*నిర్ధారణ (Diagnosis):* మొక్క గుర్తింపు ఖచ్చితం కాదు, కానీ సమస్య కనిపిస్తోంది
+*తీవ్రత (Severity):* తెలియదు
+*సిఫార్సులు (Recommendations):* సరైన సలహా ఇవ్వడానికి దయచేసి కింది బటన్ల నుండి మీ పంటను ఎంచుకోండి
+*విశ్వాసం (Confidence):* తక్కువ - పంట గుర్తింపు ఖచ్చితం కానందున""",
+            "en": """*Diagnosis:* Plant identity is uncertain, but a problem is visible
+*Severity:* Unknown
+*Recommendations:* Please pick your crop from the buttons below so advice can be given
+*Confidence:* Low - crop identity is not confident enough""",
+        }
+        return templates.get(d, templates["en"])
+
+    templates = {
+        "hi": """*निदान (Diagnosis):* पौधे की पहचान पक्की नहीं है
+*गंभीरता (Severity):* अज्ञात
+*सिफ़ारिशें (Recommendations):* कृपया नीचे दिए बटन से अपनी फसल चुनें
+*विश्वास (Confidence):* कम - फसल की पहचान पक्की नहीं होने के कारण""",
+        "mr": """*निदान (Diagnosis):* रोपाची ओळख खात्रीशीर नाही
+*गंभीरता (Severity):* अज्ञात
+*सिफ़ारिशें (Recommendations):* कृपया खालील बटणांतून तुमचे पीक निवडा
+*विश्वास (Confidence):* कमी - पिकाची ओळख खात्रीशीर नसल्यामुळे""",
+        "te": """*నిర్ధారణ (Diagnosis):* మొక్క గుర్తింపు ఖచ్చితం కాదు
+*తీవ్రత (Severity):* తెలియదు
+*సిఫార్సులు (Recommendations):* దయచేసి కింది బటన్ల నుండి మీ పంటను ఎంచుకోండి
+*విశ్వాసం (Confidence):* తక్కువ - పంట గుర్తింపు ఖచ్చితం కానందున""",
+        "en": """*Diagnosis:* Plant identity is uncertain
+*Severity:* Unknown
+*Recommendations:* Please pick your crop from the buttons below
+*Confidence:* Low - crop identity is not confident enough""",
     }
-    return templates.get(dialect, templates['en'])
+    return templates.get(d, templates["en"])

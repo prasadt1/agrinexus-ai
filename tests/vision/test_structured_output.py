@@ -57,11 +57,11 @@ def test_low_confidence_uses_structured_template():
     assert '*सिफ़ारिशें (Recommendations):*' in result
     assert '*विश्वास (Confidence):*' in result
 
-    # Check safe template content
-    assert 'पौधे की पहचान स्पष्ट नहीं है' in result
+    # Check safe template content (crop identity uncertain → buttons, not photo quality)
+    assert 'पौधे की पहचान पक्की नहीं है' in result
     assert 'अज्ञात' in result
-    assert 'स्पष्ट फोटो भेजें' in result
-    assert 'कम - फोटो की गुणवत्ता' in result
+    assert 'बटन' in result
+    assert 'फसल की पहचान पक्की नहीं' in result
 
 
 def test_medium_confidence_also_uses_structured_template():
@@ -80,7 +80,7 @@ def test_medium_confidence_also_uses_structured_template():
 
     # Should get structured template (not model output)
     assert '*निदान (Diagnosis):*' in result
-    assert 'पौधे की पहचान स्पष्ट नहीं है' in result
+    assert 'पौधे की पहचान पक्की नहीं है' in result
 
 
 def test_high_confidence_no_problem_adds_hedge():
@@ -121,10 +121,12 @@ def test_format_helper_english():
 def test_template_all_dialects():
     """Verify structured template exists for all supported dialects"""
     for dialect in ['hi', 'mr', 'te', 'en']:
-        template = get_safe_structured_template(dialect)
+        template = get_safe_structured_template(dialect, visible_problem=True)
 
         # All should have 4 sections (WhatsApp-style bold markers: single *)
         assert template.count('*') >= 8  # 4 sections × 2 markers each
 
         # All should mention diagnosis/severity/recommendations/confidence concepts
         assert len(template) > 100  # Non-empty template
+        # New copy steers to buttons, not photo quality
+        assert 'quality' not in template.lower()
