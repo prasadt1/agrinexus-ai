@@ -24,7 +24,7 @@ from common.allowlist import is_approved_user, allowlist_expiry_hint
 from common.redact import redact_phone
 from common.nudge_keywords import is_nudge_reply
 from common import visitor as visitor_mod
-from common import visitor as visitor_mod
+from common.guardrail_reply import apply_localized_guardrail_reply
 
 
 def send_whatsapp_buttons(phone_number: str, body_text: str, buttons: list):
@@ -966,11 +966,13 @@ REMEMBER: If the Context above does not contain information to answer the Questi
         try:
             response = bedrock_agent.retrieve_and_generate(**request_params)
             print(f"Successfully used existing session: {session_id[:10]}***")
-            return {
+            result = {
                 'text': response['output']['text'],
                 'citations': response.get('citations', []),
-                'sessionId': response.get('sessionId')
+                'sessionId': response.get('sessionId'),
+                'guardrailAction': response.get('guardrailAction'),
             }
+            return apply_localized_guardrail_reply(result, dialect)
         except bedrock_agent.exceptions.ValidationException as e:
             # Session doesn't exist yet, create new one by calling without sessionId
             if 'Session with Id' in str(e) and 'is not valid' in str(e):
@@ -985,11 +987,13 @@ REMEMBER: If the Context above does not contain information to answer the Questi
     if session_id:
         print(f"Created new session: {response.get('sessionId', 'unknown')}")
     
-    return {
+    result = {
         'text': response['output']['text'],
         'citations': response.get('citations', []),
-        'sessionId': response.get('sessionId')
+        'sessionId': response.get('sessionId'),
+        'guardrailAction': response.get('guardrailAction'),
     }
+    return apply_localized_guardrail_reply(result, dialect)
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:

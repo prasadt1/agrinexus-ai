@@ -148,14 +148,14 @@ Resources:
         TopicsConfig:
           - Name: NonFarmingTopics
             Definition: >-
-              Questions unrelated to agriculture or farming, including politics,
-              entertainment, general coding, medical diagnosis for humans, or
-              financial advice outside farm economics.
+              Non-agricultural questions about politics, sports scores, entertainment,
+              celebrity gossip, general software coding, or stock prices unrelated to farming.
             Examples:
-              - Who won the football match?
-              - Write me a React app
-              - Diagnose my headache
-              - What is the stock price of Amazon?
+              - Who won the football match yesterday?
+              - Write a React todo app for me
+              - What is Amazon stock price today?
+              - Tell me a celebrity joke
+              - Who is winning the cricket match?
             Type: DENY
 
   # ============================================================================
@@ -407,6 +407,8 @@ Resources:
       Description: Public web chat API for text queries (no phone number required)
       Timeout: 60
       MemorySize: 512
+      Layers:
+        - !Ref CommonLayer
       Environment:
         Variables:
           WEB_RATE_LIMIT: "5"  # 5 queries per hour per IP
