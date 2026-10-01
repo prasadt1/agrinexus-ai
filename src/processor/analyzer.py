@@ -918,31 +918,49 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         # This prevents crop names from leaking into user-facing messages.
 
         # LAYER 3: Handler enforcement
-        # If crop is unclear (non-high confidence) and we couldn't infer a crop,
-        # ask the user to confirm which crop this is. This preserves the existing
-        # crop-confirmation UX used by `handler.py` and associated tests.
+        # When a real crop photo shows a problem but crop identity is not high-confidence,
+        # offer crop-confirm buttons (profile crop first) instead of the dead-end template.
+        # Reuses handler pending_crop_confirm → vision_reprocess; do not add a second path.
         allow_crop_confirm = True
         if _relevance_gate_enabled():
             # Only allow crop confirmation when relevance gate is confidently agri.
             allow_crop_confirm = bool(relevance == "agri_photo" and conf in ("high", "medium"))
-        pk = (vision.get("photo_kind") or "unknown").strip() or "unknown"
         cc = (vision.get("crop_confidence") or vision.get("confidence") or "low").strip().lower()
-        inferred = (vision.get("inferred_crop") or "unknown").strip() or "unknown"
-        if allow_crop_confirm and cc in ("low", "medium") and inferred == "unknown" and pk in ("pest_macro", "leaf_symptom", "unknown"):
+        is_real = bool(vision.get("is_real_crop_photo", True))
+        visible = bool(vision.get("visible_problem", False))
+        if allow_crop_confirm and is_real and visible and cc != "high":
             crop_local = localize_crop_name(crop, dialect)
             prompts = {
-                "hi": f"यह तस्वीर किस फसल की है? आपकी प्रोफ़ाइल में फसल: {crop_local}. क्या यह वही है?",
-                "mr": f"हा फोटो कोणत्या पिकाचा आहे? तुमच्या प्रोफाइलमधील पीक: {crop_local}. हेच आहे का?",
-                "te": f"ఇది ఏ పంట ఫోటో? మీ ప్రొఫైల్‌లో పంట: {crop_local}. ఇదేనా?",
-                "en": f"Which crop is this photo of? Your profile crop is {crop_local}. Is it the same?",
+                "hi": (
+                    f"समस्या दिख रही है, लेकिन फसल की पहचान पक्की नहीं है। "
+                    f"कृपया बटन से फसल चुनें (प्रोफ़ाइल: {crop_local})।"
+                ),
+                "mr": (
+                    f"समस्या दिसत आहे, पण पिकाची ओळख खात्रीशीर नाही. "
+                    f"कृपया बटणांतून पीक निवडा (प्रोफाइल: {crop_local})."
+                ),
+                "te": (
+                    f"సమస్య కనిపిస్తోంది, కానీ పంట గుర్తింపు ఖచ్చితం కాదు. "
+                    f"దయచేసి బటన్ల నుండి పంటను ఎంచుకోండి (ప్రొఫైల్: {crop_local})."
+                ),
+                "en": (
+                    f"A problem is visible, but crop identity is not confident. "
+                    f"Please pick the crop from the buttons (profile: {crop_local})."
+                ),
             }
+            # WhatsApp allows 3 buttons: profile crop first, then other supported crops.
+            supported = ["Cotton", "Wheat", "Soybean"]
+            profile_title = (crop or "Cotton").strip().title() or "Cotton"
+            ordered = [profile_title] + [c for c in supported if c.lower() != profile_title.lower()]
+            buttons = [localize_crop_name(c, dialect) for c in ordered[:3]]
             return {
                 "text": prompts.get(dialect, prompts["en"]),
+                "buttons": buttons,
                 "pending_crop_confirm": {
                     "bucket": TEMP_BUCKET,
                     "key": s3_key,
-                    "profile_crop": crop,
-                    "inferred_crop": crop,
+                    "profile_crop": profile_title,
+                    "inferred_crop": profile_title,
                 },
                 "s3": {"bucket": TEMP_BUCKET, "key": s3_key},
                 "heuristics_error": heuristics_error,
