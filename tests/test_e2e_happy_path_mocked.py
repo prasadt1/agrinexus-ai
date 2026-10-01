@@ -21,6 +21,8 @@ def _install_common_stubs(sent_messages):
     import importlib
     redact_mod = importlib.import_module("common.redact")
     nk_mod = importlib.import_module("common.nudge_keywords")
+    visitor_mod = importlib.import_module("common.visitor")
+    guardrail_reply_mod = importlib.import_module("common.guardrail_reply")
 
     common_pkg = types.ModuleType("common")
     common_pkg.__path__ = []
@@ -55,11 +57,15 @@ def _install_common_stubs(sent_messages):
 
     sys.modules["common.redact"] = redact_mod
     sys.modules["common.nudge_keywords"] = nk_mod
+    sys.modules["common.visitor"] = visitor_mod
+    sys.modules["common.guardrail_reply"] = guardrail_reply_mod
     common_pkg.redact = redact_mod
     common_pkg.nudge_keywords = nk_mod
     common_pkg.whatsapp = whatsapp
     common_pkg.allowlist = allowlist
     common_pkg.district_helplines = helplines
+    common_pkg.visitor = visitor_mod
+    common_pkg.guardrail_reply = guardrail_reply_mod
 
     # Processor imports these at import time; stub to keep test lightweight.
     output = types.ModuleType("output")

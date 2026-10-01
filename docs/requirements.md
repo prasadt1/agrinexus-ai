@@ -201,11 +201,51 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **REQ-STATE-008**: When user profile data is updated, the system shall timestamp the modification for audit purposes.
 
+### 2.9b re:Invent visitor path (conference demo)
+
+**REQ-VISITOR-001**: When an unknown number’s first message contains `re:invent` or `reinvent` (case-insensitive), the system shall enter the visitor path and shall not run farmer onboarding.
+
+**REQ-VISITOR-002**: On visitor entry, the system shall reply in English with a short welcome and an interactive list of five sample questions plus a photo-diagnosis option and a farmer-onboarding option.
+
+**REQ-VISITOR-003**: The system shall accept free-text farming questions from visitors in English via the existing RAG path.
+
+**REQ-VISITOR-004**: When a visitor selects the photo-diagnosis list option, the system shall run the real vision path on the stored sample image and return the model result.
+
+**REQ-VISITOR-005**: While `demo_tier` is `visitor`, the system shall accept visitor-uploaded crop photos through the real vision path, subject to the same visitor answer caps.
+
+**REQ-VISITOR-006**: Visitor profiles shall use `demo_tier=visitor` and `source=reinvent-2026`, with TTL of `VisitorTtlDays` (default 7) on profile and conversation items.
+
+**REQ-VISITOR-007**: The system shall not send nudges, reminders, or any other proactive messages to visitor-tier numbers.
+
+**REQ-VISITOR-008**: The system shall enforce a per-visitor daily answer cap and a global daily visitor answer cap (SAM parameters; defaults 10 and 300); on either cap, it shall send one fixed message and shall not call Bedrock.
+
+**REQ-VISITOR-009**: Allowlisted numbers shall be exempt from visitor caps.
+
+**REQ-VISITOR-010**: Visitor activity shall be counted separately and shall not increment farmer nudge sent/completed metrics.
+
+**REQ-CROP-001**: When a real crop photo shows a visible problem, crop confidence is not `high`, and the model's inferred crop does not contradict the farmer's registered crop, the system shall return the full diagnosis using the registered crop, state that assumption in the message, and offer a one-reply correction.
+
+**REQ-CROP-002**: When a real crop photo shows a visible problem and either no crop is registered or the model's inferred crop contradicts the registered crop, the system shall state what was observed and then ask the farmer to pick the crop. This applies at any crop confidence, including `high`.
+
+**REQ-CROP-003**: While a crop-confirm reply is pending from an assumed-crop answer, the system shall treat only a reply of at most three words naming a different crop as a correction.
+
+**REQ-CROP-004**: When the crop a farmer picks contradicts the crop the model inferred from the image, the system shall ask once more before returning crop-specific advice, and shall accept the farmer's second answer.
+
+**REQ-CROP-005**: When a crop is supplied as fact (farmer-confirmed, assumed from profile, or configured for the visitor sample), the system shall state the crop as given in the vision prompt, shall not ask for another photo to identify the crop, and shall return the four-section diagnosis, severity, recommendations and confidence output.
+
+**REQ-CROP-006**: When a message is sent under an assumed crop, the confidence section shall state that the pest reading is the model's and the crop is taken from the profile and not confirmed from the photo, keeping the model's own confidence wording.
+
+**REQ-I18N-001**: Section labels shall use the farmer's own language; Marathi output shall not reuse Hindi labels.
+
+**REQ-PRIV-001**: When any number sends `DELETE` or `DELETE MY DATA`, the system shall erase that number’s profile and conversation rows and confirm in one message.
+
+**REQ-SEC-GUARD-001**: WhatsApp RAG and web-chat RAG shall invoke the configured Bedrock Guardrail (content filters, prompt-attack filter, and a polite redirect for non-farming questions).
+
 ### 2.10 Profile Management (Tier 3 - Cut for MVP)
 
 **REQ-PROFILE-001**: The system shall support a RESET command to re-initiate onboarding for profile updates.
 
-**REQ-PROFILE-002**: The system shall allow farmers to delete their profile and all associated data by sending a "DELETE MY DATA" command.
+**REQ-PROFILE-002**: The system shall allow farmers to delete their profile and all associated data by sending a "DELETE MY DATA" command. *(Implemented via **REQ-PRIV-001**; `DELETE` is also accepted.)*
 
 **REQ-PROFILE-003**: When a deletion request is received, the system shall confirm the action and require explicit confirmation before proceeding.
 

@@ -168,6 +168,27 @@
         "region": "${REGION}",
         "title": "Nudge Completion Rate (%)"
       }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 24,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["AgriNexus/Visitor", "visitor_started"],
+          ["AgriNexus/Visitor", "visitor_question_answered"],
+          ["AgriNexus/Visitor", "visitor_photo_answered"],
+          ["AgriNexus/Visitor", "visitor_cap_hit_user"],
+          ["AgriNexus/Visitor", "visitor_cap_hit_global"],
+          ["AgriNexus/Visitor", "visitor_delete"]
+        ],
+        "stat": "Sum",
+        "period": 300,
+        "region": "${REGION}",
+        "title": "re:Invent Visitor Metrics (separate from nudges)"
+      }
     }
   ]
 }

@@ -14,7 +14,9 @@ from typing import Any, Dict, Optional
 
 from heuristics import run_heuristics
 from messages import get_block_message, get_not_agri_message, get_safe_retake_message, localize_crop_name
+from messages import get_crop_question, get_crop_mismatch_question
 from enforcement import enforce_message_safety
+from enforcement import format_crop_message
 
 bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
 s3 = boto3.client('s3', region_name='us-east-1')
@@ -500,6 +502,7 @@ def analyze_crop_image(
     dialect: str,
     crop: str = "cotton",
     district: Optional[str] = None,
+    confirmed_crop: bool = False,
 ) -> Dict[str, Any]:
     """
     Analyze crop image for pests, diseases, or nutrient deficiencies
@@ -703,6 +706,17 @@ REMEMBER:
 - Never name crop unless visual evidence strongly supports it (95%+ certainty for "high")
 - ALWAYS check for insects/pests - they are often the main issue farmers send photos about
 """
+
+    if confirmed_crop:
+        prompt += f"""
+
+CONFIRMED CROP OVERRIDE (highest priority, replaces the 3-tier crop rules above):
+- The farmer has confirmed the crop is {crop.title()}. Treat that as given fact.
+- Set "inferred_crop" to "{crop.title()}" and "crop_confidence" to "high".
+- Name the crop freely in "diagnosis" and "recommendations".
+- Do NOT ask for another photo to identify the crop, and do NOT say the crop is unclear.
+- Still judge the pest, disease or deficiency only from what is visible in the image.
+"""
     
     # Call Claude vision (BEDROCK_MODEL_ID)
     print(f"Analyzing image with Claude vision (dialect: {dialect}, crop: {crop})")
@@ -795,6 +809,32 @@ REMEMBER:
         }
 
 
+
+def diagnose_with_confirmed_crop(
+    image_bytes: bytes,
+    dialect: str,
+    crop: str,
+    district: Optional[str] = None,
+) -> str:
+    """
+    Diagnose an image with the crop supplied as fact rather than guessed.
+    Used after a crop-confirm tap and by the re:Invent sample photo, so both
+    produce identical text for the same image + crop + dialect + district.
+    """
+    vision = analyze_crop_image(image_bytes, dialect, crop, district=district, confirmed_crop=True)
+    return format_crop_message(vision, crop, dialect, assumed=False)
+
+
+def crop_mismatch_prompt(dialect: str, model_crop: str, chosen_crop: str):
+    """Question and two buttons for a tapped crop that disagrees with the image."""
+    model_local = localize_crop_name(model_crop, dialect)
+    chosen_local = localize_crop_name(chosen_crop, dialect)
+    return (
+        get_crop_mismatch_question(dialect, model_crop=model_local, chosen_crop=chosen_local),
+        [model_local, chosen_local],
+    )
+
+
 def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any]) -> Dict[str, Any]:
     """
     3-layer defense with diagnostic logging.
@@ -810,7 +850,8 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
     try:
         image_id = message['image']['id']
         dialect = user_profile.get('dialect', 'hi')
-        crop = user_profile.get('crop', 'cotton')
+        registered_crop = (user_profile.get('crop') or '').strip()
+        crop = registered_crop or 'cotton'
         phone = user_profile.get('phone_number', 'unknown')
 
         print(f"Processing image message: image_id={image_id}, dialect={dialect}, crop={crop}")
@@ -918,31 +959,75 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         # This prevents crop names from leaking into user-facing messages.
 
         # LAYER 3: Handler enforcement
-        # If crop is unclear (non-high confidence) and we couldn't infer a crop,
-        # ask the user to confirm which crop this is. This preserves the existing
-        # crop-confirmation UX used by `handler.py` and associated tests.
-        allow_crop_confirm = True
-        if _relevance_gate_enabled():
-            # Only allow crop confirmation when relevance gate is confidently agri.
-            allow_crop_confirm = bool(relevance == "agri_photo" and conf in ("high", "medium"))
-        pk = (vision.get("photo_kind") or "unknown").strip() or "unknown"
+        # When a real crop photo shows a problem but crop identity is not high-confidence,
+        # offer crop-confirm buttons (profile crop first) instead of the dead-end template.
+        # Reuses handler pending_crop_confirm → vision_reprocess; do not add a second path.
+        # Do not require Haiku relevance==agri_photo here: pest macros often score
+        # unclear/low on the relevance gate while Claude vision correctly sets
+        # is_real_crop_photo + visible_problem (see 9148 pink-bollworm WhatsApp).
+        # Non-agri hard-block already ran above; Gate 1 still blocks non-crop photos.
         cc = (vision.get("crop_confidence") or vision.get("confidence") or "low").strip().lower()
-        inferred = (vision.get("inferred_crop") or "unknown").strip() or "unknown"
-        if allow_crop_confirm and cc in ("low", "medium") and inferred == "unknown" and pk in ("pest_macro", "leaf_symptom", "unknown"):
-            crop_local = localize_crop_name(crop, dialect)
-            prompts = {
-                "hi": f"यह तस्वीर किस फसल की है? आपकी प्रोफ़ाइल में फसल: {crop_local}. क्या यह वही है?",
-                "mr": f"हा फोटो कोणत्या पिकाचा आहे? तुमच्या प्रोफाइलमधील पीक: {crop_local}. हेच आहे का?",
-                "te": f"ఇది ఏ పంట ఫోటో? మీ ప్రొఫైల్‌లో పంట: {crop_local}. ఇదేనా?",
-                "en": f"Which crop is this photo of? Your profile crop is {crop_local}. Is it the same?",
-            }
+        is_real = bool(vision.get("is_real_crop_photo", True))
+        visible = bool(vision.get("visible_problem", False))
+        model_crop = (vision.get("inferred_crop") or "unknown").strip()
+        # Only a crop the farmer actually registered can be assumed. The default
+        # above exists for the model prompt, not as an answer on their behalf.
+        profile_title = registered_crop.title()
+        contradicts = (
+            model_crop.lower() not in ("", "unknown")
+            and bool(profile_title)
+            and model_crop.lower() != profile_title.lower()
+        )
+        supported = ["Cotton", "Wheat", "Soybean"]
+
+        # A crop the model names and the farmer's registered crop disagreeing is the
+        # dangerous case, and it does not depend on confidence: a confident wrong crop
+        # produces crop-specific chemical advice with no hedge at all. Ask whenever
+        # they disagree. Otherwise the question is only worth asking when the model is
+        # unsure and there is no registered crop to fall back on.
+        # Agreement, or no opinion from the model: answer now and state the
+        # assumption. Asking first costs a round trip and tells the farmer nothing
+        # they can check.
+        if is_real and visible and cc != "high" and profile_title and not contradicts:
+            print(f"Assumed profile crop {profile_title} (crop_confidence={cc}, model_crop={model_crop})")
             return {
-                "text": prompts.get(dialect, prompts["en"]),
+                "text": format_crop_message(vision, profile_title, dialect, assumed=True),
                 "pending_crop_confirm": {
                     "bucket": TEMP_BUCKET,
                     "key": s3_key,
-                    "profile_crop": crop,
-                    "inferred_crop": crop,
+                    "profile_crop": profile_title,
+                    "model_crop": model_crop,
+                    "inferred_crop": profile_title,
+                    "assumed": True,
+                },
+                "s3": {"bucket": TEMP_BUCKET, "key": s3_key},
+                "heuristics_error": heuristics_error,
+            }
+
+        if is_real and visible and (cc != "high" or contradicts):
+            # No registered crop, or the image suggests a different one. Lead with
+            # what was actually seen so the question has something to check against.
+            observation = str(vision.get("diagnosis") or "").strip()
+            question = get_crop_question(
+                dialect,
+                profile_crop=localize_crop_name(profile_title, dialect) if contradicts else "",
+                model_crop=localize_crop_name(model_crop, dialect) if contradicts else "",
+            )
+            first = model_crop.title() if contradicts else (profile_title or "Cotton")
+            ordered = [first]
+            if profile_title and profile_title.lower() != first.lower():
+                ordered.append(profile_title)
+            ordered += [c for c in supported if c.lower() not in [o.lower() for o in ordered]]
+            return {
+                "text": f"{observation}\n\n{question}" if observation else question,
+                "buttons": [localize_crop_name(c, dialect) for c in ordered[:3]],
+                "pending_crop_confirm": {
+                    "bucket": TEMP_BUCKET,
+                    "key": s3_key,
+                    "profile_crop": profile_title or "",
+                    "model_crop": model_crop,
+                    "inferred_crop": first,
+                    "contradiction": bool(contradicts),
                 },
                 "s3": {"bucket": TEMP_BUCKET, "key": s3_key},
                 "heuristics_error": heuristics_error,

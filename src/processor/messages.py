@@ -155,36 +155,147 @@ def get_error_message(error_type: str, dialect: str) -> str:
     return messages.get(error_type, messages['unknown']).get(dialect, messages['unknown']['en'])
 
 
-def get_safe_structured_template(dialect: str) -> str:
+def get_safe_structured_template(
+    dialect: str,
+    *,
+    visible_problem: bool = False,
+    quality_flagged: bool = False,
+) -> str:
     """
-    Structured 4-section template for low/medium confidence cases.
-    Acknowledges the farmer's question without making unreliable claims.
+    Structured 4-section template for low/medium crop-confidence cases.
 
-    Returns professional format matching high-confidence output:
-    **निदान (Diagnosis):** [what we can/can't see]
-    **गंभीरता (Severity):** unknown
-    **सिफ़ारिशें (Recommendations):** [send better photo]
-    **विश्वास (Confidence):** [why confidence is low]
+    Does not attribute failure to photo quality unless heuristics flagged it.
+    When a problem is visible, steer the user to the crop-confirm buttons.
     """
-    templates = {
-        'hi': """*निदान (Diagnosis):* पौधे की पहचान स्पष्ट नहीं है
-*गंभीरता (Severity):* अज्ञात
-*सिफ़ारिशें (Recommendations):* कृपया प्रभावित पत्ती या हिस्से का करीब से स्पष्ट फोटो भेजें
-*विश्वास (Confidence):* कम - फोटो की गुणवत्ता या कोण के कारण स्पष्ट विश्लेषण नहीं कर सकते""",
+    d = (dialect or "en").strip().lower() or "en"
 
-        'mr': """*निदान (Diagnosis):* रोपाची ओळख स्पष्ट नाही
+    if quality_flagged:
+        templates = {
+            "hi": """*निदान (Diagnosis):* पौधे की पहचान स्पष्ट नहीं है
 *गंभीरता (Severity):* अज्ञात
-*सिफ़ारिशें (Recommendations):* कृपया प्रभावित पानाचा किंवा भागाचा जवळून स्पष्ट फोटो पाठवा
-*विश्वास (Confidence):* कम - फोटोची गुणवत्ता किंवा कोनामुळे स्पष्ट विश्लेषण करू शकत नाही""",
-
-        'te': """*నిర్ధారణ (Diagnosis):* మొక్క గుర్తింపు స్పష్టంగా లేదు
+*सिफ़ारिशें (Recommendations):* फोटो की गुणवत्ता कम है। कृपया प्रभावित पत्ती या हिस्से का साफ़, नज़दीक से लिया फोटो भेजें
+*विश्वास (Confidence):* कम - फोटो की गुणवत्ता के कारण विश्लेषण अधूरा है""",
+            "mr": """*निदान (Diagnosis):* रोपाची ओळख स्पष्ट नाही
+*गंभीरता (Severity):* अज्ञात
+*सिफ़ारिशें (Recommendations):* फोटोची गुणवत्ता कमी आहे. कृपया प्रभावित पान किंवा भागाचा स्पष्ट, जवळून घेतलेला फोटो पाठवा
+*विश्वास (Confidence):* कमी - फोटोच्या गुणवत्तेमुळे विश्लेषण अपूर्ण आहे""",
+            "te": """*నిర్ధారణ (Diagnosis):* మొక్క గుర్తింపు స్పష్టంగా లేదు
 *తీవ్రత (Severity):* తెలియదు
-*సిఫార్సులు (Recommendations):* దయచేసి ప్రభావిత ఆకు లేదా భాగం యొక్క దగ్గరి స్పష్ట ఫోటో పంపండి
-*విశ్వాసం (Confidence):* తక్కువ - ఫోటో నాణ్యత లేదా కోణం కారణంగా స్పష్ట విశ్లేషణ చేయలేము""",
-
-        'en': """*Diagnosis:* Cannot identify the plant clearly
+*సిఫార్సులు (Recommendations):* ఫోటో నాణ్యత తక్కువగా ఉంది. దయచేసి ప్రభావిత ఆకు లేదా భాగం యొక్క స్పష్టమైన దగ్గరి ఫోటో పంపండి
+*విశ్వాసం (Confidence):* తక్కువ - ఫోటో నాణ్యత వల్ల విశ్లేషణ అసంపూర్ణం""",
+            "en": """*Diagnosis:* Cannot identify the plant clearly
 *Severity:* Unknown
-*Recommendations:* Please send a closer, clearer photo of the affected leaf or part
-*Confidence:* Low - Cannot provide clear analysis due to photo quality or angle"""
+*Recommendations:* Photo quality is too low. Please send a clear close-up of the affected leaf or part
+*Confidence:* Low - analysis incomplete due to photo quality""",
+        }
+        return templates.get(d, templates["en"])
+
+    if visible_problem:
+        templates = {
+            "hi": """*निदान (Diagnosis):* पौधे की पहचान पक्की नहीं है, लेकिन समस्या दिख रही है
+*गंभीरता (Severity):* अज्ञात
+*सिफ़ारिशें (Recommendations):* कृपया नीचे दिए बटन से अपनी फसल चुनें, ताकि सही सलाह दी जा सके
+*विश्वास (Confidence):* कम - फसल की पहचान पक्की नहीं होने के कारण""",
+            "mr": """*निदान (Diagnosis):* रोपाची ओळख खात्रीशीर नाही, पण समस्या दिसत आहे
+*गंभीरता (Severity):* अज्ञात
+*सिफ़ारिशें (Recommendations):* कृपया खालील बटणांतून तुमचे पीक निवडा, जेणेकरून योग्य सल्ला देता येईल
+*विश्वास (Confidence):* कमी - पिकाची ओळख खात्रीशीर नसल्यामुळे""",
+            "te": """*నిర్ధారణ (Diagnosis):* మొక్క గుర్తింపు ఖచ్చితం కాదు, కానీ సమస్య కనిపిస్తోంది
+*తీవ్రత (Severity):* తెలియదు
+*సిఫార్సులు (Recommendations):* సరైన సలహా ఇవ్వడానికి దయచేసి కింది బటన్ల నుండి మీ పంటను ఎంచుకోండి
+*విశ్వాసం (Confidence):* తక్కువ - పంట గుర్తింపు ఖచ్చితం కానందున""",
+            "en": """*Diagnosis:* Plant identity is uncertain, but a problem is visible
+*Severity:* Unknown
+*Recommendations:* Please pick your crop from the buttons below so advice can be given
+*Confidence:* Low - crop identity is not confident enough""",
+        }
+        return templates.get(d, templates["en"])
+
+    templates = {
+        "hi": """*निदान (Diagnosis):* पौधे की पहचान पक्की नहीं है
+*गंभीरता (Severity):* अज्ञात
+*सिफ़ारिशें (Recommendations):* कृपया नीचे दिए बटन से अपनी फसल चुनें
+*विश्वास (Confidence):* कम - फसल की पहचान पक्की नहीं होने के कारण""",
+        "mr": """*निदान (Diagnosis):* रोपाची ओळख खात्रीशीर नाही
+*गंभीरता (Severity):* अज्ञात
+*सिफ़ारिशें (Recommendations):* कृपया खालील बटणांतून तुमचे पीक निवडा
+*विश्वास (Confidence):* कमी - पिकाची ओळख खात्रीशीर नसल्यामुळे""",
+        "te": """*నిర్ధారణ (Diagnosis):* మొక్క గుర్తింపు ఖచ్చితం కాదు
+*తీవ్రత (Severity):* తెలియదు
+*సిఫార్సులు (Recommendations):* దయచేసి కింది బటన్ల నుండి మీ పంటను ఎంచుకోండి
+*విశ్వాసం (Confidence):* తక్కువ - పంట గుర్తింపు ఖచ్చితం కానందున""",
+        "en": """*Diagnosis:* Plant identity is uncertain
+*Severity:* Unknown
+*Recommendations:* Please pick your crop from the buttons below
+*Confidence:* Low - crop identity is not confident enough""",
     }
-    return templates.get(dialect, templates['en'])
+    return templates.get(d, templates["en"])
+
+
+def get_assumed_crop_line(crop_local: str, dialect: str) -> str:
+    """Stated assumption when the image did not contradict the registered crop."""
+    lines = {
+        "hi": f"आपकी प्रोफ़ाइल के अनुसार फसल {crop_local} मानी गई है।",
+        "mr": f"तुमच्या प्रोफाइलनुसार पीक {crop_local} गृहीत धरले आहे.",
+        "te": f"మీ ప్రొఫైల్ ప్రకారం పంట {crop_local} అని తీసుకున్నాము.",
+        "en": f"Taking your crop as {crop_local} from your profile.",
+    }
+    return lines.get(dialect, lines["en"])
+
+
+def get_crop_correction_hint(crop_local: str, dialect: str) -> str:
+    """One-reply correction affordance shown under an assumed-crop answer."""
+    lines = {
+        "hi": f"{crop_local} नहीं है? फसल का नाम भेजें।",
+        "mr": f"{crop_local} नाही? पिकाचे नाव पाठवा.",
+        "te": f"{crop_local} కాదా? పంట పేరు పంపండి.",
+        "en": f"Not {crop_local}? Reply with the crop name.",
+    }
+    return lines.get(dialect, lines["en"])
+
+
+def get_crop_question(dialect: str, profile_crop: str = "", model_crop: str = "") -> str:
+    """Asked after the observation, not before it."""
+    if model_crop and profile_crop:
+        lines = {
+            "hi": f"यह {model_crop} जैसा दिख रहा है, लेकिन आपकी प्रोफ़ाइल में {profile_crop} है। यह कौन सी फसल है?",
+            "mr": f"हे {model_crop} सारखे दिसते, पण तुमच्या प्रोफाइलमध्ये {profile_crop} आहे. हे कोणते पीक आहे?",
+            "te": f"ఇది {model_crop} లా కనిపిస్తోంది, కానీ మీ ప్రొఫైల్‌లో {profile_crop} ఉంది. ఇది ఏ పంట?",
+            "en": f"This looks like {model_crop}, but your profile says {profile_crop}. Which crop is this?",
+        }
+        return lines.get(dialect, lines["en"])
+    lines = {
+        "hi": "यह कौन सी फसल है? बटन से चुनें।",
+        "mr": "हे कोणते पीक आहे? बटणांतून निवडा.",
+        "te": "ఇది ఏ పంట? బటన్ల నుండి ఎంచుకోండి.",
+        "en": "Which crop is this? Pick from the buttons.",
+    }
+    return lines.get(dialect, lines["en"])
+
+
+def get_crop_mismatch_question(dialect: str, model_crop: str, chosen_crop: str) -> str:
+    """Asked once when the tapped crop disagrees with what the image shows."""
+    lines = {
+        "hi": f"फोटो {model_crop} जैसा लग रहा है, {chosen_crop} नहीं। कौन सा सही है?",
+        "mr": f"फोटो {model_crop} सारखा दिसतो, {chosen_crop} नाही. कोणते बरोबर आहे?",
+        "te": f"ఫోటో {model_crop} లా ఉంది, {chosen_crop} కాదు. ఏది సరైనది?",
+        "en": f"The photo looks like {model_crop}, not {chosen_crop}. Which is right?",
+    }
+    return lines.get(dialect, lines["en"])
+
+
+def get_assumed_confidence_note(crop_local: str, dialect: str, model_note: str = "") -> str:
+    """
+    Confidence shown under an assumed crop. The pest reading is the model's; the
+    crop is not, so the line says which half is which instead of one word that
+    covers both.
+    """
+    notes = {
+        "hi": f"कीट की पहचान मॉडल ने की है। फसल {crop_local} आपकी प्रोफ़ाइल से मानी गई है, फोटो से पुष्टि नहीं हुई।",
+        "mr": f"कीडीची ओळख मॉडेलने केली आहे. पीक {crop_local} तुमच्या प्रोफाइलवरून गृहीत धरले आहे, फोटोतून खात्री झालेली नाही.",
+        "te": f"చీడ గుర్తింపు మోడల్ చేసింది. పంట {crop_local} మీ ప్రొఫైల్ నుండి తీసుకున్నాము, ఫోటో ద్వారా నిర్ధారణ కాలేదు.",
+        "en": f"Pest reading is the model's. The crop {crop_local} is taken from your profile, not confirmed from the photo.",
+    }
+    note = notes.get(dialect, notes["en"])
+    model_note = (model_note or "").strip()
+    return f"{note} {model_note}".strip() if model_note else note

@@ -67,7 +67,7 @@
 
 ## Production Evidence
 
-> *Metrics below are from April 26, 2026. Between roughly 30 July and 26 Sept 2026, the RAG and vision paths were down (retired Bedrock model ID; fixed in [PR #7](https://github.com/prasadt1/agrinexus-ai/pull/7)). Not yet re-verified against current traffic.*
+> *WhatsApp paths re-verified 1 October 2026 on the allowlisted owner number: onboarding (Marathi), text RAG, weather nudge, simulated T+24h/T+48h reminders, DONE close-loop, and web-chat RAG. Voice and visitor photo were not part of that run. April 2026 metrics below remain a competition-period snapshot; RAG/vision were down ~30 July–26 Sept 2026 (retired Bedrock model ID; fixed in [PR #7](https://github.com/prasadt1/agrinexus-ai/pull/7)).*
 
 AgriNexus is a deployed, functional prototype with production-grade observability — publicly reachable and instrumented, built to production standards on AWS and judged functional by AWS reviewers against a requirement that it not be staged. It has no farmer user base and is not in a pilot program.
 
@@ -78,6 +78,7 @@ AgriNexus is a deployed, functional prototype with production-grade observabilit
 | WhatsApp Business number | ✅ Reachable | [wa.me/4915120105731](https://wa.me/4915120105731) |
 | Web demo (public) | ✅ Reachable | [demo.agrinexus-ai.farm](https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html) |
 | Product site (owned landing page) | ✅ Reachable | [agrinexus-ai.farm](https://agrinexus-ai.farm/) |
+| re:Invent visitor landing | ⏳ After site publish | [agrinexus-ai.farm/try](https://agrinexus-ai.farm/try) (`docs/try/` + site twin) |
 | Webhook API (Meta verified) | ✅ Reachable | API Gateway + WAF |
 | Health endpoint (liveness) | ✅ Reachable | [health](https://h4bt24ycdl.execute-api.us-east-1.amazonaws.com/dev/health) |
 | Weather API integration | ✅ Reachable | OpenWeatherMap via Secrets Manager |
@@ -153,12 +154,13 @@ AgriNexus is a deployed, functional prototype with production-grade observabilit
 
 ### Capability Coverage
 
-| Pipeline | Production status |
+| Pipeline | Status |
 | --- | --- |
-| 📝 Text RAG (Hindi / Marathi / Telugu / English) | ✅ End-to-end |
-| 🎙️ Voice round-trip (Transcribe + RAG + Polly) | ✅ End-to-end, ~20–34s |
-| 📷 Vision (Claude Vision, structured schema) | ✅ End-to-end |
-| 🔔 Weather-gated nudges + closed loop | ✅ End-to-end, T+24h/T+48h/T+72h expiry |
+| 📝 Text RAG (Hindi / Marathi / Telugu / English) | ✅ End-to-end (re-checked 1 Oct 2026) |
+| 🎙️ Voice round-trip (Transcribe + RAG + Polly) | ✅ Prior E2E ~20–34s (allowlisted); not part of 1 Oct 2026 re-verify |
+| 📷 Vision (Claude Vision, structured schema) | ✅ End-to-end (allowlisted; visitors after deploy) |
+| 🔔 Weather-gated nudges + closed loop | ✅ End-to-end, T+24h/T+48h/T+72h (re-checked 1 Oct 2026) |
+| 🎫 re:Invent visitor path (trigger + caps + DELETE) | ⏳ Code ready; needs deploy + sample photo upload |
 | 🔒 Security (Meta HMAC-SHA256, secrets in Secrets Manager, PII redaction) | ✅ Enforced |
 | 📊 Observability (CloudWatch + X-Ray + custom metrics) | ✅ Enforced |
 
@@ -173,7 +175,7 @@ AgriNexus is a deployed, functional prototype with production-grade observabilit
 | IAM least-privilege | ✅ Enforced | DynamoDB / S3 / Bedrock resource-scoped |
 | Encryption at rest | ✅ Active | DynamoDB default encryption |
 | Encryption in transit | ✅ Active | HTTPS only |
-| Data retention TTL | ✅ Active | Conversations 90d / MSG rows 7d / Nudges 180d / WAMID dedup 24h |
+| Data retention TTL | ✅ Active | Farmer conversations 90d / webhook MSG copies 7d / Nudges 180d / WAMID dedup 24h / **re:Invent visitor profile+MSG: 7d** (`VisitorTtlDays`) |
 | Log retention | ✅ Active (set 27 Sept 2026) | CloudWatch Logs kept 90 days on all Lambda and canary log groups ([`scripts/set-log-retention.sh`](scripts/set-log-retention.sh)); previously never expired |
 
 ### Verification Note

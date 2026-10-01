@@ -37,6 +37,18 @@ class _FakeDynamoTable:
 
 
 def _install_common_stubs(sent_messages):
+    layer = str(Path(__file__).resolve().parents[1] / "src" / "common-layer" / "python")
+    if layer not in sys.path:
+        sys.path.insert(0, layer)
+    for name in list(sys.modules):
+        if name == "common" or name.startswith("common."):
+            sys.modules.pop(name, None)
+
+    import common.redact as redact_mod  # noqa: E402
+    import common.nudge_keywords as nk_mod  # noqa: E402
+    import common.visitor as visitor_mod  # noqa: E402
+    import common.guardrail_reply as guardrail_reply_mod  # noqa: E402
+
     common_pkg = types.ModuleType("common")
     sys.modules["common"] = common_pkg
 
@@ -62,19 +74,21 @@ def _install_common_stubs(sent_messages):
     allowlist.allowlist_expiry_hint = lambda *_args, **_kwargs: ""
     sys.modules["common.allowlist"] = allowlist
 
-    layer = str(Path(__file__).resolve().parents[1] / "src" / "common-layer" / "python")
-    if layer not in sys.path:
-        sys.path.insert(0, layer)
-    import common.redact as redact_mod  # noqa: E402
-    import common.nudge_keywords as nk_mod  # noqa: E402
     sys.modules["common.redact"] = redact_mod
     sys.modules["common.nudge_keywords"] = nk_mod
+    sys.modules["common.visitor"] = visitor_mod
+    sys.modules["common.guardrail_reply"] = guardrail_reply_mod
     common_pkg.redact = redact_mod
     common_pkg.nudge_keywords = nk_mod
+    common_pkg.visitor = visitor_mod
+    common_pkg.guardrail_reply = guardrail_reply_mod
+    common_pkg.whatsapp = whatsapp
+    common_pkg.allowlist = allowlist
 
     helplines = types.ModuleType("common.district_helplines")
     helplines.maybe_append_helpline_footer = lambda text, *_args, **_kwargs: text
     sys.modules["common.district_helplines"] = helplines
+    common_pkg.district_helplines = helplines
 
     output = types.ModuleType("output")
     output.text_to_speech = lambda *_args, **_kwargs: None
@@ -138,6 +152,11 @@ def test_crop_confirm_then_reprocess_on_yes(monkeypatch):
 
     analyzer.process_image_message = process_image_message
     analyzer.analyze_crop_image = analyze_crop_image
+    analyzer.diagnose_with_confirmed_crop = (
+        lambda image_bytes, dialect, crop, district=None: analyze_crop_image(
+            image_bytes, dialect, crop, district
+        )["recommendations"]
+    )
     sys.modules["analyzer"] = analyzer
 
     handler_path = repo_root / "src" / "processor" / "handler.py"
@@ -211,6 +230,11 @@ def test_crop_confirm_hindi_yes_phrase_reprocesses(monkeypatch):
 
     analyzer.process_image_message = process_image_message
     analyzer.analyze_crop_image = analyze_crop_image
+    analyzer.diagnose_with_confirmed_crop = (
+        lambda image_bytes, dialect, crop, district=None: analyze_crop_image(
+            image_bytes, dialect, crop, district
+        )["recommendations"]
+    )
     sys.modules["analyzer"] = analyzer
 
     handler_path = repo_root / "src" / "processor" / "handler.py"

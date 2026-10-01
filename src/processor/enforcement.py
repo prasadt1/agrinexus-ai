@@ -5,6 +5,12 @@ Returns professional 4-section format for ALL responses.
 """
 from typing import Dict, Any
 from messages import get_safe_retake_message, get_block_message, get_safe_structured_template
+from messages import (
+    get_assumed_confidence_note,
+    get_assumed_crop_line,
+    get_crop_correction_hint,
+    localize_crop_name,
+)
 
 
 def _localize_severity(severity: str, dialect: str) -> str:
@@ -55,8 +61,8 @@ def _format_structured_output(
         },
         'mr': {
             'diagnosis': '*निदान (Diagnosis):*',
-            'severity': '*गंभीरता (Severity):*',
-            'recommendations': '*सिफ़ारिशें (Recommendations):*',
+            'severity': '*तीव्रता (Severity):*',
+            'recommendations': '*शिफारशी (Recommendations):*',
             'confidence': '*विश्वास (Confidence):*'
         },
         'te': {
@@ -114,7 +120,11 @@ def enforce_message_safety(
 
     # Gate 2: Low/medium confidence → structured safe template
     if crop_confidence != "high":
-        return get_safe_structured_template(dialect)
+        return get_safe_structured_template(
+            dialect,
+            visible_problem=bool(visible_problem),
+            quality_flagged=bool(vision_result.get("quality_flagged", False)),
+        )
 
     # Gate 3: High confidence → format model's structured output
     diagnosis = vision_result.get('diagnosis') or ""
@@ -134,4 +144,49 @@ def enforce_message_safety(
 
     return _format_structured_output(
         diagnosis, severity, recommendations, confidence_text, dialect
+    )
+
+
+def format_crop_message(
+    vision_result: Dict[str, Any],
+    crop: str,
+    dialect: str,
+    assumed: bool = False,
+) -> str:
+    """
+    Four-section output for a crop that is an input rather than a model guess:
+    either the farmer confirmed it, or it came from the profile and the image did
+    not contradict it.
+
+    Gate 2 is deliberately not applied here. It guards against leaking a crop name
+    the model guessed; on this path the crop is supplied, so that risk is absent.
+    Gate 1 (non-crop photo) still applies.
+    """
+    if not vision_result.get("is_real_crop_photo", True):
+        return get_block_message(vision_result.get("non_photo_reason") or "screenshot", dialect)
+
+    diagnosis = vision_result.get("diagnosis") or ""
+    severity = vision_result.get("severity") or "unknown"
+    recommendations = vision_result.get("recommendations") or vision_result.get("final_message") or ""
+    confidence_text = vision_result.get("confidence_text") or ""
+
+    crop_local = localize_crop_name(crop, dialect)
+    if assumed:
+        # The model's confidence is about the pest. Saying "Confidence: high" under an
+        # assumed crop reads as confidence in the whole answer, including the half the
+        # farmer still has to check.
+        confidence_text = get_assumed_confidence_note(crop_local, dialect, confidence_text)
+
+    body = _format_structured_output(diagnosis, severity, recommendations, confidence_text, dialect)
+    if not assumed:
+        return body
+
+    return "\n".join(
+        [
+            get_assumed_crop_line(crop_local, dialect),
+            "",
+            body,
+            "",
+            get_crop_correction_hint(crop_local, dialect),
+        ]
     )

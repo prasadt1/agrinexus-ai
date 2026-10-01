@@ -4,6 +4,57 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 1 October 2026 — crop identity asked only when it is in doubt (code; not deployed)
+
+### What was wrong
+A live WhatsApp test (number ending 9148) sent two licence-free cotton pest photos. Claude vision returned correct high-severity diagnoses for both (whitefly; pink bollworm), but `crop_confidence` was `low`, so Gate 2 replaced the answer with the safe template and the farmer was asked to send a better photo. The photos were sharp; the model was unsure which crop it was looking at, not whether the image was usable. A later fix added crop-confirm buttons, which recovered the advice but cost a round trip and still dropped the diagnosis, severity and confidence sections, and the reply ended by asking for a photo to identify a crop the farmer had just confirmed.
+
+### Behaviour now
+- Problem visible, crop confidence not high, image does not contradict the registered crop → answer immediately, state the assumption ("Taking your crop as Cotton from your profile"), and accept a one-reply correction.
+- No registered crop, or the image suggests a different crop → lead with what was observed, then ask, with the crop the image suggests offered first.
+- A tapped crop that disagrees with the image is questioned once before any crop-specific chemical advice is given; the farmer's second answer stands.
+- A crop supplied as fact is passed to the model as fact (`confirmed_crop=True`), so it stops asking for crop-identification photos, and the reply keeps the four-section diagnosis / severity / recommendations / confidence format.
+- Only a crop the farmer actually registered can be assumed; the `cotton` default in `process_image_message` is for the model prompt, not an answer on their behalf.
+
+### Follow-up from the live run (same day)
+Replaying the pink-bollworm photo against Bedrock exposed a worse failure than the one above: the model returned `inferred_crop=Sugarcane` with `crop_confidence=high`, so the farmer received sugarcane borer advice for a cotton boll. Gate 2, the crop-confirm buttons and the assume/ask branch all key on confidence not being high, so a confidently wrong crop passed every check. Disagreement between the model's crop and the registered crop now triggers the question at any confidence level; agreement at high confidence is answered directly as before.
+
+### Message defects found by reading a live Marathi reply
+- The `mr` section labels were a copy of the `hi` block, so Marathi farmers saw Hindi headings (`सिफ़ारिशें`, `गंभीरता`). Now `शिफारशी` and `तीव्रता`.
+- Under an assumed crop the confidence section read `विश्वास: उच्च`, directly below a line saying the crop was assumed. The model's confidence is about the pest, not the crop. The section now says which half is the model's reading and which half is the profile assumption, and keeps the model's own wording after it.
+
+### Known, not fixed here
+- The photo path gives chemical names and dosages with no retrieval and no citations, while the text path cites ICAR and FAO. Any claim that photo advice is "grounded in ICAR and FAO" is not supported today.
+- A live reply labelled whiteflies as aphids (`पांढऱ्या रंगाच्या माशा (एफिड्स)`). Two different pests; needs a prompt change and a retest.
+
+### Unchanged
+Gate 1 (non-crop photo hard block) and Gate 2 (no crop name when the model guessed it) are untouched. Visitor sample and farmer-confirmed paths still share one helper, so the booth demo shows real behaviour.
+
+### Note
+`src/vision/` carries a parallel copy of the analyzer, enforcement and messages modules. No `CodeUri` in `template.yaml` points at it, so it is not deployed; only `src/processor/` is. These changes were made there.
+
+---
+
+## 1 October 2026 — re:Invent visitor path (code; not deployed)
+
+### Summary
+Adds a conference visitor WhatsApp path for the re:Invent QR landing (`/try`), without changing the farmer onboarding or allowlisted demo flow. **Not deployed** until explicitly approved.
+
+### Behaviour
+- Trigger phrase `re:invent` / `reinvent` on first message from an unknown number → English visitor welcome + sample-question list
+- `demo_tier=visitor`, `source=reinvent-2026`, 7-day TTL; no nudges/reminders
+- Caps: 10 answers/visitor/day and 300 global/day (SAM parameters); allowlisted exempt
+- Visitor photo uploads + sample photo diagnosis (S3 key `visitor-samples/crop-leaf.jpg` — **photo must be supplied before deploy**)
+- `DELETE` / `DELETE MY DATA` erases profile + conversation rows
+- `AWS::Bedrock::Guardrail` in `template.yaml` (content filters, prompt attack, non-farming topic)
+
+### Ops
+- `scripts/reset-onboard-and-demo.sh --as-visitor` / `--restore`
+- `scripts/visitor-acceptance.sh` (notes: uses a **reset** owner number, not a new MSISDN)
+- Landing: `docs/try/index.html` and twin in `agrinexus-ai-site/try/`
+
+---
+
 ## 26 September 2026 — Bedrock model parameterization and docs accuracy
 
 ### Summary

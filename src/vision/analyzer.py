@@ -717,6 +717,48 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         # This prevents crop names from leaking into user-facing messages.
 
         # LAYER 3: Handler enforcement
+        # Mirror processor: offer crop-confirm when real crop + visible problem + non-high confidence.
+        from src.vision.messages import localize_crop_name
+        cc = (vision.get("crop_confidence") or vision.get("confidence") or "low").strip().lower()
+        is_real = bool(vision.get("is_real_crop_photo", True))
+        visible = bool(vision.get("visible_problem", False))
+        if is_real and visible and cc != "high":
+            crop_local = localize_crop_name(crop, dialect)
+            prompts = {
+                "hi": (
+                    f"समस्या दिख रही है, लेकिन फसल की पहचान पक्की नहीं है। "
+                    f"कृपया बटन से फसल चुनें (प्रोफ़ाइल: {crop_local})।"
+                ),
+                "mr": (
+                    f"समस्या दिसत आहे, पण पिकाची ओळख खात्रीशीर नाही. "
+                    f"कृपया बटणांतून पीक निवडा (प्रोफाइल: {crop_local})."
+                ),
+                "te": (
+                    f"సమస్య కనిపిస్తోంది, కానీ పంట గుర్తింపు ఖచ్చితం కాదు. "
+                    f"దయచేసి బటన్ల నుండి పంటను ఎంచుకోండి (ప్రొఫైల్: {crop_local})."
+                ),
+                "en": (
+                    f"A problem is visible, but crop identity is not confident. "
+                    f"Please pick the crop from the buttons (profile: {crop_local})."
+                ),
+            }
+            supported = ["Cotton", "Wheat", "Soybean"]
+            profile_title = (crop or "Cotton").strip().title() or "Cotton"
+            ordered = [profile_title] + [c for c in supported if c.lower() != profile_title.lower()]
+            buttons = [localize_crop_name(c, dialect) for c in ordered[:3]]
+            return {
+                "text": prompts.get(dialect, prompts["en"]),
+                "buttons": buttons,
+                "pending_crop_confirm": {
+                    "bucket": TEMP_BUCKET,
+                    "key": s3_key,
+                    "profile_crop": profile_title,
+                    "inferred_crop": profile_title,
+                },
+                "s3": {"bucket": TEMP_BUCKET, "key": s3_key},
+                "heuristics_error": heuristics_error,
+            }
+
         final_msg = enforce_message_safety(vision, crop, dialect)
 
         print(f"Final message (enforced): {final_msg[:100]}...")

@@ -225,6 +225,12 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Fetch full profile (consent + crop/district)
         profile = table.get_item(Key={'PK': f'USER#{phone_number}', 'SK': 'PROFILE'}).get('Item') or {}
 
+        # re:Invent visitors never receive proactive nudges
+        if profile.get('demo_tier') == 'visitor':
+            print(f"Skipping {redact_phone(phone_number)} - visitor tier (no nudges)")
+            nudges_skipped += 1
+            continue
+
         # Consent gate: nudges are proactive messages; only send if user opted in.
         # Onboarding stores consent in profile['consent'].
         if not profile.get('onboarding_complete'):

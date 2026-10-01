@@ -27,12 +27,16 @@ Parameters:
   GuardrailId:
     Type: String
     Default: ""
-    Description: Bedrock Guardrail ID from Week 1 (optional)
-  
+    Description: >-
+      Optional external Bedrock Guardrail ID. When empty, the stack uses the
+      AgriNexusContentGuardrail resource created below.
+
   GuardrailVersion:
     Type: String
-    Default: "1"
-    Description: Bedrock Guardrail Version from Week 1 (optional)
+    Default: "DRAFT"
+    Description: >-
+      Guardrail version when GuardrailId is set externally. Ignored when the
+      stack-managed AgriNexusContentGuardrail is used.
 
   BedrockModelId:
     Type: String
@@ -40,6 +44,33 @@ Parameters:
     Description: >-
       Bedrock inference profile ID for RAG (RetrieveAndGenerate) and vision
       (InvokeModel). Use an active profile from list-inference-profiles.
+
+  VisitorTtlDays:
+    Type: Number
+    Default: 7
+    Description: DynamoDB TTL days for re:Invent visitor profiles and conversation rows.
+
+  VisitorDailyGlobalCap:
+    Type: Number
+    Default: 300
+    Description: Max Bedrock-backed visitor answers per UTC day (all visitors combined).
+
+  VisitorDailyPerUserCap:
+    Type: Number
+    Default: 10
+    Description: Max Bedrock-backed answers per visitor number per UTC day.
+
+  VisitorSampleImageCrop:
+    Type: String
+    Default: Cotton
+    AllowedValues:
+      - Cotton
+      - Wheat
+      - Soybean
+      - Maize
+    Description: >-
+      Confirmed crop for the re:Invent visitor sample photo (VISITOR_SAMPLE_IMAGE_KEY).
+      Not inferred by the model; used on the same path as farmer crop-confirm.
 
   RateLimitBypassPhones:
     Type: String
@@ -63,6 +94,9 @@ Parameters:
       Comma-separated WhatsApp numbers (digits only, no +) routed to the beta vision pipeline.
       Leave empty to disable beta routing.
 
+Conditions:
+  UseExternalGuardrail: !Not [!Equals [!Ref GuardrailId, ""]]
+
 Globals:
   Function:
     Runtime: python3.11
@@ -73,12 +107,77 @@ Globals:
       Variables:
         TABLE_NAME: !Ref TableName
         KNOWLEDGE_BASE_ID: !Ref KnowledgeBaseId
-        GUARDRAIL_ID: !Ref GuardrailId
-        GUARDRAIL_VERSION: !Ref GuardrailVersion
+        GUARDRAIL_ID: !If
+          - UseExternalGuardrail
+          - !Ref GuardrailId
+          - !GetAtt AgriNexusContentGuardrail.GuardrailId
+        GUARDRAIL_VERSION: !If
+          - UseExternalGuardrail
+          - !Ref GuardrailVersion
+          - !GetAtt AgriNexusContentGuardrailVersion.Version
         RATE_LIMIT_MESSAGES: "25"  # Max inbound WhatsApp messages per user per hour (see webhook FilterExpression)
         RATE_LIMIT_WINDOW_SECONDS: "3600"  # 1 hour window
+        VISITOR_TTL_DAYS: !Ref VisitorTtlDays
+        VISITOR_DAILY_GLOBAL_CAP: !Ref VisitorDailyGlobalCap
+        VISITOR_DAILY_PER_USER_CAP: !Ref VisitorDailyPerUserCap
 
 Resources:
+  # ============================================================================
+  # Bedrock Guardrail (content filters + prompt attack + non-farming redirect)
+  # ============================================================================
+  AgriNexusContentGuardrail:
+    Type: AWS::Bedrock::Guardrail
+    Properties:
+      Name: !Sub agrinexus-content-${Environment}
+      Description: AgriNexus farming-topic guardrail (WhatsApp + web chat)
+      BlockedInputMessaging: >-
+        I can only help with farming questions — crops, pests, weather, soil, or irrigation.
+        Please ask something related to agriculture.
+      BlockedOutputsMessaging: >-
+        I can only help with farming questions — crops, pests, weather, soil, or irrigation.
+        Please ask something related to agriculture.
+      ContentPolicyConfig:
+        FiltersConfig:
+          - Type: HATE
+            InputStrength: HIGH
+            OutputStrength: HIGH
+          - Type: INSULTS
+            InputStrength: HIGH
+            OutputStrength: HIGH
+          - Type: SEXUAL
+            InputStrength: HIGH
+            OutputStrength: HIGH
+          - Type: VIOLENCE
+            InputStrength: HIGH
+            OutputStrength: HIGH
+          - Type: MISCONDUCT
+            InputStrength: HIGH
+            OutputStrength: HIGH
+          - Type: PROMPT_ATTACK
+            InputStrength: HIGH
+            OutputStrength: NONE
+      TopicPolicyConfig:
+        TopicsConfig:
+          - Name: NonFarmingTopics
+            Definition: >-
+              Non-agricultural questions about politics, sports scores, entertainment,
+              celebrity gossip, general software coding, or stock prices unrelated to farming.
+            Examples:
+              - Who won the football match yesterday?
+              - Write a React todo app for me
+              - What is Amazon stock price today?
+              - Tell me a celebrity joke
+              - Who is winning the cricket match?
+            Type: DENY
+
+  # Pin a numbered version so console DRAFT edits cannot change live Lambda behavior
+  # without a stack update that recreates this version resource.
+  AgriNexusContentGuardrailVersion:
+    Type: AWS::Bedrock::GuardrailVersion
+    Properties:
+      GuardrailIdentifier: !GetAtt AgriNexusContentGuardrail.GuardrailId
+      Description: !Sub Pinned content guardrail for ${Environment}
+
   # ============================================================================
   # Lambda Layer: Common Utilities
   # ============================================================================
@@ -328,6 +427,8 @@ Resources:
       Description: Public web chat API for text queries (no phone number required)
       Timeout: 60
       MemorySize: 512
+      Layers:
+        - !Ref CommonLayer
       Environment:
         Variables:
           WEB_RATE_LIMIT: "5"  # 5 queries per hour per IP
@@ -348,6 +449,7 @@ Resources:
                 - bedrock:ListInferenceProfiles
                 - bedrock:RetrieveAndGenerate
                 - bedrock:Retrieve
+                - bedrock:ApplyGuardrail
                 - bedrock-agent:Retrieve
                 - bedrock-agent:RetrieveAndGenerate
               Resource: '*'
@@ -413,6 +515,9 @@ Resources:
           # Shorter Polly audio; full reply always sent as text first (see output.truncate_for_voice)
           VOICE_TTS_MAX_CHARS: "700"
           IMAGE_MAX_BYTES: "5242880"
+          VISITOR_SAMPLE_IMAGE_BUCKET: !Ref TempAudioBucket
+          VISITOR_SAMPLE_IMAGE_KEY: visitor-samples/crop-leaf.jpg
+          VISITOR_SAMPLE_IMAGE_CROP: !Ref VisitorSampleImageCrop
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TableName
@@ -427,6 +532,7 @@ Resources:
                 - bedrock:ListInferenceProfiles
                 - bedrock:RetrieveAndGenerate
                 - bedrock:Retrieve
+                - bedrock:ApplyGuardrail
                 - bedrock-agent:Retrieve
                 - bedrock-agent:RetrieveAndGenerate
               Resource: '*'
@@ -476,6 +582,9 @@ Resources:
           LAST_IMAGE_TTL_SECONDS: "600"
           VISION_MIN_DIMENSION: "320"
           VISION_MIN_FILE_BYTES: "3000"
+          VISITOR_SAMPLE_IMAGE_BUCKET: !Ref TempAudioBucket
+          VISITOR_SAMPLE_IMAGE_KEY: visitor-samples/crop-leaf.jpg
+          VISITOR_SAMPLE_IMAGE_CROP: !Ref VisitorSampleImageCrop
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TableName
@@ -490,6 +599,7 @@ Resources:
                 - bedrock:ListInferenceProfiles
                 - bedrock:RetrieveAndGenerate
                 - bedrock:Retrieve
+                - bedrock:ApplyGuardrail
                 - bedrock-agent:Retrieve
                 - bedrock-agent:RetrieveAndGenerate
               Resource: '*'

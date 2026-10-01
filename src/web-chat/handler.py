@@ -14,6 +14,7 @@ from datetime import datetime
 from decimal import Decimal
 import hashlib
 from botocore.exceptions import ClientError
+from common.guardrail_reply import apply_localized_guardrail_reply
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -464,10 +465,12 @@ REMEMBER: If the Context above does not contain information to answer the Questi
         retrieveAndGenerateConfiguration=rag_config
     )
     
-    return {
+    result = {
         'text': response['output']['text'],
-        'citations': response.get('citations', [])
+        'citations': response.get('citations', []),
+        'guardrailAction': response.get('guardrailAction'),
     }
+    return apply_localized_guardrail_reply(result, dialect)
 
 
 def analyze_image(image_base64: str, dialect: str = 'en') -> str:

@@ -23,6 +23,8 @@ from common.district_helplines import maybe_append_helpline_footer
 from common.allowlist import is_approved_user, allowlist_expiry_hint
 from common.redact import redact_phone
 from common.nudge_keywords import is_nudge_reply
+from common import visitor as visitor_mod
+from common.guardrail_reply import apply_localized_guardrail_reply
 
 
 def send_whatsapp_buttons(phone_number: str, body_text: str, buttons: list):
@@ -39,6 +41,7 @@ def send_whatsapp_buttons(phone_number: str, body_text: str, buttons: list):
 dynamodb = boto3.resource('dynamodb')
 bedrock_agent = boto3.client('bedrock-agent-runtime')
 s3 = boto3.client("s3")
+cloudwatch = boto3.client("cloudwatch")
 
 TABLE_NAME = os.environ['TABLE_NAME']
 KB_ID = os.environ['KNOWLEDGE_BASE_ID']
@@ -122,6 +125,36 @@ def _put_pending_crop_confirm(phone_number: str, pending: Dict[str, Any]):
 
 def _delete_pending_crop_confirm(phone_number: str):
     table.delete_item(Key={"PK": f"USER#{phone_number}", "SK": _PENDING_CROP_CONFIRM_SK})
+
+
+
+def _is_crop_correction(text: str, chosen: str, pending: Dict[str, Any]) -> bool:
+    """
+    An answer was already given under a stated assumption, so only a short,
+    explicit crop name counts as a correction. Without this, an ordinary question
+    that happens to name a crop ("how much water for wheat?") would be re-run as
+    an image diagnosis for the ten minutes the pending row lives.
+    """
+    if not pending.get("assumed"):
+        return True
+    if len(str(text or "").split()) > 3:
+        return False
+    assumed_crop = str(pending.get("profile_crop") or "").strip().lower()
+    return chosen.strip().lower() != assumed_crop
+
+
+def _crop_tap_conflicts_with_image(chosen: str, pending: Dict[str, Any]) -> bool:
+    """
+    True when the tapped crop disagrees with what the model saw and we have not
+    already said so. A wrong tap otherwise produces crop-specific chemical advice
+    for the wrong crop, which is the one failure here that can cause real harm.
+    """
+    model_crop = str(pending.get("model_crop") or "").strip()
+    if not model_crop or model_crop.lower() == "unknown":
+        return False
+    if pending.get("rechecked") or pending.get("contradiction"):
+        return False
+    return model_crop.lower() != chosen.strip().lower()
 
 
 def _parse_crop_confirm_reply(text: str, inferred_crop: str, profile_crop: str) -> Optional[str]:
@@ -209,6 +242,7 @@ def _parse_crop_word(text: str) -> Optional[str]:
         "maize": "Maize",
         # Hindi
         "गेहूं": "Wheat",
+        "गेहूँ": "Wheat",
         "कपास": "Cotton",
         "सोयाबीन": "Soybean",
         "मक्का": "Maize",
@@ -742,14 +776,23 @@ def source_labels_from_citations(citations: Any) -> List[str]:
     return labels
 
 
-def save_message(phone_number: str, wamid: str, message_data: Dict[str, Any], response_text: str, source_citation: str):
-    """Save message to DynamoDB with TTL"""
+def save_message(
+    phone_number: str,
+    wamid: str,
+    message_data: Dict[str, Any],
+    response_text: str,
+    source_citation: str,
+    *,
+    ttl_days: Optional[int] = None,
+):
+    """Save message to DynamoDB with TTL (90 days default; visitors use VisitorTtlDays)."""
     timestamp = datetime.utcnow().isoformat()
-    ttl = int(datetime.utcnow().timestamp()) + (90 * 24 * 60 * 60)  # 90 days
-    
+    days = ttl_days if ttl_days is not None else 90
+    ttl = int(datetime.utcnow().timestamp()) + (days * 24 * 60 * 60)
+
     # Convert any float values to Decimal for DynamoDB
     message_data_clean = convert_floats_to_decimal(message_data)
-    
+
     table.put_item(
         Item={
             'PK': f'USER#{phone_number}',
@@ -761,6 +804,99 @@ def save_message(phone_number: str, wamid: str, message_data: Dict[str, Any], re
             'ttl': ttl
         }
     )
+
+
+def _msg_ttl_days(profile: Optional[Dict[str, Any]]) -> int:
+    if visitor_mod.is_visitor_profile(profile):
+        return visitor_mod.visitor_ttl_days()
+    return 90
+
+
+def _consume_visitor_or_refuse(from_number: str, profile: Optional[Dict[str, Any]], approved: bool) -> bool:
+    """Return True if the caller may proceed to Bedrock. Sends CAP_MSG and returns False if blocked."""
+    if not visitor_mod.is_visitor_profile(profile):
+        return True
+    ok, reason = visitor_mod.try_consume_visitor_answer(table, from_number, bypass=approved)
+    if ok:
+        return True
+    if reason == "user":
+        visitor_mod.emit_visitor_metric(cloudwatch, "visitor_cap_hit_user")
+    elif reason == "global":
+        visitor_mod.emit_visitor_metric(cloudwatch, "visitor_cap_hit_global")
+    send_whatsapp_message(from_number, visitor_mod.CAP_MSG)
+    return False
+
+
+def _diagnose_image_with_confirmed_crop(
+    image_bytes: bytes,
+    dialect: str,
+    crop: str,
+    district: Optional[str] = None,
+) -> str:
+    """
+    Same path a farmer reaches after tapping a crop-confirm button:
+    call analyze_crop_image with the crop supplied as fact and format the full
+    four-section message (Gate 2 is not applied on this path). Visitor sample uses
+    this too, so both produce identical text for the same image bytes + crop +
+    dialect + district.
+    """
+    return analyzer.diagnose_with_confirmed_crop(image_bytes, dialect, crop, district=district)
+
+
+def _run_visitor_sample_vision(from_number: str, profile: Dict[str, Any], wamid: str) -> None:
+    """Run real vision path on the configured sample crop image (S3)."""
+    bucket = (
+        os.environ.get("VISITOR_SAMPLE_IMAGE_BUCKET")
+        or os.environ.get("TEMP_AUDIO_BUCKET")
+        or ""
+    )
+    key = os.environ.get("VISITOR_SAMPLE_IMAGE_KEY") or "visitor-samples/crop-leaf.jpg"
+    if not bucket:
+        send_whatsapp_message(
+            from_number,
+            "Sample photo diagnosis is not configured yet. Please ask a text question, or send your own crop photo.",
+        )
+        return
+    try:
+        obj = s3.get_object(Bucket=bucket, Key=key)
+        image_bytes = obj["Body"].read()
+    except Exception as e:
+        print(f"Visitor sample image load failed: {e}")
+        send_whatsapp_message(
+            from_number,
+            "Sample photo is temporarily unavailable. Please send your own crop/leaf photo, or ask in text.",
+        )
+        return
+    send_whatsapp_message(from_number, "✓ Running photo diagnosis on a sample crop image...")
+    dialect = profile.get("dialect") or "en"
+    # Configured crop for the sample image (not a model guess) — same confirmed-crop
+    # path as farmer crop-confirm reprocess.
+    crop = (os.environ.get("VISITOR_SAMPLE_IMAGE_CROP") or "Cotton").strip() or "Cotton"
+    district = profile.get("district") or profile.get("location")
+    reply = _diagnose_image_with_confirmed_crop(image_bytes, dialect, crop, district=district)
+    if not reply:
+        reply = "Vision analysis completed but returned an empty result."
+    save_message(
+        from_number,
+        wamid,
+        {"type": "visitor_sample_photo", "s3": {"bucket": bucket, "key": key}, "crop": crop},
+        reply,
+        "visitor_sample_vision",
+        ttl_days=_msg_ttl_days(profile),
+    )
+    send_whatsapp_message(from_number, reply)
+    visitor_mod.emit_visitor_metric(cloudwatch, "visitor_photo_answered")
+
+
+def _handle_delete_command(from_number: str) -> None:
+    visitor_mod.delete_user_conversation_data(table, from_number)
+    media_bucket = os.environ.get("TEMP_AUDIO_BUCKET") or ""
+    try:
+        visitor_mod.delete_user_media_objects(s3, media_bucket, from_number)
+    except Exception as e:
+        print(f"Visitor media delete failed for {redact_phone(from_number)}: {e}")
+    visitor_mod.emit_visitor_metric(cloudwatch, "visitor_delete")
+    send_whatsapp_message(from_number, visitor_mod.DELETE_CONFIRM_MSG)
 
 
 def query_bedrock(query: str, dialect: str = 'hi', session_id: Optional[str] = None) -> Dict[str, Any]:
@@ -884,11 +1020,13 @@ REMEMBER: If the Context above does not contain information to answer the Questi
         try:
             response = bedrock_agent.retrieve_and_generate(**request_params)
             print(f"Successfully used existing session: {session_id[:10]}***")
-            return {
+            result = {
                 'text': response['output']['text'],
                 'citations': response.get('citations', []),
-                'sessionId': response.get('sessionId')
+                'sessionId': response.get('sessionId'),
+                'guardrailAction': response.get('guardrailAction'),
             }
+            return apply_localized_guardrail_reply(result, dialect)
         except bedrock_agent.exceptions.ValidationException as e:
             # Session doesn't exist yet, create new one by calling without sessionId
             if 'Session with Id' in str(e) and 'is not valid' in str(e):
@@ -903,11 +1041,13 @@ REMEMBER: If the Context above does not contain information to answer the Questi
     if session_id:
         print(f"Created new session: {response.get('sessionId', 'unknown')}")
     
-    return {
+    result = {
         'text': response['output']['text'],
         'citations': response.get('citations', []),
-        'sessionId': response.get('sessionId')
+        'sessionId': response.get('sessionId'),
+        'guardrailAction': response.get('guardrailAction'),
     }
+    return apply_localized_guardrail_reply(result, dialect)
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -1032,28 +1172,41 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             f"dialect={profile.get('dialect') if profile else None}, "
             f"onboarding_complete={profile.get('onboarding_complete') if profile else None}"
         )
-        
+
+        # Extract text early for DELETE / visitor trigger (works mid-onboarding too)
+        early_text = ''
+        if message_type == 'text':
+            early_text = message.get('text', {}).get('body', '')
+        elif message_type == 'interactive':
+            interactive = message.get('interactive', {}) if isinstance(message, dict) else {}
+            interactive_type = interactive.get('type', '')
+            if interactive_type == 'button_reply':
+                early_text = interactive.get('button_reply', {}).get('title', '')
+            elif interactive_type == 'list_reply':
+                list_reply = interactive.get('list_reply', {})
+                early_text = list_reply.get('id') or list_reply.get('title', '')
+
+        if early_text and visitor_mod.is_delete_command(early_text):
+            _handle_delete_command(from_number)
+            continue
+
+        # re:Invent visitor path: unknown number + trigger phrase → skip farmer onboarding
+        if (not profile) and message_type == 'text' and visitor_mod.matches_reinvent_trigger(early_text):
+            profile = visitor_mod.create_visitor_profile(table, from_number)
+            visitor_mod.emit_visitor_metric(cloudwatch, "visitor_started")
+            welcome = visitor_mod.visitor_welcome_list()
+            send_whatsapp_list(
+                from_number,
+                welcome['content'],
+                welcome['button_text'],
+                welcome['sections'],
+            )
+            continue
+
         # Check if onboarding is complete
         if not profile or not profile.get('onboarding_complete', False):
             # Handle onboarding
-            text = ''
-            if message_type == 'text':
-                text = message.get('text', {}).get('body', '')
-            elif message_type == 'interactive':
-                # Extract interactive reply (button or list)
-                interactive = message.get('interactive', {})
-                interactive_type = interactive.get('type', '')
-                
-                if interactive_type == 'button_reply':
-                    # Button reply: use title
-                    button_reply = interactive.get('button_reply', {})
-                    text = button_reply.get('title', '')
-                elif interactive_type == 'list_reply':
-                    # List reply: use id (e.g., 'en', 'hi', 'mr', 'te')
-                    list_reply = interactive.get('list_reply', {})
-                    text = list_reply.get('id', '')
-                else:
-                    text = ''
+            text = early_text
             
             if text:
                 # HELP must work even during onboarding (judges try it immediately).
@@ -1095,21 +1248,41 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
         
         dialect = profile.get('dialect', 'hi')
         approved = is_approved_user(table, from_number)
+        is_visitor = visitor_mod.is_visitor_profile(profile)
         
         # Process based on message type
         if message_type in ('text', 'interactive'):
-            text = ''
-            if message_type == 'text':
-                text = message.get('text', {}).get('body', '')
-            else:
-                interactive = message.get('interactive', {}) if isinstance(message, dict) else {}
-                interactive_type = interactive.get('type', '')
-                if interactive_type == 'button_reply':
-                    button_reply = interactive.get('button_reply', {})
-                    text = button_reply.get('title', '')
-                elif interactive_type == 'list_reply':
-                    list_reply = interactive.get('list_reply', {})
-                    text = list_reply.get('title') or list_reply.get('id', '')
+            text = early_text
+
+            # Visitor: switch to farmer onboarding
+            if is_visitor and visitor_mod.is_farmer_onboard_selection(text):
+                visitor_mod.delete_user_conversation_data(table, from_number)
+                onboarding_response = handle_onboarding(from_number, "Hi", None, is_interactive=False)
+                if onboarding_response['type'] == 'list':
+                    send_whatsapp_list(
+                        from_number,
+                        onboarding_response['content'],
+                        onboarding_response['button_text'],
+                        onboarding_response['sections'],
+                    )
+                elif onboarding_response['type'] == 'buttons':
+                    send_whatsapp_buttons(from_number, onboarding_response['content'], onboarding_response['buttons'])
+                else:
+                    send_whatsapp_message(from_number, onboarding_response['content'])
+                continue
+
+            # Visitor: sample photo diagnosis (counts against caps)
+            if is_visitor and visitor_mod.is_sample_photo_selection(text):
+                if not _consume_visitor_or_refuse(from_number, profile, approved):
+                    continue
+                _run_visitor_sample_vision(from_number, profile, wamid)
+                continue
+
+            # Visitor: map sample list ids to full questions
+            if is_visitor:
+                mapped = visitor_mod.resolve_sample_question(text)
+                if mapped:
+                    text = mapped
 
             # If we are waiting for crop confirmation from a previous photo, intercept first.
             pending = _get_pending_crop_confirm(from_number)
@@ -1119,18 +1292,49 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                     inferred_crop=str(pending.get("inferred_crop") or ""),
                     profile_crop=str(pending.get("profile_crop") or profile.get("crop") or ""),
                 )
+
+                if chosen and not _is_crop_correction(text, chosen, pending):
+                    chosen = None
+
+                if chosen:
+                    model_crop = str(pending.get("model_crop") or "").strip()
+                    if _crop_tap_conflicts_with_image(chosen, pending):
+                        # A wrong tap would produce crop-specific chemical advice for
+                        # the wrong crop. Ask once instead of complying silently.
+                        carry = {
+                            k: v
+                            for k, v in pending.items()
+                            if k not in ("PK", "SK", "ttl")
+                        }
+                        carry["rechecked"] = True
+                        carry["inferred_crop"] = model_crop
+                        _put_pending_crop_confirm(from_number, carry)
+                        ask_text, ask_buttons = analyzer.crop_mismatch_prompt(
+                            dialect, model_crop, chosen
+                        )
+                        send_whatsapp_buttons(from_number, ask_text, ask_buttons)
+                        continue
+
                 if chosen:
                     bucket = pending.get("bucket") or os.environ.get("TEMP_AUDIO_BUCKET")
                     key = pending.get("key")
                     if bucket and key:
                         try:
+                            if not _consume_visitor_or_refuse(from_number, profile, approved):
+                                continue
                             obj = s3.get_object(Bucket=bucket, Key=key)
                             image_bytes = obj["Body"].read()
                             district = profile.get("district") or profile.get("location")
-                            result = analyzer.analyze_crop_image(image_bytes, dialect, chosen, district=district)
-                            reply_text = str(result.get("recommendations") or "")
-                            save_message(from_number, wamid, message, reply_text, "vision_reprocess")
+                            reply_text = _diagnose_image_with_confirmed_crop(
+                                image_bytes, dialect, chosen, district=district
+                            )
+                            save_message(
+                                from_number, wamid, message, reply_text, "vision_reprocess",
+                                ttl_days=_msg_ttl_days(profile),
+                            )
                             send_whatsapp_message(from_number, reply_text)
+                            if is_visitor:
+                                visitor_mod.emit_visitor_metric(cloudwatch, "visitor_photo_answered")
                         finally:
                             _delete_pending_crop_confirm(from_number)
                         continue
@@ -1168,7 +1372,11 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             if text.strip().upper() in ['HELP', 'मदद', 'मदत', 'సహాయం']:
                 _send_help(from_number, dialect)
                 continue
-            
+
+            # Visitor daily caps (allowlisted numbers bypass)
+            if not _consume_visitor_or_refuse(from_number, profile, approved):
+                continue
+
             # Immediate text-query ack only (voice already got VOICE_RECEIVED_ACK in VoiceProcessor)
             voice_source = message.get('_source')
             if voice_source not in ('voice', 'voice_test'):
@@ -1230,7 +1438,10 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             )
             
             # Save to DynamoDB
-            save_message(from_number, wamid, message, reply_text, str(result['citations']))
+            save_message(
+                from_number, wamid, message, reply_text, str(result['citations']),
+                ttl_days=_msg_ttl_days(profile),
+            )
             
             # Check if user wants voice response (Hindi, Marathi, English supported)
             send_voice = (approved and dialect in ['hi', 'mr', 'en'] and 
@@ -1251,9 +1462,13 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             else:
                 # Send text response
                 send_whatsapp_message(from_number, reply_text)
+
+            if is_visitor:
+                visitor_mod.emit_visitor_metric(cloudwatch, "visitor_question_answered")
         
         elif message_type == 'image':
-            if not approved:
+            # Allowlisted users + re:Invent visitors (visitor uploads count against caps)
+            if not approved and not is_visitor:
                 gate_msg = {
                     'hi': f'फोटो विश्लेषण सुविधा अभी बंद है। कृपया टेक्स्ट में प्रश्न भेजें। {allowlist_expiry_hint(dialect)}',
                     'mr': f'फोटो विश्लेषण सुविधा सध्या बंद आहे. कृपया प्रश्न टेक्स्टमध्ये पाठवा. {allowlist_expiry_hint(dialect)}',
@@ -1261,6 +1476,9 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                     'en': f'Photo analysis is not enabled in the public demo. Please ask in text. {allowlist_expiry_hint(dialect)}',
                 }
                 send_whatsapp_message(from_number, gate_msg.get(dialect, gate_msg['en']))
+                continue
+
+            if not _consume_visitor_or_refuse(from_number, profile, approved):
                 continue
 
             # Process image with Claude Vision
@@ -1291,7 +1509,10 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                 pending.setdefault("profile_crop", profile.get("crop"))
                 _put_pending_crop_confirm(from_number, pending)
                 text_out = str(analysis.get("text") or "")
-                save_message(from_number, wamid, message, text_out, "vision_crop_confirm")
+                save_message(
+                    from_number, wamid, message, text_out, "vision_crop_confirm",
+                    ttl_days=_msg_ttl_days(profile),
+                )
                 buttons = analysis.get("buttons") if isinstance(analysis, dict) else None
                 if isinstance(buttons, list) and buttons:
                     send_whatsapp_buttons(from_number, text_out, buttons)
@@ -1304,10 +1525,15 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                 analysis = str(analysis.get("text") or analysis.get("recommendations") or "")
             
             # Save to DynamoDB
-            save_message(from_number, wamid, message, analysis, 'vision_analysis')
+            save_message(
+                from_number, wamid, message, analysis, 'vision_analysis',
+                ttl_days=_msg_ttl_days(profile),
+            )
             
             # Send response (text only - no voice for image responses)
             send_whatsapp_message(from_number, analysis)
+            if is_visitor:
+                visitor_mod.emit_visitor_metric(cloudwatch, "visitor_photo_answered")
         
         elif message_type == 'audio':
             # Audio messages are normally handled by VoiceProcessor Lambda (gated in webhook).
