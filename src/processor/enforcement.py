@@ -6,6 +6,7 @@ Returns professional 4-section format for ALL responses.
 from typing import Dict, Any
 from messages import get_safe_retake_message, get_block_message, get_safe_structured_template
 from messages import (
+    get_assumed_confidence_note,
     get_assumed_crop_line,
     get_crop_correction_hint,
     localize_crop_name,
@@ -60,8 +61,8 @@ def _format_structured_output(
         },
         'mr': {
             'diagnosis': '*निदान (Diagnosis):*',
-            'severity': '*गंभीरता (Severity):*',
-            'recommendations': '*सिफ़ारिशें (Recommendations):*',
+            'severity': '*तीव्रता (Severity):*',
+            'recommendations': '*शिफारशी (Recommendations):*',
             'confidence': '*विश्वास (Confidence):*'
         },
         'te': {
@@ -169,11 +170,17 @@ def format_crop_message(
     recommendations = vision_result.get("recommendations") or vision_result.get("final_message") or ""
     confidence_text = vision_result.get("confidence_text") or ""
 
+    crop_local = localize_crop_name(crop, dialect)
+    if assumed:
+        # The model's confidence is about the pest. Saying "Confidence: high" under an
+        # assumed crop reads as confidence in the whole answer, including the half the
+        # farmer still has to check.
+        confidence_text = get_assumed_confidence_note(crop_local, dialect, confidence_text)
+
     body = _format_structured_output(diagnosis, severity, recommendations, confidence_text, dialect)
     if not assumed:
         return body
 
-    crop_local = localize_crop_name(crop, dialect)
     return "\n".join(
         [
             get_assumed_crop_line(crop_local, dialect),

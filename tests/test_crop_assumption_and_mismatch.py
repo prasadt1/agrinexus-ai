@@ -243,3 +243,33 @@ def test_confident_agreeing_crop_is_still_answered_directly(monkeypatch):
 
     assert "buttons" not in out
     assert "pending_crop_confirm" not in out
+
+
+def test_marathi_labels_are_marathi_not_hindi(monkeypatch):
+    from src.processor import enforcement as e
+
+    out = e.format_crop_message(_vision(crop_confidence="high"), "Cotton", "mr", assumed=False)
+    assert "शिफारशी" in out  # Marathi
+    assert "सिफ़ारिशें" not in out  # Hindi
+    assert "तीव्रता" in out
+    assert "गंभीरता" not in out
+
+
+def test_assumed_answer_does_not_claim_confidence_in_the_crop(monkeypatch):
+    from src.processor import enforcement as e
+
+    vision = _vision(confidence_text="high - pest clearly visible")
+    out = e.format_crop_message(vision, "Cotton", "mr", assumed=True)
+    # The crop half is named as an assumption inside the confidence section itself.
+    assert "गृहीत धरले आहे" in out.split("विश्वास")[1]
+    # The model's own wording is kept rather than discarded.
+    assert "high - pest clearly visible" in out
+
+
+def test_confirmed_answer_keeps_the_model_confidence_wording(monkeypatch):
+    from src.processor import enforcement as e
+
+    vision = _vision(confidence_text="high - boll and fibre visible", crop_confidence="high")
+    out = e.format_crop_message(vision, "Cotton", "en", assumed=False)
+    assert "high - boll and fibre visible" in out
+    assert "taken from your profile" not in out

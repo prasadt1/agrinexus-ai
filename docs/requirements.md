@@ -233,6 +233,10 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **REQ-CROP-005**: When a crop is supplied as fact (farmer-confirmed, assumed from profile, or configured for the visitor sample), the system shall state the crop as given in the vision prompt, shall not ask for another photo to identify the crop, and shall return the four-section diagnosis, severity, recommendations and confidence output.
 
+**REQ-CROP-006**: When a message is sent under an assumed crop, the confidence section shall state that the pest reading is the model's and the crop is taken from the profile and not confirmed from the photo, keeping the model's own confidence wording.
+
+**REQ-I18N-001**: Section labels shall use the farmer's own language; Marathi output shall not reuse Hindi labels.
+
 **REQ-PRIV-001**: When any number sends `DELETE` or `DELETE MY DATA`, the system shall erase that number’s profile and conversation rows and confirm in one message.
 
 **REQ-SEC-GUARD-001**: WhatsApp RAG and web-chat RAG shall invoke the configured Bedrock Guardrail (content filters, prompt-attack filter, and a polite redirect for non-farming questions).
