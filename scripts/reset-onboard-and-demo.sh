@@ -144,6 +144,10 @@ case "$MODE" in
     echo ""
     echo "Visitor mode ready for ${PHONE}."
     echo "NOTE: This is a reset number, not a brand-new MSISDN."
+    echo "WARNING: Do not run sam deploy between --as-visitor and --restore."
+    echo "         A deploy restores BETA_PHONES / RATE_LIMIT_BYPASS_PHONES from"
+    echo "         template parameters and silently re-allowlists this number,"
+    echo "         which invalidates the visitor acceptance run."
     echo "From WhatsApp send: Hi from re:Invent"
     echo "When finished: $0 --phone ${PHONE} --restore"
     ;;
