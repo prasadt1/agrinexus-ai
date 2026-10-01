@@ -998,8 +998,19 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         # they can check.
         if is_real and visible and cc != "high" and profile_title and not contradicts:
             print(f"Assumed profile crop {profile_title} (crop_confidence={cc}, model_crop={model_crop})")
+            # The first pass must not be told the crop, or it could never name a
+            # different one. Without the crop it often cannot name the pest either
+            # (pink bollworm on a boll it calls "unknown"), and then names no product.
+            # Diagnose again with the assumed crop as given, as after a crop tap.
+            diagnosis_vision = vision
+            try:
+                diagnosis_vision = analyze_crop_image(
+                    image_bytes, dialect, profile_title, district=district, confirmed_crop=True
+                )
+            except Exception as e:
+                print(f"Assumed-crop diagnosis failed, using first pass: {type(e).__name__}: {e}")
             return {
-                "text": format_crop_message(vision, profile_title, dialect, assumed=True),
+                "text": format_crop_message(diagnosis_vision, profile_title, dialect, assumed=True),
                 "pending_crop_confirm": {
                     "bucket": TEMP_BUCKET,
                     "key": s3_key,

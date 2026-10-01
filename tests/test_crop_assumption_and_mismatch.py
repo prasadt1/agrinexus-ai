@@ -70,6 +70,71 @@ def test_assumed_crop_answers_without_asking(monkeypatch):
     assert pending["profile_crop"] == "Cotton"
 
 
+def _analyzer_two_pass(monkeypatch, first, second):
+    """First call is the blind first pass; a confirmed_crop call gets `second`."""
+    a = _analyzer(monkeypatch, first)
+    calls = []
+
+    def _fake(_image, _dialect, crop, district=None, confirmed_crop=False):
+        calls.append({"crop": crop, "confirmed_crop": confirmed_crop})
+        if confirmed_crop:
+            if isinstance(second, Exception):
+                raise second
+            return second
+        return first
+
+    monkeypatch.setattr(a, "analyze_crop_image", _fake)
+    return a, calls
+
+
+def test_assumed_crop_is_diagnosed_again_with_the_crop_as_given(monkeypatch):
+    first = _vision(diagnosis="Pink larvae feeding.", recommendations="Ask the officer.")
+    second = _vision(
+        inferred_crop="Cotton",
+        crop_confidence="high",
+        diagnosis="Pink bollworm larvae inside a cotton boll.",
+        recommendations="Remove infested bolls; spray as per label.",
+    )
+    a, calls = _analyzer_two_pass(monkeypatch, first, second)
+    out = a.process_image_message(
+        {"image": {"id": "m"}, "from": "1555"},
+        {"dialect": "en", "crop": "Cotton", "district": "Latur", "phone_number": "1555"},
+    )
+
+    assert calls == [
+        {"crop": "Cotton", "confirmed_crop": False},
+        {"crop": "Cotton", "confirmed_crop": True},
+    ]
+    assert "Pink bollworm larvae inside a cotton boll." in out["text"]
+    assert "Ask the officer." not in out["text"]
+    assert "Taking your crop as Cotton" in out["text"]
+    assert out["pending_crop_confirm"]["assumed"] is True
+
+
+def test_assumed_crop_falls_back_to_first_pass_if_second_call_fails(monkeypatch):
+    first = _vision(diagnosis="Pink larvae feeding.")
+    a, _calls = _analyzer_two_pass(monkeypatch, first, RuntimeError("throttled"))
+    out = a.process_image_message(
+        {"image": {"id": "m"}, "from": "1555"},
+        {"dialect": "en", "crop": "Cotton", "district": "Latur", "phone_number": "1555"},
+    )
+
+    assert "Pink larvae feeding." in out["text"]
+    assert "Taking your crop as Cotton" in out["text"]
+
+
+def test_crop_question_does_not_make_a_second_call(monkeypatch):
+    first = _vision(inferred_crop="Sugarcane", crop_confidence="high")
+    a, calls = _analyzer_two_pass(monkeypatch, first, _vision())
+    out = a.process_image_message(
+        {"image": {"id": "m"}, "from": "1555"},
+        {"dialect": "en", "crop": "Cotton", "district": "Latur", "phone_number": "1555"},
+    )
+
+    assert out["buttons"][0] == "Sugarcane"
+    assert calls == [{"crop": "Cotton", "confirmed_crop": False}]
+
+
 def test_contradicting_image_asks_and_leads_with_the_observation(monkeypatch):
     a = _analyzer(monkeypatch, _vision(inferred_crop="Wheat", crop_confidence="medium"))
     out = a.process_image_message(
