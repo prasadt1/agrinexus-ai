@@ -169,3 +169,24 @@ Cost: one extra Bedrock vision call (about 10 s) on the assume branch.
 Remaining wording issue: because the second call is told the crop, its confidence text
 can say the cotton boll is "clearly visible" right after the line saying the crop was
 assumed from the profile, not confirmed from the photo.
+
+### After `ffd17ec` (assumption note only in the confidence section)
+
+On the assume branch the confidence section now shows only the fixed note; the second
+call's own confidence wording is dropped. The second call's result is also used only if
+it still reports a real crop photo with a visible problem (`40fb22d`), otherwise the
+first pass is shown. 5 first-pass runs per photo, Marathi, profile crop Cotton
+(`replays/2026-10-02-after-confidence-note-only.json`):
+
+| | F | G |
+|---|---|---|
+| Branch | assume 5/5 | assume 5/5 |
+| Vision calls per run | 2 | 2 |
+| Pest | caterpillar 5/5 (pink bollworm in text) | whitefly 5/5 |
+| Product with rate | 5/5 | 5/5 |
+| Photo request | 0/5 | 0/5 |
+| Second call rejected by guard | 0/5 | 0/5 |
+| Confidence section identical across runs | 5/5 | 5/5 |
+
+Confidence section in all 10 runs:
+"कीडीची ओळख मॉडेलने केली आहे. पीक कापूस तुमच्या प्रोफाइलवरून गृहीत धरले आहे, फोटोतून खात्री झालेली नाही."
