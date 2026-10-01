@@ -1004,9 +1004,15 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
             # Diagnose again with the assumed crop as given, as after a crop tap.
             diagnosis_vision = vision
             try:
-                diagnosis_vision = analyze_crop_image(
+                second = analyze_crop_image(
                     image_bytes, dialect, profile_title, district=district, confirmed_crop=True
                 )
+                # Routing used the first pass's verdict; a second call that disagrees
+                # would turn an answer into a "not a crop photo" block.
+                if second.get("is_real_crop_photo", True) and second.get("visible_problem", False):
+                    diagnosis_vision = second
+                else:
+                    print("Assumed-crop diagnosis disagreed with first pass, using first pass")
             except Exception as e:
                 print(f"Assumed-crop diagnosis failed, using first pass: {type(e).__name__}: {e}")
             return {

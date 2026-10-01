@@ -123,6 +123,21 @@ def test_assumed_crop_falls_back_to_first_pass_if_second_call_fails(monkeypatch)
     assert "Taking your crop as Cotton" in out["text"]
 
 
+def test_second_call_that_disagrees_with_first_pass_is_ignored(monkeypatch):
+    first = _vision(diagnosis="Pink larvae feeding.")
+    for flipped in (
+        _vision(is_real_crop_photo=False, non_photo_reason="logo", diagnosis="Not a crop."),
+        _vision(visible_problem=False, diagnosis="Looks healthy."),
+    ):
+        a, _calls = _analyzer_two_pass(monkeypatch, first, flipped)
+        out = a.process_image_message(
+            {"image": {"id": "m"}, "from": "1555"},
+            {"dialect": "en", "crop": "Cotton", "district": "Latur", "phone_number": "1555"},
+        )
+        assert "Pink larvae feeding." in out["text"]
+        assert "Taking your crop as Cotton" in out["text"]
+
+
 def test_crop_question_does_not_make_a_second_call(monkeypatch):
     first = _vision(inferred_crop="Sugarcane", crop_confidence="high")
     a, calls = _analyzer_two_pass(monkeypatch, first, _vision())
