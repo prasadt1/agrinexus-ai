@@ -5,6 +5,11 @@ Returns professional 4-section format for ALL responses.
 """
 from typing import Dict, Any
 from messages import get_safe_retake_message, get_block_message, get_safe_structured_template
+from messages import (
+    get_assumed_crop_line,
+    get_crop_correction_hint,
+    localize_crop_name,
+)
 
 
 def _localize_severity(severity: str, dialect: str) -> str:
@@ -138,4 +143,43 @@ def enforce_message_safety(
 
     return _format_structured_output(
         diagnosis, severity, recommendations, confidence_text, dialect
+    )
+
+
+def format_crop_message(
+    vision_result: Dict[str, Any],
+    crop: str,
+    dialect: str,
+    assumed: bool = False,
+) -> str:
+    """
+    Four-section output for a crop that is an input rather than a model guess:
+    either the farmer confirmed it, or it came from the profile and the image did
+    not contradict it.
+
+    Gate 2 is deliberately not applied here. It guards against leaking a crop name
+    the model guessed; on this path the crop is supplied, so that risk is absent.
+    Gate 1 (non-crop photo) still applies.
+    """
+    if not vision_result.get("is_real_crop_photo", True):
+        return get_block_message(vision_result.get("non_photo_reason") or "screenshot", dialect)
+
+    diagnosis = vision_result.get("diagnosis") or ""
+    severity = vision_result.get("severity") or "unknown"
+    recommendations = vision_result.get("recommendations") or vision_result.get("final_message") or ""
+    confidence_text = vision_result.get("confidence_text") or ""
+
+    body = _format_structured_output(diagnosis, severity, recommendations, confidence_text, dialect)
+    if not assumed:
+        return body
+
+    crop_local = localize_crop_name(crop, dialect)
+    return "\n".join(
+        [
+            get_assumed_crop_line(crop_local, dialect),
+            "",
+            body,
+            "",
+            get_crop_correction_hint(crop_local, dialect),
+        ]
     )

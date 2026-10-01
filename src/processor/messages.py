@@ -230,3 +230,55 @@ def get_safe_structured_template(
 *Confidence:* Low - crop identity is not confident enough""",
     }
     return templates.get(d, templates["en"])
+
+
+def get_assumed_crop_line(crop_local: str, dialect: str) -> str:
+    """Stated assumption when the image did not contradict the registered crop."""
+    lines = {
+        "hi": f"आपकी प्रोफ़ाइल के अनुसार फसल {crop_local} मानी गई है।",
+        "mr": f"तुमच्या प्रोफाइलनुसार पीक {crop_local} गृहीत धरले आहे.",
+        "te": f"మీ ప్రొఫైల్ ప్రకారం పంట {crop_local} అని తీసుకున్నాము.",
+        "en": f"Taking your crop as {crop_local} from your profile.",
+    }
+    return lines.get(dialect, lines["en"])
+
+
+def get_crop_correction_hint(crop_local: str, dialect: str) -> str:
+    """One-reply correction affordance shown under an assumed-crop answer."""
+    lines = {
+        "hi": f"{crop_local} नहीं है? फसल का नाम भेजें।",
+        "mr": f"{crop_local} नाही? पिकाचे नाव पाठवा.",
+        "te": f"{crop_local} కాదా? పంట పేరు పంపండి.",
+        "en": f"Not {crop_local}? Reply with the crop name.",
+    }
+    return lines.get(dialect, lines["en"])
+
+
+def get_crop_question(dialect: str, profile_crop: str = "", model_crop: str = "") -> str:
+    """Asked after the observation, not before it."""
+    if model_crop and profile_crop:
+        lines = {
+            "hi": f"यह {model_crop} जैसा दिख रहा है, लेकिन आपकी प्रोफ़ाइल में {profile_crop} है। यह कौन सी फसल है?",
+            "mr": f"हे {model_crop} सारखे दिसते, पण तुमच्या प्रोफाइलमध्ये {profile_crop} आहे. हे कोणते पीक आहे?",
+            "te": f"ఇది {model_crop} లా కనిపిస్తోంది, కానీ మీ ప్రొఫైల్‌లో {profile_crop} ఉంది. ఇది ఏ పంట?",
+            "en": f"This looks like {model_crop}, but your profile says {profile_crop}. Which crop is this?",
+        }
+        return lines.get(dialect, lines["en"])
+    lines = {
+        "hi": "यह कौन सी फसल है? बटन से चुनें।",
+        "mr": "हे कोणते पीक आहे? बटणांतून निवडा.",
+        "te": "ఇది ఏ పంట? బటన్ల నుండి ఎంచుకోండి.",
+        "en": "Which crop is this? Pick from the buttons.",
+    }
+    return lines.get(dialect, lines["en"])
+
+
+def get_crop_mismatch_question(dialect: str, model_crop: str, chosen_crop: str) -> str:
+    """Asked once when the tapped crop disagrees with what the image shows."""
+    lines = {
+        "hi": f"फोटो {model_crop} जैसा लग रहा है, {chosen_crop} नहीं। कौन सा सही है?",
+        "mr": f"फोटो {model_crop} सारखा दिसतो, {chosen_crop} नाही. कोणते बरोबर आहे?",
+        "te": f"ఫోటో {model_crop} లా ఉంది, {chosen_crop} కాదు. ఏది సరైనది?",
+        "en": f"The photo looks like {model_crop}, not {chosen_crop}. Which is right?",
+    }
+    return lines.get(dialect, lines["en"])

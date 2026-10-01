@@ -223,6 +223,16 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **REQ-VISITOR-010**: Visitor activity shall be counted separately and shall not increment farmer nudge sent/completed metrics.
 
+**REQ-CROP-001**: When a real crop photo shows a visible problem, crop confidence is not `high`, and the model's inferred crop does not contradict the farmer's registered crop, the system shall return the full diagnosis using the registered crop, state that assumption in the message, and offer a one-reply correction.
+
+**REQ-CROP-002**: When a real crop photo shows a visible problem, crop confidence is not `high`, and either no crop is registered or the inferred crop contradicts the registered crop, the system shall state what was observed and then ask the farmer to pick the crop.
+
+**REQ-CROP-003**: While a crop-confirm reply is pending from an assumed-crop answer, the system shall treat only a reply of at most three words naming a different crop as a correction.
+
+**REQ-CROP-004**: When the crop a farmer picks contradicts the crop the model inferred from the image, the system shall ask once more before returning crop-specific advice, and shall accept the farmer's second answer.
+
+**REQ-CROP-005**: When a crop is supplied as fact (farmer-confirmed, assumed from profile, or configured for the visitor sample), the system shall state the crop as given in the vision prompt, shall not ask for another photo to identify the crop, and shall return the four-section diagnosis, severity, recommendations and confidence output.
+
 **REQ-PRIV-001**: When any number sends `DELETE` or `DELETE MY DATA`, the system shall erase that number’s profile and conversation rows and confirm in one message.
 
 **REQ-SEC-GUARD-001**: WhatsApp RAG and web-chat RAG shall invoke the configured Bedrock Guardrail (content filters, prompt-attack filter, and a polite redirect for non-farming questions).

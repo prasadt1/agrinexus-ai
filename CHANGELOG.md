@@ -4,6 +4,26 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 1 October 2026 — crop identity asked only when it is in doubt (code; not deployed)
+
+### What was wrong
+A live WhatsApp test (number ending 9148) sent two licence-free cotton pest photos. Claude vision returned correct high-severity diagnoses for both (whitefly; pink bollworm), but `crop_confidence` was `low`, so Gate 2 replaced the answer with the safe template and the farmer was asked to send a better photo. The photos were sharp; the model was unsure which crop it was looking at, not whether the image was usable. A later fix added crop-confirm buttons, which recovered the advice but cost a round trip and still dropped the diagnosis, severity and confidence sections, and the reply ended by asking for a photo to identify a crop the farmer had just confirmed.
+
+### Behaviour now
+- Problem visible, crop confidence not high, image does not contradict the registered crop → answer immediately, state the assumption ("Taking your crop as Cotton from your profile"), and accept a one-reply correction.
+- No registered crop, or the image suggests a different crop → lead with what was observed, then ask, with the crop the image suggests offered first.
+- A tapped crop that disagrees with the image is questioned once before any crop-specific chemical advice is given; the farmer's second answer stands.
+- A crop supplied as fact is passed to the model as fact (`confirmed_crop=True`), so it stops asking for crop-identification photos, and the reply keeps the four-section diagnosis / severity / recommendations / confidence format.
+- Only a crop the farmer actually registered can be assumed; the `cotton` default in `process_image_message` is for the model prompt, not an answer on their behalf.
+
+### Unchanged
+Gate 1 (non-crop photo hard block) and Gate 2 (no crop name when the model guessed it) are untouched. Visitor sample and farmer-confirmed paths still share one helper, so the booth demo shows real behaviour.
+
+### Note
+`src/vision/` carries a parallel copy of the analyzer, enforcement and messages modules. No `CodeUri` in `template.yaml` points at it, so it is not deployed; only `src/processor/` is. These changes were made there.
+
+---
+
 ## 1 October 2026 — re:Invent visitor path (code; not deployed)
 
 ### Summary

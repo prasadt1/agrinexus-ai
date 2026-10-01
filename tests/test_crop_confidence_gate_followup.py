@@ -96,7 +96,12 @@ def test_visitor_sample_and_farmer_confirm_share_helper(monkeypatch):
         calls.append((image_bytes, dialect, crop, district))
         return {"recommendations": f"ADVICE|{dialect}|{crop}|{district}"}
 
+    def _diagnose(image_bytes, dialect, crop, district=None):
+        calls.append((image_bytes, dialect, crop, district))
+        return f"ADVICE|{dialect}|{crop}|{district}"
+
     analyzer_mod.analyze_crop_image = _analyze
+    analyzer_mod.diagnose_with_confirmed_crop = _diagnose
     analyzer_mod.process_image_message = lambda *a, **k: {}
     monkeypatch.setitem(sys.modules, "analyzer", analyzer_mod)
 

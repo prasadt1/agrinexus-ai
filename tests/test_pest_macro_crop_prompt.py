@@ -41,12 +41,14 @@ def test_pest_macro_low_confidence_prompts_for_crop(monkeypatch):
 
     out = a.process_image_message(msg, profile)
 
+    # Image does not contradict the registered crop: answer now under a stated
+    # assumption instead of spending a round trip on a question.
     assert isinstance(out, dict)
-    assert "pending_crop_confirm" in out
-    assert "buttons" in out and len(out["buttons"]) == 3
-    text_l = out["text"].lower()
-    assert "crop" in text_l or "पीक" in out["text"] or "फसल" in out["text"] or "పంట" in out["text"]
-    assert out["buttons"][0] in ("Wheat", "गहू", "गेहूँ", "गेहूं", "గోధుమ")  # profile crop first
+    assert "buttons" not in out
+    assert out["pending_crop_confirm"]["assumed"] is True
+    assert out["pending_crop_confirm"]["profile_crop"] == "Wheat"
+    assert "Wheat" in out["text"]
+    assert "profile" in out["text"].lower()
 
 
 def test_visible_problem_low_confidence_prompts_even_when_inferred_crop_set(monkeypatch):
@@ -84,8 +86,10 @@ def test_visible_problem_low_confidence_prompts_even_when_inferred_crop_set(monk
     profile = {"dialect": "en", "crop": "Cotton", "district": "Latur", "phone_number": "1555"}
 
     out = a.process_image_message(msg, profile)
-    assert "pending_crop_confirm" in out
-    assert out["buttons"][0] == "Cotton"
+    # inferred_crop agrees with the profile, so there is nothing to ask about.
+    assert "buttons" not in out
+    assert out["pending_crop_confirm"]["assumed"] is True
+    assert out["pending_crop_confirm"]["model_crop"] == "Cotton"
 
 
 def test_crop_confirm_still_offered_when_relevance_unclear_low(monkeypatch):
@@ -132,9 +136,9 @@ def test_crop_confirm_still_offered_when_relevance_unclear_low(monkeypatch):
     profile = {"dialect": "mr", "crop": "Cotton", "district": "Latur", "phone_number": "1555"}
 
     out = a.process_image_message(msg, profile)
-    assert "pending_crop_confirm" in out
-    assert "buttons" in out and len(out["buttons"]) == 3
-    assert out["buttons"][0] in ("कापूस", "Cotton")
+    assert "buttons" not in out
+    assert out["pending_crop_confirm"]["assumed"] is True
+    assert "कापूस" in out["text"]
 
 
 def test_leaf_symptom_low_confidence_prompts_for_crop(monkeypatch):

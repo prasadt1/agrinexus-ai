@@ -127,6 +127,36 @@ def _delete_pending_crop_confirm(phone_number: str):
     table.delete_item(Key={"PK": f"USER#{phone_number}", "SK": _PENDING_CROP_CONFIRM_SK})
 
 
+
+def _is_crop_correction(text: str, chosen: str, pending: Dict[str, Any]) -> bool:
+    """
+    An answer was already given under a stated assumption, so only a short,
+    explicit crop name counts as a correction. Without this, an ordinary question
+    that happens to name a crop ("how much water for wheat?") would be re-run as
+    an image diagnosis for the ten minutes the pending row lives.
+    """
+    if not pending.get("assumed"):
+        return True
+    if len(str(text or "").split()) > 3:
+        return False
+    assumed_crop = str(pending.get("profile_crop") or "").strip().lower()
+    return chosen.strip().lower() != assumed_crop
+
+
+def _crop_tap_conflicts_with_image(chosen: str, pending: Dict[str, Any]) -> bool:
+    """
+    True when the tapped crop disagrees with what the model saw and we have not
+    already said so. A wrong tap otherwise produces crop-specific chemical advice
+    for the wrong crop, which is the one failure here that can cause real harm.
+    """
+    model_crop = str(pending.get("model_crop") or "").strip()
+    if not model_crop or model_crop.lower() == "unknown":
+        return False
+    if pending.get("rechecked") or pending.get("contradiction"):
+        return False
+    return model_crop.lower() != chosen.strip().lower()
+
+
 def _parse_crop_confirm_reply(text: str, inferred_crop: str, profile_crop: str) -> Optional[str]:
     """
     Returns chosen crop string, or None if the reply isn't a crop-confirm response.
@@ -805,12 +835,12 @@ def _diagnose_image_with_confirmed_crop(
 ) -> str:
     """
     Same path a farmer reaches after tapping a crop-confirm button:
-    call analyze_crop_image with a confirmed crop and return raw recommendations
-    (Gate 2 is not applied on this path). Visitor sample uses this too so both
-    produce identical text for the same image bytes + crop + dialect + district.
+    call analyze_crop_image with the crop supplied as fact and format the full
+    four-section message (Gate 2 is not applied on this path). Visitor sample uses
+    this too, so both produce identical text for the same image bytes + crop +
+    dialect + district.
     """
-    result = analyzer.analyze_crop_image(image_bytes, dialect, crop, district=district)
-    return str(result.get("recommendations") or "")
+    return analyzer.diagnose_with_confirmed_crop(image_bytes, dialect, crop, district=district)
 
 
 def _run_visitor_sample_vision(from_number: str, profile: Dict[str, Any], wamid: str) -> None:
@@ -1262,6 +1292,29 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                     inferred_crop=str(pending.get("inferred_crop") or ""),
                     profile_crop=str(pending.get("profile_crop") or profile.get("crop") or ""),
                 )
+
+                if chosen and not _is_crop_correction(text, chosen, pending):
+                    chosen = None
+
+                if chosen:
+                    model_crop = str(pending.get("model_crop") or "").strip()
+                    if _crop_tap_conflicts_with_image(chosen, pending):
+                        # A wrong tap would produce crop-specific chemical advice for
+                        # the wrong crop. Ask once instead of complying silently.
+                        carry = {
+                            k: v
+                            for k, v in pending.items()
+                            if k not in ("PK", "SK", "ttl")
+                        }
+                        carry["rechecked"] = True
+                        carry["inferred_crop"] = model_crop
+                        _put_pending_crop_confirm(from_number, carry)
+                        ask_text, ask_buttons = analyzer.crop_mismatch_prompt(
+                            dialect, model_crop, chosen
+                        )
+                        send_whatsapp_buttons(from_number, ask_text, ask_buttons)
+                        continue
+
                 if chosen:
                     bucket = pending.get("bucket") or os.environ.get("TEMP_AUDIO_BUCKET")
                     key = pending.get("key")

@@ -152,6 +152,11 @@ def test_crop_confirm_then_reprocess_on_yes(monkeypatch):
 
     analyzer.process_image_message = process_image_message
     analyzer.analyze_crop_image = analyze_crop_image
+    analyzer.diagnose_with_confirmed_crop = (
+        lambda image_bytes, dialect, crop, district=None: analyze_crop_image(
+            image_bytes, dialect, crop, district
+        )["recommendations"]
+    )
     sys.modules["analyzer"] = analyzer
 
     handler_path = repo_root / "src" / "processor" / "handler.py"
@@ -225,6 +230,11 @@ def test_crop_confirm_hindi_yes_phrase_reprocesses(monkeypatch):
 
     analyzer.process_image_message = process_image_message
     analyzer.analyze_crop_image = analyze_crop_image
+    analyzer.diagnose_with_confirmed_crop = (
+        lambda image_bytes, dialect, crop, district=None: analyze_crop_image(
+            image_bytes, dialect, crop, district
+        )["recommendations"]
+    )
     sys.modules["analyzer"] = analyzer
 
     handler_path = repo_root / "src" / "processor" / "handler.py"
