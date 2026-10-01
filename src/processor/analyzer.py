@@ -676,7 +676,8 @@ Look for:
 
 PEST NAMING (the pest name selects the pesticide, so do not guess):
 - Whiteflies and aphids are different pests. Look for wings before choosing between them.
-- If you cannot tell which of two similar pests it is, name both as possible in "diagnosis", say the pest identity is uncertain in "confidence_text", and in "recommendations" give non-chemical steps first and advise confirming the pest with the local agriculture officer before buying a pesticide.
+- When you can identify the pest confidently, name it and give the standard recommended product with its label rate, alongside the non-chemical steps. Uncertainty about the crop alone is not a reason to hold this back.
+- Only when two or more similar pests are genuinely possible: name both as possible in "diagnosis", say the pest identity is uncertain in "confidence_text", and in "recommendations" give non-chemical steps first and advise confirming the pest with the local agriculture officer before buying a pesticide.
 
 **If you see ANY insect/creature → IMMEDIATELY set:**
 - visible_problem=true
