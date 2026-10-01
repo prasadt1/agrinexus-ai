@@ -88,6 +88,55 @@ def test_visible_problem_low_confidence_prompts_even_when_inferred_crop_set(monk
     assert out["buttons"][0] == "Cotton"
 
 
+def test_crop_confirm_still_offered_when_relevance_unclear_low(monkeypatch):
+    """Haiku relevance unclear/low must not suppress crop-confirm after Claude vision agrees."""
+    os.environ["TEMP_AUDIO_BUCKET"] = "tmp-bucket"
+
+    from src.processor import analyzer as a
+    a.TEMP_BUCKET = "tmp-bucket"
+    monkeypatch.setenv("VISION_RELEVANCE_GATE_ENABLED", "true")
+
+    monkeypatch.setattr(a, "download_whatsapp_image", lambda _mid: b"\xff\xd8fakejpg")
+    monkeypatch.setattr(
+        a,
+        "run_heuristics",
+        lambda _b: {"decision": "pass", "reason": None, "metrics": {"green_frac": 0.2, "palette_size": 200}},
+    )
+    monkeypatch.setattr(
+        a,
+        "classify_image_relevance",
+        lambda *_a, **_k: {"relevance": "unclear", "confidence": "low", "reason": "other"},
+    )
+
+    class _FakeS3:
+        def put_object(self, **_kwargs):
+            return {"ResponseMetadata": {"HTTPStatusCode": 200}}
+
+    monkeypatch.setattr(a, "s3", _FakeS3())
+    monkeypatch.setattr(
+        a,
+        "analyze_crop_image",
+        lambda *_args, **_kwargs: {
+            "recommendations": "SHOULD_NOT_LEAK",
+            "diagnosis": "pink bollworm",
+            "severity": "high",
+            "is_real_crop_photo": True,
+            "visible_problem": True,
+            "photo_kind": "pest_macro",
+            "inferred_crop": "unknown",
+            "crop_confidence": "low",
+        },
+    )
+
+    msg = {"image": {"id": "mid-relev"}, "from": "1555"}
+    profile = {"dialect": "mr", "crop": "Cotton", "district": "Latur", "phone_number": "1555"}
+
+    out = a.process_image_message(msg, profile)
+    assert "pending_crop_confirm" in out
+    assert "buttons" in out and len(out["buttons"]) == 3
+    assert out["buttons"][0] in ("कापूस", "Cotton")
+
+
 def test_leaf_symptom_low_confidence_prompts_for_crop(monkeypatch):
     os.environ["TEMP_AUDIO_BUCKET"] = "tmp-bucket"
 

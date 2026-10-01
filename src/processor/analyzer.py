@@ -921,14 +921,14 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         # When a real crop photo shows a problem but crop identity is not high-confidence,
         # offer crop-confirm buttons (profile crop first) instead of the dead-end template.
         # Reuses handler pending_crop_confirm → vision_reprocess; do not add a second path.
-        allow_crop_confirm = True
-        if _relevance_gate_enabled():
-            # Only allow crop confirmation when relevance gate is confidently agri.
-            allow_crop_confirm = bool(relevance == "agri_photo" and conf in ("high", "medium"))
+        # Do not require Haiku relevance==agri_photo here: pest macros often score
+        # unclear/low on the relevance gate while Claude vision correctly sets
+        # is_real_crop_photo + visible_problem (see 9148 pink-bollworm WhatsApp).
+        # Non-agri hard-block already ran above; Gate 1 still blocks non-crop photos.
         cc = (vision.get("crop_confidence") or vision.get("confidence") or "low").strip().lower()
         is_real = bool(vision.get("is_real_crop_photo", True))
         visible = bool(vision.get("visible_problem", False))
-        if allow_crop_confirm and is_real and visible and cc != "high":
+        if is_real and visible and cc != "high":
             crop_local = localize_crop_name(crop, dialect)
             prompts = {
                 "hi": (
