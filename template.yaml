@@ -60,6 +60,18 @@ Parameters:
     Default: 10
     Description: Max Bedrock-backed answers per visitor number per UTC day.
 
+  VisitorSampleImageCrop:
+    Type: String
+    Default: Cotton
+    AllowedValues:
+      - Cotton
+      - Wheat
+      - Soybean
+      - Maize
+    Description: >-
+      Confirmed crop for the re:Invent visitor sample photo (VISITOR_SAMPLE_IMAGE_KEY).
+      Not inferred by the model; used on the same path as farmer crop-confirm.
+
   RateLimitBypassPhones:
     Type: String
     Default: ""
@@ -505,6 +517,7 @@ Resources:
           IMAGE_MAX_BYTES: "5242880"
           VISITOR_SAMPLE_IMAGE_BUCKET: !Ref TempAudioBucket
           VISITOR_SAMPLE_IMAGE_KEY: visitor-samples/crop-leaf.jpg
+          VISITOR_SAMPLE_IMAGE_CROP: !Ref VisitorSampleImageCrop
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TableName
@@ -571,6 +584,7 @@ Resources:
           VISION_MIN_FILE_BYTES: "3000"
           VISITOR_SAMPLE_IMAGE_BUCKET: !Ref TempAudioBucket
           VISITOR_SAMPLE_IMAGE_KEY: visitor-samples/crop-leaf.jpg
+          VISITOR_SAMPLE_IMAGE_CROP: !Ref VisitorSampleImageCrop
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TableName

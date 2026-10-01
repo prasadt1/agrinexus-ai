@@ -212,6 +212,7 @@ def _parse_crop_word(text: str) -> Optional[str]:
         "maize": "Maize",
         # Hindi
         "गेहूं": "Wheat",
+        "गेहूँ": "Wheat",
         "कपास": "Cotton",
         "सोयाबीन": "Soybean",
         "मक्का": "Maize",
@@ -796,6 +797,22 @@ def _consume_visitor_or_refuse(from_number: str, profile: Optional[Dict[str, Any
     return False
 
 
+def _diagnose_image_with_confirmed_crop(
+    image_bytes: bytes,
+    dialect: str,
+    crop: str,
+    district: Optional[str] = None,
+) -> str:
+    """
+    Same path a farmer reaches after tapping a crop-confirm button:
+    call analyze_crop_image with a confirmed crop and return raw recommendations
+    (Gate 2 is not applied on this path). Visitor sample uses this too so both
+    produce identical text for the same image bytes + crop + dialect + district.
+    """
+    result = analyzer.analyze_crop_image(image_bytes, dialect, crop, district=district)
+    return str(result.get("recommendations") or "")
+
+
 def _run_visitor_sample_vision(from_number: str, profile: Dict[str, Any], wamid: str) -> None:
     """Run real vision path on the configured sample crop image (S3)."""
     bucket = (
@@ -822,22 +839,17 @@ def _run_visitor_sample_vision(from_number: str, profile: Dict[str, Any], wamid:
         return
     send_whatsapp_message(from_number, "✓ Running photo diagnosis on a sample crop image...")
     dialect = profile.get("dialect") or "en"
-    crop = profile.get("crop") or "Cotton"
+    # Configured crop for the sample image (not a model guess) — same confirmed-crop
+    # path as farmer crop-confirm reprocess.
+    crop = (os.environ.get("VISITOR_SAMPLE_IMAGE_CROP") or "Cotton").strip() or "Cotton"
     district = profile.get("district") or profile.get("location")
-    result = analyzer.analyze_crop_image(image_bytes, dialect, crop, district=district)
-    reply = ""
-    if isinstance(result, dict):
-        reply = str(result.get("recommendations") or result.get("text") or result.get("diagnosis") or "")
-        if result.get("diagnosis") == "non_photo":
-            reply = reply or "Sample image was not classified as a crop photo."
-    else:
-        reply = str(result or "")
+    reply = _diagnose_image_with_confirmed_crop(image_bytes, dialect, crop, district=district)
     if not reply:
         reply = "Vision analysis completed but returned an empty result."
     save_message(
         from_number,
         wamid,
-        {"type": "visitor_sample_photo", "s3": {"bucket": bucket, "key": key}},
+        {"type": "visitor_sample_photo", "s3": {"bucket": bucket, "key": key}, "crop": crop},
         reply,
         "visitor_sample_vision",
         ttl_days=_msg_ttl_days(profile),
@@ -1260,8 +1272,9 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                             obj = s3.get_object(Bucket=bucket, Key=key)
                             image_bytes = obj["Body"].read()
                             district = profile.get("district") or profile.get("location")
-                            result = analyzer.analyze_crop_image(image_bytes, dialect, chosen, district=district)
-                            reply_text = str(result.get("recommendations") or "")
+                            reply_text = _diagnose_image_with_confirmed_crop(
+                                image_bytes, dialect, chosen, district=district
+                            )
                             save_message(
                                 from_number, wamid, message, reply_text, "vision_reprocess",
                                 ttl_days=_msg_ttl_days(profile),
