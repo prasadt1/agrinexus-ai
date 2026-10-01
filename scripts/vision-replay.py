@@ -105,11 +105,12 @@ def main() -> int:
 
     def first_pass(image: bytes, tag: str) -> dict:
         # process_image_message reads module globals, so patch them one run at a time.
-        captured: dict = {}
+        calls: list = []
 
         def spy(*a, **k):
-            captured["v"] = vision_call(*a, **k)
-            return captured["v"]
+            v = vision_call(*a, **k)
+            calls.append(v)
+            return v
 
         with first_pass_lock:
             analyzer.download_whatsapp_image = lambda _mid: image
@@ -121,18 +122,22 @@ def main() -> int:
                 )
             finally:
                 analyzer.analyze_crop_image = vision_call
-        v = captured.get("v", {})
+        # calls[0] is the blind first pass (crop inference); on the assume branch a
+        # second call diagnoses with the assumed crop, and that is what the farmer sees.
+        blind = calls[0] if calls else {}
+        shown = calls[-1] if calls else {}
         pending = out.get("pending_crop_confirm") or {}
-        rec = v.get("recommendations") or ""
+        rec = shown.get("recommendations") or ""
         return {
             "branch": "ask" if out.get("buttons") else ("assume" if pending.get("assumed") else "direct"),
-            "inferred_crop": v.get("inferred_crop"),
-            "crop_confidence": v.get("crop_confidence"),
-            "insects_visible": v.get("insects_visible"),
+            "vision_calls": len(calls),
+            "inferred_crop": blind.get("inferred_crop"),
+            "crop_confidence": blind.get("crop_confidence"),
+            "insects_visible": shown.get("insects_visible"),
             "buttons": out.get("buttons"),
-            "diagnosis": v.get("diagnosis"),
+            "diagnosis": shown.get("diagnosis"),
             "recommendations": rec,
-            "confidence_text": v.get("confidence_text"),
+            "confidence_text": shown.get("confidence_text"),
             "reply_text": out.get("text"),
             **_flags(rec),
         }
