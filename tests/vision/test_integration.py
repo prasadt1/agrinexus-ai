@@ -5,6 +5,8 @@ import os
 os.environ['TEMP_AUDIO_BUCKET'] = 'test-bucket'
 
 from src.vision.analyzer import process_image_message
+from src.vision.enforcement import enforce_message_safety
+from src.vision.messages import get_safe_structured_template
 from tests.vision.test_heuristics import generate_dark_github_screenshot, generate_cotton_boll_photo
 
 
@@ -53,9 +55,6 @@ def test_cotton_boll_passes_to_vision():
 
 def test_low_confidence_returns_safe_template():
     """Low confidence vision result should return safe template"""
-    from src.vision.enforcement import enforce_message_safety
-    from src.vision.messages import get_safe_retake_message
-
     # Simulate vision model returning low confidence
     vision = {
         'is_real_crop_photo': True,
@@ -67,11 +66,11 @@ def test_low_confidence_returns_safe_template():
     }
 
     result = enforce_message_safety(vision, 'cotton', 'en')
-    expected = get_safe_retake_message('en')
+    expected = get_safe_structured_template('en', visible_problem=False)
 
     # Should return template, not model message
     assert result == expected
-    assert 'Cannot identify the plant' in result
+    assert 'Plant identity is uncertain' in result
 
 
 def test_full_3_layer_defense_screenshot():
@@ -124,4 +123,5 @@ def test_full_3_layer_defense_real_crop_low_confidence():
     result = enforce_message_safety(vision, 'cotton', 'hi')
 
     # Layer 3 enforcement → safe template in Hindi
-    assert 'पौधे की पहचान स्पष्ट नहीं' in result
+    assert 'पौधे की पहचान पक्की नहीं' in result
+    assert 'बटन' in result

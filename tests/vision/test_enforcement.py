@@ -27,7 +27,7 @@ def test_low_confidence_blocks_crop_name():
 
     # Should return safe template, NOT model message
     assert 'wheat' not in result.lower()
-    assert 'Cannot identify' in result
+    assert 'Plant identity is uncertain' in result
 
 
 def test_non_crop_hard_block():
@@ -55,5 +55,5 @@ def test_medium_confidence_also_gets_template():
     result = enforce_message_safety(vision, 'cotton', 'en')
 
     # Should return safe template, not model message
-    assert 'Cannot identify' in result
+    assert 'Plant identity is uncertain' in result
     assert 'cotton' not in result.lower()
