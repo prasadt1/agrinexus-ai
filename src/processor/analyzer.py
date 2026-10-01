@@ -639,7 +639,8 @@ VISUAL CROP EVIDENCE WINS (DO NOT ANCHOR ON PROFILE):
    - inferred_crop="unknown"
    - crop_confidence="low"
    - In recommendations: use "this plant"/"this leaf" (NO crop name)
-   - Suggest clearer/closer photo
+   - Do NOT ask for another photo to identify the crop; the app confirms the crop with the farmer separately.
+   - Only suggest a clearer photo when the pest or symptom itself cannot be made out.
 
 3. **Never anchor on profile**: Do NOT use {crop.title()} as evidence. Only name crops when visual features confirm it.
 

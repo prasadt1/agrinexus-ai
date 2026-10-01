@@ -147,6 +147,36 @@ def test_confirmed_crop_prompt_tells_the_model_not_to_ask(monkeypatch):
     assert "Do NOT ask for another photo to identify the crop" in prompt
 
 
+def test_first_pass_prompt_keeps_crop_inference_but_drops_crop_photo_request(monkeypatch):
+    """The first call must still let the model name a different crop (the contradiction
+    question depends on it), but must not ask the farmer for a crop-identification photo."""
+    from src.processor import analyzer as a
+
+    seen = {}
+
+    def _fake_invoke(**kwargs):
+        import json as _json
+
+        body = _json.loads(kwargs["body"])
+        seen["prompt"] = body["messages"][0]["content"][1]["text"]
+        raise RuntimeError("stop after prompt capture")
+
+    monkeypatch.setattr(a, "_looks_like_screenshot_or_ui", lambda _b: False)
+    monkeypatch.setattr(a, "_looks_like_logo_or_graphic", lambda _b: False, raising=False)
+    monkeypatch.setattr(a.bedrock, "invoke_model", _fake_invoke)
+
+    try:
+        a.analyze_crop_image(b"\xff\xd8fake", "en", "Cotton")
+    except Exception:
+        pass
+
+    prompt = seen.get("prompt", "")
+    assert "CONFIRMED CROP OVERRIDE" not in prompt
+    assert "Visual overrides profile" in prompt
+    assert "Do NOT ask for another photo to identify the crop" in prompt
+    assert "Suggest clearer/closer photo" not in prompt
+
+
 def test_mismatched_tap_is_questioned_once(monkeypatch):
     from src.processor import analyzer as a
 
