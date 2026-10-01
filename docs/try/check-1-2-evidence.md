@@ -149,3 +149,23 @@ which knows the crop is cotton, does not have this problem.
 
 Contradiction branch frequency is not measurable at this sample size: 0/10 here,
 1/5 and 0/5 in earlier ad hoc runs, 1/2 live. Not recorded as a behaviour change.
+
+### After `05dcc1a` (second vision call on the assume branch)
+
+When the image does not contradict the registered crop, a second call diagnoses with
+that crop as given. The first call is unchanged, so the crop question still works.
+10 first-pass + 3 confirmed runs per photo, two vision calls per first-pass run:
+
+| | First pass (assumed crop) | Confirmed crop |
+|---|---|---|
+| F pest named pink bollworm | 10/10 | 3/3 |
+| F product with rate | 10/10 (profenofos, spinosad or chlorantraniliprole; pheromone traps) | 3/3 |
+| G pest named whitefly | 10/10 | 3/3 |
+| G product with rate | 10/10 | 3/3 |
+| Photo request / "lemon water" / dimethoate / aphid | 0 | 0 |
+
+Cost: one extra Bedrock vision call (about 10 s) on the assume branch.
+
+Remaining wording issue: because the second call is told the crop, its confidence text
+can say the cotton boll is "clearly visible" right after the line saying the crop was
+assumed from the profile, not confirmed from the photo.
