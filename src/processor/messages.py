@@ -284,7 +284,7 @@ def get_crop_mismatch_question(dialect: str, model_crop: str, chosen_crop: str) 
     return lines.get(dialect, lines["en"])
 
 
-def get_assumed_confidence_note(crop_local: str, dialect: str, model_note: str = "") -> str:
+def get_assumed_confidence_note(crop_local: str, dialect: str) -> str:
     """
     Confidence shown under an assumed crop. The pest reading is the model's; the
     crop is not, so the line says which half is which instead of one word that
@@ -296,6 +296,4 @@ def get_assumed_confidence_note(crop_local: str, dialect: str, model_note: str =
         "te": f"చీడ గుర్తింపు మోడల్ చేసింది. పంట {crop_local} మీ ప్రొఫైల్ నుండి తీసుకున్నాము, ఫోటో ద్వారా నిర్ధారణ కాలేదు.",
         "en": f"Pest reading is the model's. The crop {crop_local} is taken from your profile, not confirmed from the photo.",
     }
-    note = notes.get(dialect, notes["en"])
-    model_note = (model_note or "").strip()
-    return f"{note} {model_note}".strip() if model_note else note
+    return notes.get(dialect, notes["en"])

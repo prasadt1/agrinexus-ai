@@ -172,10 +172,10 @@ def format_crop_message(
 
     crop_local = localize_crop_name(crop, dialect)
     if assumed:
-        # The model's confidence is about the pest. Saying "Confidence: high" under an
-        # assumed crop reads as confidence in the whole answer, including the half the
-        # farmer still has to check.
-        confidence_text = get_assumed_confidence_note(crop_local, dialect, confidence_text)
+        # The diagnosing call was told the crop, so its confidence wording justifies
+        # that crop ("cotton boll clearly visible") rather than reporting what the
+        # first pass saw. Show only the note that separates pest from crop.
+        confidence_text = get_assumed_confidence_note(crop_local, dialect)
 
     body = _format_structured_output(diagnosis, severity, recommendations, confidence_text, dialect)
     if not assumed:

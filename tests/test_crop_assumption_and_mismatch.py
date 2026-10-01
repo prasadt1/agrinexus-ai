@@ -403,12 +403,12 @@ def test_marathi_labels_are_marathi_not_hindi(monkeypatch):
 def test_assumed_answer_does_not_claim_confidence_in_the_crop(monkeypatch):
     from src.processor import enforcement as e
 
-    vision = _vision(confidence_text="high - pest clearly visible")
+    vision = _vision(confidence_text="high - cotton boll clearly visible")
     out = e.format_crop_message(vision, "Cotton", "mr", assumed=True)
     # The crop half is named as an assumption inside the confidence section itself.
     assert "गृहीत धरले आहे" in out.split("विश्वास")[1]
-    # The model's own wording is kept rather than discarded.
-    assert "high - pest clearly visible" in out
+    # The diagnosing call was told the crop; its wording would vouch for the assumption.
+    assert "cotton boll clearly visible" not in out
 
 
 def test_confirmed_answer_keeps_the_model_confidence_wording(monkeypatch):
