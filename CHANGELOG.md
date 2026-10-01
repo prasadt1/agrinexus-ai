@@ -4,6 +4,26 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 1 October 2026 — re:Invent visitor path (code; not deployed)
+
+### Summary
+Adds a conference visitor WhatsApp path for the re:Invent QR landing (`/try`), without changing the farmer onboarding or allowlisted demo flow. **Not deployed** until explicitly approved.
+
+### Behaviour
+- Trigger phrase `re:invent` / `reinvent` on first message from an unknown number → English visitor welcome + sample-question list
+- `demo_tier=visitor`, `source=reinvent-2026`, 7-day TTL; no nudges/reminders
+- Caps: 10 answers/visitor/day and 300 global/day (SAM parameters); allowlisted exempt
+- Visitor photo uploads + sample photo diagnosis (S3 key `visitor-samples/crop-leaf.jpg` — **photo must be supplied before deploy**)
+- `DELETE` / `DELETE MY DATA` erases profile + conversation rows
+- `AWS::Bedrock::Guardrail` in `template.yaml` (content filters, prompt attack, non-farming topic)
+
+### Ops
+- `scripts/reset-onboard-and-demo.sh --as-visitor` / `--restore`
+- `scripts/visitor-acceptance.sh` (notes: uses a **reset** owner number, not a new MSISDN)
+- Landing: `docs/try/index.html` and twin in `agrinexus-ai-site/try/`
+
+---
+
 ## 26 September 2026 — Bedrock model parameterization and docs accuracy
 
 ### Summary

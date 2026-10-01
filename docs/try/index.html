@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Try AgriNexus AI — re:Invent demo</title>
+    <meta
+      name="description"
+      content="Try the AgriNexus AI WhatsApp demo. One of ten Innovation Award winners, AWS 10,000 AIdeas Competition."
+    />
+    <link rel="icon" type="image/png" href="/assets/favicon.png" />
+    <style>
+      :root {
+        --bg: #0b1a12;
+        --bg2: #13261a;
+        --text: #f3f7f4;
+        --muted: rgba(243, 247, 244, 0.78);
+        --faint: rgba(243, 247, 244, 0.58);
+        --line: rgba(255, 255, 255, 0.14);
+        --accent: #6dff9b;
+        --accent2: #2f6b4f;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(1200px 600px at 10% -10%, rgba(109, 255, 155, 0.16), transparent 55%),
+          radial-gradient(900px 500px at 100% 0%, rgba(70, 140, 255, 0.12), transparent 50%),
+          linear-gradient(180deg, var(--bg), var(--bg2));
+      }
+      main {
+        max-width: 34rem;
+        margin: 0 auto;
+        padding: 2.25rem 1.25rem 3rem;
+      }
+      h1 {
+        font-size: clamp(1.7rem, 5vw, 2.15rem);
+        line-height: 1.15;
+        margin: 0 0 0.75rem;
+        letter-spacing: -0.02em;
+      }
+      .award {
+        margin: 0 0 1.25rem;
+        color: var(--accent);
+        font-size: 0.98rem;
+        font-weight: 600;
+      }
+      .lead {
+        margin: 0 0 1.5rem;
+        color: var(--muted);
+        line-height: 1.55;
+        font-size: 1.05rem;
+      }
+      .cta {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        margin-bottom: 1.75rem;
+      }
+      a.btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        border-radius: 999px;
+        padding: 0.95rem 1.2rem;
+        font-weight: 650;
+        font-size: 1.05rem;
+      }
+      a.btn.primary {
+        background: var(--accent);
+        color: #062012;
+      }
+      a.btn.secondary {
+        color: var(--text);
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .privacy {
+        border-top: 1px solid var(--line);
+        padding-top: 1.25rem;
+        color: var(--faint);
+        font-size: 0.9rem;
+        line-height: 1.55;
+      }
+      .privacy h2 {
+        margin: 0 0 0.6rem;
+        font-size: 0.95rem;
+        color: var(--muted);
+        font-weight: 650;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .privacy a { color: var(--accent); }
+      footer {
+        margin-top: 1.5rem;
+        font-size: 0.85rem;
+        color: var(--faint);
+      }
+      footer a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Try AgriNexus AI</h1>
+      <p class="award">One of ten Innovation Award winners, AWS 10,000 AIdeas Competition.</p>
+      <p class="lead">
+        A deployed demo prototype for conference visitors — agronomic Q&amp;A on WhatsApp.
+        There is no farmer cohort on this number yet. The farmer product flow is unchanged.
+      </p>
+
+      <div class="cta">
+        <a
+          class="btn primary"
+          href="https://wa.me/4915120105731?text=Hi%20from%20re%3AInvent"
+          rel="noopener noreferrer"
+          >Open in WhatsApp</a
+        >
+        <a
+          class="btn secondary"
+          href="https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html"
+          rel="noopener noreferrer"
+          >Try the web demo instead</a
+        >
+      </div>
+
+      <section class="privacy" aria-labelledby="privacy-heading">
+        <h2 id="privacy-heading">Privacy notice</h2>
+        <p>
+          Operated by Prasad Tilloo. When you message the demo WhatsApp number we store your
+          phone number and message content so we can reply and measure the demo. Visitor demo
+          records expire after <strong>7 days</strong>. Data is stored in
+          <strong>AWS us-east-1</strong>. WhatsApp / Meta carries the messages as the messaging
+          channel. To delete your demo data, send <strong>DELETE</strong> in the chat.
+        </p>
+        <p>
+          Legal notice:
+          <a href="https://prasadtilloo.com/impressum" rel="noopener noreferrer">Impressum</a>.
+        </p>
+      </section>
+
+      <footer>
+        <a href="https://agrinexus-ai.farm/">agrinexus-ai.farm</a>
+        ·
+        <a href="https://github.com/prasadt1/agrinexus-ai">Source</a>
+      </footer>
+    </main>
+  </body>
+</html>

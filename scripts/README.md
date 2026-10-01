@@ -8,6 +8,8 @@ Scripts actually present in this repo (others may live under `scripts/local/` on
 
 - `e2e-smoke.sh` — SAM validate + fast pytest + optional KB + web chat curl (see script header)
 - `reset-profile.sh` / `delete-user-data.sh` — Non-interactive or interactive DynamoDB user reset
+- `reset-onboard-and-demo.sh` — `--as-visitor` / `--restore` for re:Invent visitor acceptance on the owner number
+- `visitor-acceptance.sh` — Scripted English visitor trigger + question + DELETE (after `--as-visitor`)
 - `set-log-retention.sh` — Sets CloudWatch Logs retention (default 90 days) on all AgriNexus Lambda and canary log groups; run after deploys that add a function
 
 **Deploy:** use the SAM CLI from the repo root (see **README.md**): `sam build --template-file template.yaml` then `sam deploy --config-file samconfig-week2.toml`.

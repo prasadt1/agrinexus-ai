@@ -201,11 +201,37 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **REQ-STATE-008**: When user profile data is updated, the system shall timestamp the modification for audit purposes.
 
+### 2.9b re:Invent visitor path (conference demo)
+
+**REQ-VISITOR-001**: When an unknown number’s first message contains `re:invent` or `reinvent` (case-insensitive), the system shall enter the visitor path and shall not run farmer onboarding.
+
+**REQ-VISITOR-002**: On visitor entry, the system shall reply in English with a short welcome and an interactive list of five sample questions plus a photo-diagnosis option and a farmer-onboarding option.
+
+**REQ-VISITOR-003**: The system shall accept free-text farming questions from visitors in English via the existing RAG path.
+
+**REQ-VISITOR-004**: When a visitor selects the photo-diagnosis list option, the system shall run the real vision path on the stored sample image and return the model result.
+
+**REQ-VISITOR-005**: While `demo_tier` is `visitor`, the system shall accept visitor-uploaded crop photos through the real vision path, subject to the same visitor answer caps.
+
+**REQ-VISITOR-006**: Visitor profiles shall use `demo_tier=visitor` and `source=reinvent-2026`, with TTL of `VisitorTtlDays` (default 7) on profile and conversation items.
+
+**REQ-VISITOR-007**: The system shall not send nudges, reminders, or any other proactive messages to visitor-tier numbers.
+
+**REQ-VISITOR-008**: The system shall enforce a per-visitor daily answer cap and a global daily visitor answer cap (SAM parameters; defaults 10 and 300); on either cap, it shall send one fixed message and shall not call Bedrock.
+
+**REQ-VISITOR-009**: Allowlisted numbers shall be exempt from visitor caps.
+
+**REQ-VISITOR-010**: Visitor activity shall be counted separately and shall not increment farmer nudge sent/completed metrics.
+
+**REQ-PRIV-001**: When any number sends `DELETE` or `DELETE MY DATA`, the system shall erase that number’s profile and conversation rows and confirm in one message.
+
+**REQ-SEC-GUARD-001**: WhatsApp RAG and web-chat RAG shall invoke the configured Bedrock Guardrail (content filters, prompt-attack filter, and a polite redirect for non-farming questions).
+
 ### 2.10 Profile Management (Tier 3 - Cut for MVP)
 
 **REQ-PROFILE-001**: The system shall support a RESET command to re-initiate onboarding for profile updates.
 
-**REQ-PROFILE-002**: The system shall allow farmers to delete their profile and all associated data by sending a "DELETE MY DATA" command.
+**REQ-PROFILE-002**: The system shall allow farmers to delete their profile and all associated data by sending a "DELETE MY DATA" command. *(Implemented via **REQ-PRIV-001**; `DELETE` is also accepted.)*
 
 **REQ-PROFILE-003**: When a deletion request is received, the system shall confirm the action and require explicit confirmation before proceeding.
 

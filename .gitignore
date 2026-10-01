@@ -15,7 +15,7 @@ scripts/demo-nudge-loop.sh
 scripts/demo-nudge-multilang.sh
 scripts/demo-nudge.sh
 scripts/demo-scenario.sh
-scripts/reset-onboard-and-demo.sh
+# reset-onboard-and-demo.sh is tracked (supports --as-visitor / --restore for re:Invent)
 
 # SAM build artifacts (do not commit)
 .aws-sam/
