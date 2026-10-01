@@ -980,10 +980,14 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         )
         supported = ["Cotton", "Wheat", "Soybean"]
 
-        # The image shows a problem but the model is not certain which crop it is.
-        # If it does not contradict the registered crop, answer now and state the
-        # assumption; asking first costs the farmer a round trip and tells them
-        # nothing they can check. Ask only when the crop is genuinely in doubt.
+        # A crop the model names and the farmer's registered crop disagreeing is the
+        # dangerous case, and it does not depend on confidence: a confident wrong crop
+        # produces crop-specific chemical advice with no hedge at all. Ask whenever
+        # they disagree. Otherwise the question is only worth asking when the model is
+        # unsure and there is no registered crop to fall back on.
+        # Agreement, or no opinion from the model: answer now and state the
+        # assumption. Asking first costs a round trip and tells the farmer nothing
+        # they can check.
         if is_real and visible and cc != "high" and profile_title and not contradicts:
             print(f"Assumed profile crop {profile_title} (crop_confidence={cc}, model_crop={model_crop})")
             return {
@@ -1000,7 +1004,7 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
                 "heuristics_error": heuristics_error,
             }
 
-        if is_real and visible and cc != "high":
+        if is_real and visible and (cc != "high" or contradicts):
             # No registered crop, or the image suggests a different one. Lead with
             # what was actually seen so the question has something to check against.
             observation = str(vision.get("diagnosis") or "").strip()

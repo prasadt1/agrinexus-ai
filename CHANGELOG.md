@@ -16,6 +16,9 @@ A live WhatsApp test (number ending 9148) sent two licence-free cotton pest phot
 - A crop supplied as fact is passed to the model as fact (`confirmed_crop=True`), so it stops asking for crop-identification photos, and the reply keeps the four-section diagnosis / severity / recommendations / confidence format.
 - Only a crop the farmer actually registered can be assumed; the `cotton` default in `process_image_message` is for the model prompt, not an answer on their behalf.
 
+### Follow-up from the live run (same day)
+Replaying the pink-bollworm photo against Bedrock exposed a worse failure than the one above: the model returned `inferred_crop=Sugarcane` with `crop_confidence=high`, so the farmer received sugarcane borer advice for a cotton boll. Gate 2, the crop-confirm buttons and the assume/ask branch all key on confidence not being high, so a confidently wrong crop passed every check. Disagreement between the model's crop and the registered crop now triggers the question at any confidence level; agreement at high confidence is answered directly as before.
+
 ### Unchanged
 Gate 1 (non-crop photo hard block) and Gate 2 (no crop name when the model guessed it) are untouched. Visitor sample and farmer-confirmed paths still share one helper, so the booth demo shows real behaviour.
 

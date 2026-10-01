@@ -225,7 +225,7 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **REQ-CROP-001**: When a real crop photo shows a visible problem, crop confidence is not `high`, and the model's inferred crop does not contradict the farmer's registered crop, the system shall return the full diagnosis using the registered crop, state that assumption in the message, and offer a one-reply correction.
 
-**REQ-CROP-002**: When a real crop photo shows a visible problem, crop confidence is not `high`, and either no crop is registered or the inferred crop contradicts the registered crop, the system shall state what was observed and then ask the farmer to pick the crop.
+**REQ-CROP-002**: When a real crop photo shows a visible problem and either no crop is registered or the model's inferred crop contradicts the registered crop, the system shall state what was observed and then ask the farmer to pick the crop. This applies at any crop confidence, including `high`.
 
 **REQ-CROP-003**: While a crop-confirm reply is pending from an assumed-crop answer, the system shall treat only a reply of at most three words naming a different crop as a correction.
 

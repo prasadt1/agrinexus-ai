@@ -212,3 +212,34 @@ def test_tap_against_the_image_is_questioned_once(monkeypatch):
     # Agreement, and the unknown case, pass straight through.
     assert h._crop_tap_conflicts_with_image("Cotton", pending) is False
     assert h._crop_tap_conflicts_with_image("Wheat", {"model_crop": "unknown"}) is False
+
+
+def test_confident_wrong_crop_is_questioned_not_obeyed(monkeypatch):
+    """
+    Live case: a cotton boll macro came back as Sugarcane with crop_confidence
+    high, and the farmer was given sugarcane borer advice. A confident crop the
+    farmer did not register is the dangerous case, so it is asked about rather
+    than acted on.
+    """
+    a = _analyzer(monkeypatch, _vision(inferred_crop="Sugarcane", crop_confidence="high"))
+    out = a.process_image_message(
+        {"image": {"id": "m"}, "from": "1555"},
+        {"dialect": "en", "crop": "Cotton", "district": "Latur", "phone_number": "1555"},
+    )
+
+    assert out["text"].startswith("Two pink-striped caterpillars")
+    assert "looks like Sugarcane" in out["text"]
+    assert out["buttons"][0] == "Sugarcane"
+    assert "Cotton" in out["buttons"]
+    assert out["pending_crop_confirm"]["contradiction"] is True
+
+
+def test_confident_agreeing_crop_is_still_answered_directly(monkeypatch):
+    a = _analyzer(monkeypatch, _vision(inferred_crop="Cotton", crop_confidence="high"))
+    out = a.process_image_message(
+        {"image": {"id": "m"}, "from": "1555"},
+        {"dialect": "en", "crop": "Cotton", "district": "Latur", "phone_number": "1555"},
+    )
+
+    assert "buttons" not in out
+    assert "pending_crop_confirm" not in out
