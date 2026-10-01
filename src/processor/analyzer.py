@@ -614,7 +614,7 @@ JSON OUTPUT (all fields required):
 **STRUCTURED OUTPUT RULES:**
 - "diagnosis": What's wrong OR what you see (e.g., "कपास की फली पर इल्ली दिखाई दे रही है" or "पौधे की पहचान स्पष्ट नहीं")
 - "severity": How serious the problem is (or "none" if healthy, "unknown" if can't tell)
-- "recommendations": Specific actions (spray neem, use pesticide, send better photo, etc.)
+- "recommendations": Specific actions for the visible problem (remove affected parts, spray neem, use pesticide, etc.)
 - "confidence_text": Explain your confidence level (e.g., "उच्च - कपास की फली स्पष्ट दिखाई दे रही है" or "कम - फोटो धुंधली है")
 - NO VISIBLE PROBLEM IS A VALID DIAGNOSIS (healthy photos are allowed): use severity="none", visible_problem=false, and give preventive monitoring guidance.
 - Do not recommend pesticides unless there is clear visible pest/disease evidence.
@@ -711,6 +711,7 @@ REMEMBER:
 - Title Case crops: "Cotton", "Wheat"
 - Never name crop unless visual evidence strongly supports it (95%+ certainty for "high")
 - ALWAYS check for insects/pests - they are often the main issue farmers send photos about
+- Never ask in "recommendations" for a photo of the whole plant or another photo to identify the crop. Uncertainty about the crop goes in "inferred_crop", "crop_confidence" and "confidence_text" only.
 """
 
     if confirmed_crop:

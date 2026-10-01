@@ -174,7 +174,9 @@ def test_first_pass_prompt_keeps_crop_inference_but_drops_crop_photo_request(mon
     assert "CONFIRMED CROP OVERRIDE" not in prompt
     assert "Visual overrides profile" in prompt
     assert "Do NOT ask for another photo to identify the crop" in prompt
+    assert "Never ask in \"recommendations\" for a photo of the whole plant" in prompt
     assert "Suggest clearer/closer photo" not in prompt
+    assert "send better photo" not in prompt
 
 
 def test_prompt_separates_whitefly_from_aphid(monkeypatch):
