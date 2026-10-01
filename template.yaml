@@ -102,7 +102,7 @@ Globals:
         GUARDRAIL_VERSION: !If
           - UseExternalGuardrail
           - !Ref GuardrailVersion
-          - !GetAtt AgriNexusContentGuardrail.Version
+          - !GetAtt AgriNexusContentGuardrailVersion.Version
         RATE_LIMIT_MESSAGES: "25"  # Max inbound WhatsApp messages per user per hour (see webhook FilterExpression)
         RATE_LIMIT_WINDOW_SECONDS: "3600"  # 1 hour window
         VISITOR_TTL_DAYS: !Ref VisitorTtlDays
@@ -157,6 +157,14 @@ Resources:
               - Tell me a celebrity joke
               - Who is winning the cricket match?
             Type: DENY
+
+  # Pin a numbered version so console DRAFT edits cannot change live Lambda behavior
+  # without a stack update that recreates this version resource.
+  AgriNexusContentGuardrailVersion:
+    Type: AWS::Bedrock::GuardrailVersion
+    Properties:
+      GuardrailIdentifier: !GetAtt AgriNexusContentGuardrail.GuardrailId
+      Description: !Sub Pinned content guardrail for ${Environment}
 
   # ============================================================================
   # Lambda Layer: Common Utilities
