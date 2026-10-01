@@ -157,7 +157,7 @@ AgriNexus is a deployed, functional prototype with production-grade observabilit
 | Pipeline | Status |
 | --- | --- |
 | 📝 Text RAG (Hindi / Marathi / Telugu / English) | ✅ End-to-end (re-checked 1 Oct 2026) |
-| 🎙️ Voice round-trip (Transcribe + RAG + Polly) | ✅ End-to-end, ~20–34s (allowlisted) |
+| 🎙️ Voice round-trip (Transcribe + RAG + Polly) | ✅ Prior E2E ~20–34s (allowlisted); not part of 1 Oct 2026 re-verify |
 | 📷 Vision (Claude Vision, structured schema) | ✅ End-to-end (allowlisted; visitors after deploy) |
 | 🔔 Weather-gated nudges + closed loop | ✅ End-to-end, T+24h/T+48h/T+72h (re-checked 1 Oct 2026) |
 | 🎫 re:Invent visitor path (trigger + caps + DELETE) | ⏳ Code ready; needs deploy + sample photo upload |
