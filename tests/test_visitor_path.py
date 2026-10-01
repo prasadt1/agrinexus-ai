@@ -89,6 +89,103 @@ class TestDelete:
         assert table.delete_item.call_count >= 2
 
 
+
+
+class TestVisitorMetrics:
+    def test_emit_visitor_metric_namespace(self):
+        cw = MagicMock()
+        visitor_mod.emit_visitor_metric(cw, "visitor_started", 1.0)
+        cw.put_metric_data.assert_called_once()
+        kwargs = cw.put_metric_data.call_args[1]
+        assert kwargs["Namespace"] == "AgriNexus/Visitor"
+        assert kwargs["MetricData"][0]["MetricName"] == "visitor_started"
+
+    def test_processor_wires_expected_metric_names(self):
+        """Processor must emit each required Visitor counter on the live paths."""
+        src = (REPO / "src" / "processor" / "handler.py").read_text(encoding="utf-8")
+        for name in (
+            "visitor_started",
+            "visitor_question_answered",
+            "visitor_photo_answered",
+            "visitor_cap_hit_user",
+            "visitor_cap_hit_global",
+            "visitor_delete",
+        ):
+            assert f'"{name}"' in src or f"'{name}'" in src, f"missing emit for {name}"
+
+    def test_cap_hit_and_delete_metrics_fire_via_processor_helpers(self, monkeypatch):
+        monkeypatch.setenv("TABLE_NAME", "t")
+        monkeypatch.setenv("KNOWLEDGE_BASE_ID", "kb")
+        monkeypatch.setenv("GUARDRAIL_ID", "")
+        monkeypatch.setenv("GUARDRAIL_VERSION", "1")
+        monkeypatch.setenv("TEMP_AUDIO_BUCKET", "media-bucket")
+        monkeypatch.setenv("VISITOR_DAILY_PER_USER_CAP", "1")
+        monkeypatch.setenv("VISITOR_DAILY_GLOBAL_CAP", "300")
+
+        import importlib.util
+        import types
+
+        emitted: list[str] = []
+        mock_cw = MagicMock()
+        mock_cw.put_metric_data.side_effect = lambda **kw: emitted.append(
+            kw["MetricData"][0]["MetricName"]
+        )
+        mock_s3 = MagicMock()
+        mock_s3.list_objects_v2.return_value = {"Contents": []}
+        mock_table = MagicMock()
+        mock_table.query.return_value = {"Items": []}
+        mock_table.update_item.side_effect = [
+            {},  # user ok
+            {},  # global ok
+            ClientError(
+                {"Error": {"Code": "ConditionalCheckFailedException", "Message": "x"}},
+                "UpdateItem",
+            ),
+        ]
+
+        output_mod = types.ModuleType("output")
+        output_mod.text_to_speech = lambda *a, **k: None
+        output_mod.truncate_for_voice = lambda t, *a, **k: t
+        output_mod.voice_truncation_prefix = lambda *a, **k: ""
+        monkeypatch.setitem(sys.modules, "output", output_mod)
+        analyzer_mod = types.ModuleType("analyzer")
+        analyzer_mod.analyze_crop_image = lambda *a, **k: {"recommendations": "ok"}
+        analyzer_mod.process_image_message = lambda *a, **k: {"text": "ok"}
+        monkeypatch.setitem(sys.modules, "analyzer", analyzer_mod)
+
+        wa = types.ModuleType("common.whatsapp")
+        wa.send_whatsapp_message = MagicMock(return_value=True)
+        wa.send_whatsapp_list = MagicMock(return_value=True)
+        wa.send_whatsapp_buttons = MagicMock(return_value=True)
+        monkeypatch.setitem(sys.modules, "common.whatsapp", wa)
+
+        original_path = list(sys.path)
+        try:
+            sys.path.insert(0, str(REPO / "src" / "processor"))
+            sys.path.insert(0, COMMON)
+            spec = importlib.util.spec_from_file_location(
+                "processor_handler_visitor_metrics",
+                REPO / "src" / "processor" / "handler.py",
+            )
+            mod = importlib.util.module_from_spec(spec)
+            assert spec and spec.loader
+            spec.loader.exec_module(mod)
+        finally:
+            sys.path[:] = original_path
+
+        mod.table = mock_table
+        mod.cloudwatch = mock_cw
+        mod.s3 = mock_s3
+
+        profile = {"demo_tier": "visitor", "dialect": "en", "onboarding_complete": True}
+        assert mod._consume_visitor_or_refuse("15550001111", profile, approved=False) is True
+        assert mod._consume_visitor_or_refuse("15550001111", profile, approved=False) is False
+        assert "visitor_cap_hit_user" in emitted
+
+        mod._handle_delete_command("15550001111")
+        assert "visitor_delete" in emitted
+
+
 class TestNudgeExclusion:
     def test_visitor_profile_detected(self):
         assert visitor_mod.is_visitor_profile({"demo_tier": "visitor"})

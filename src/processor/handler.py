@@ -41,6 +41,7 @@ def send_whatsapp_buttons(phone_number: str, body_text: str, buttons: list):
 dynamodb = boto3.resource('dynamodb')
 bedrock_agent = boto3.client('bedrock-agent-runtime')
 s3 = boto3.client("s3")
+cloudwatch = boto3.client("cloudwatch")
 
 TABLE_NAME = os.environ['TABLE_NAME']
 KB_ID = os.environ['KNOWLEDGE_BASE_ID']
@@ -784,9 +785,13 @@ def _consume_visitor_or_refuse(from_number: str, profile: Optional[Dict[str, Any
     """Return True if the caller may proceed to Bedrock. Sends CAP_MSG and returns False if blocked."""
     if not visitor_mod.is_visitor_profile(profile):
         return True
-    ok, _reason = visitor_mod.try_consume_visitor_answer(table, from_number, bypass=approved)
+    ok, reason = visitor_mod.try_consume_visitor_answer(table, from_number, bypass=approved)
     if ok:
         return True
+    if reason == "user":
+        visitor_mod.emit_visitor_metric(cloudwatch, "visitor_cap_hit_user")
+    elif reason == "global":
+        visitor_mod.emit_visitor_metric(cloudwatch, "visitor_cap_hit_global")
     send_whatsapp_message(from_number, visitor_mod.CAP_MSG)
     return False
 
@@ -838,10 +843,12 @@ def _run_visitor_sample_vision(from_number: str, profile: Dict[str, Any], wamid:
         ttl_days=_msg_ttl_days(profile),
     )
     send_whatsapp_message(from_number, reply)
+    visitor_mod.emit_visitor_metric(cloudwatch, "visitor_photo_answered")
 
 
 def _handle_delete_command(from_number: str) -> None:
     visitor_mod.delete_user_conversation_data(table, from_number)
+    visitor_mod.emit_visitor_metric(cloudwatch, "visitor_delete")
     send_whatsapp_message(from_number, visitor_mod.DELETE_CONFIRM_MSG)
 
 
@@ -1139,6 +1146,7 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
         # re:Invent visitor path: unknown number + trigger phrase → skip farmer onboarding
         if (not profile) and message_type == 'text' and visitor_mod.matches_reinvent_trigger(early_text):
             profile = visitor_mod.create_visitor_profile(table, from_number)
+            visitor_mod.emit_visitor_metric(cloudwatch, "visitor_started")
             welcome = visitor_mod.visitor_welcome_list()
             send_whatsapp_list(
                 from_number,
@@ -1254,6 +1262,8 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                                 ttl_days=_msg_ttl_days(profile),
                             )
                             send_whatsapp_message(from_number, reply_text)
+                            if is_visitor:
+                                visitor_mod.emit_visitor_metric(cloudwatch, "visitor_photo_answered")
                         finally:
                             _delete_pending_crop_confirm(from_number)
                         continue
@@ -1381,6 +1391,9 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             else:
                 # Send text response
                 send_whatsapp_message(from_number, reply_text)
+
+            if is_visitor:
+                visitor_mod.emit_visitor_metric(cloudwatch, "visitor_question_answered")
         
         elif message_type == 'image':
             # Allowlisted users + re:Invent visitors (visitor uploads count against caps)
@@ -1448,6 +1461,8 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             
             # Send response (text only - no voice for image responses)
             send_whatsapp_message(from_number, analysis)
+            if is_visitor:
+                visitor_mod.emit_visitor_metric(cloudwatch, "visitor_photo_answered")
         
         elif message_type == 'audio':
             # Audio messages are normally handled by VoiceProcessor Lambda (gated in webhook).
