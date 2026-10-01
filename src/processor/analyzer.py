@@ -601,7 +601,7 @@ JSON OUTPUT (all fields required):
 {{
     "is_real_crop_photo": true | false,
     "non_photo_reason": "screenshot" | "logo" | "document" | "too_blurry" | null,
-    "insects_visible": ["beetle", "grasshopper", "caterpillar", "aphid", "moth"] | [],
+    "insects_visible": ["beetle", "grasshopper", "caterpillar", "aphid", "whitefly", "moth"] | [],
     "inferred_crop": "Cotton" | "Wheat" | "Soybean" | "Rice" | "Sugarcane" | "Maize" | "unknown",
     "crop_confidence": "high" | "medium" | "low",
     "diagnosis": "<1-2 sentences describing what you see in {language}>",
@@ -670,8 +670,13 @@ If is_real_crop_photo=false:
 Look for:
 - Beetles, grasshoppers, locusts, moths, butterflies ON the plant
 - Caterpillars, worms, larvae ON leaves/stems/grain
-- Aphids (tiny white/green bugs in clusters)
+- Whiteflies: tiny insects with powdery WHITE WINGS held flat like a tent, usually on the leaf underside, adults often fly up when disturbed
+- Aphids: soft, pear-shaped, mostly WINGLESS bodies, usually green, black, yellow or brown, clustered on young shoots and leaf undersides
 - ANY creature sitting on or near plant parts
+
+PEST NAMING (the pest name selects the pesticide, so do not guess):
+- Whiteflies and aphids are different pests. Look for wings before choosing between them.
+- If you cannot tell which of two similar pests it is, name both as possible in "diagnosis", say the pest identity is uncertain in "confidence_text", and in "recommendations" give non-chemical steps first and advise confirming the pest with the local agriculture officer before buying a pesticide.
 
 **If you see ANY insect/creature → IMMEDIATELY set:**
 - visible_problem=true

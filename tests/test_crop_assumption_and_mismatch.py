@@ -177,6 +177,36 @@ def test_first_pass_prompt_keeps_crop_inference_but_drops_crop_photo_request(mon
     assert "Suggest clearer/closer photo" not in prompt
 
 
+def test_prompt_separates_whitefly_from_aphid(monkeypatch):
+    """Whiteflies were being named aphids, and the pest name selects the pesticide."""
+    from src.processor import analyzer as a
+
+    seen = {}
+
+    def _fake_invoke(**kwargs):
+        import json as _json
+
+        body = _json.loads(kwargs["body"])
+        seen["prompt"] = body["messages"][0]["content"][1]["text"]
+        raise RuntimeError("stop after prompt capture")
+
+    monkeypatch.setattr(a, "_looks_like_screenshot_or_ui", lambda _b: False)
+    monkeypatch.setattr(a, "_looks_like_logo_or_graphic", lambda _b: False, raising=False)
+    monkeypatch.setattr(a.bedrock, "invoke_model", _fake_invoke)
+
+    for confirmed in (False, True):
+        seen.clear()
+        try:
+            a.analyze_crop_image(b"\xff\xd8fake", "en", "Cotton", confirmed_crop=confirmed)
+        except Exception:
+            pass
+        prompt = seen.get("prompt", "")
+        assert "Whiteflies:" in prompt
+        assert "Aphids:" in prompt
+        assert "tiny white/green bugs in clusters" not in prompt
+        assert "advise confirming the pest" in prompt
+
+
 def test_mismatched_tap_is_questioned_once(monkeypatch):
     from src.processor import analyzer as a
 
