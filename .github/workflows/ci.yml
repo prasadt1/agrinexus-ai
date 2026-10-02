@@ -7,11 +7,13 @@ on:
     branches: [main, master]
 
 jobs:
-  pytest-fast:
+  pytest:
     runs-on: ubuntu-latest
     env:
       AWS_REGION: us-east-1
       AWS_DEFAULT_REGION: us-east-1
+      # Lambda layout: handlers import their siblings and the common layer as top-level modules.
+      PYTHONPATH: src/processor:src/common-layer/python:src
     steps:
       - uses: actions/checkout@v4
 
@@ -19,12 +21,11 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install pytest
-        run: pip install pytest boto3 requests
+      - name: Install test dependencies
+        run: pip install pytest boto3 requests pyyaml pillow
 
-      - name: Fast tests (no live AWS Bedrock)
-        run: |
-          python3 -m pytest tests/test_nudge_flow.py tests/test_district_helplines.py tests/test_e2e_happy_path_mocked.py -v
+      - name: Full test suite (live Bedrock tests skip without KNOWLEDGE_BASE_ID)
+        run: python3 -m pytest tests/ -q -rf
 
       - name: Install SAM CLI
         run: pip install aws-sam-cli
