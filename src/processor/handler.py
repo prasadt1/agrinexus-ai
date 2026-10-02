@@ -1276,6 +1276,11 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
         # Process based on message type
         if message_type in ('text', 'interactive'):
             text = early_text
+            if not text.strip():
+                # Unhandled interactive types (e.g. nfm_reply) and blank text carry nothing
+                # to answer; Bedrock rejects empty input and SQS would retry the ack.
+                print(f"Empty {message_type} payload from {redact_phone(from_number)}; skipping")
+                continue
 
             # Visitor: switch to farmer onboarding
             if is_visitor and visitor_mod.is_farmer_onboard_selection(text):
