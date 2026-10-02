@@ -261,9 +261,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Parse webhook payload
         try:
             payload = json.loads(body)
-            # Only log message count, not full payload (saves CloudWatch costs)
-            msg_count = len(payload.get('entry', [{}])[0].get('changes', [{}])[0].get('value', {}).get('messages', []))
-            logger.info(f"Parsed payload: {msg_count} message(s)")
         except json.JSONDecodeError as e:
             logger.error(f"JSON decode error: {e}")
             return {
@@ -271,16 +268,18 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'body': json.dumps({'error': 'Invalid JSON'})
             }
         
-        # Extract message data
-        entry = payload.get('entry', [{}])[0]
-        changes = entry.get('changes', [{}])[0]
-        value = changes.get('value', {})
-        messages = value.get('messages', [])
+        # Meta may batch several entries and changes into one delivery.
+        batch = []
+        for entry in (payload.get('entry') if isinstance(payload, dict) else None) or []:
+            for change in (entry.get('changes') if isinstance(entry, dict) else None) or []:
+                value = (change.get('value') if isinstance(change, dict) else None) or {}
+                for message in value.get('messages') or []:
+                    batch.append((message, value))
         
-        logger.info(f"Processing {len(messages)} message(s)")
+        logger.info(f"Processing {len(batch)} message(s)")
         
         # Queue each message for async processing
-        for message in messages:
+        for message, value in batch:
             wamid = message.get('id')
             from_number = message.get('from')
             message_type = message.get('type')
