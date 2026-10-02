@@ -290,7 +290,7 @@ def test_prompt_separates_whitefly_from_aphid(monkeypatch):
         assert "Only when two or more similar pests are genuinely possible" in prompt
         assert "label rate" not in prompt
         assert "NO PESTICIDES" in prompt
-        assert "refer the farmer to the local KVK" in prompt
+        assert "referral to the local KVK" in prompt
 
 
 def test_mismatched_tap_is_questioned_once(monkeypatch):

@@ -539,7 +539,7 @@ CONFIDENCE LEVELS:
 
 NO PESTICIDES (applies to every field):
 - Never name a pesticide, insecticide, fungicide or herbicide product, brand, active ingredient, formulation (EC, SL, WG, SC, WP, SG) or any dose, quantity or dilution.
-- Give the pest or disease, the severity, and non-chemical steps the farmer can take today. For chemical control, refer the farmer to the local KVK for the right product and quantity.
+- Give the pest or disease, the severity, and non-chemical steps the farmer can take today. The app ends every reply with a referral to the local KVK for chemical control, so do not write that referral yourself.
 - Neem, yellow sticky traps and pheromone traps may be named as practices, without any quantity or dilution.
 
 REMEMBER:
