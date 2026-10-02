@@ -73,6 +73,10 @@ REQUIRED_ACTIVES = [
     "रीजेंट वापरा.",
     "Lannate kills larvae.",
     "लॅनेट फवारा.",
+    "Spray sulfoxaflor.",
+    "Etofenprox works on hoppers.",
+    "Use pymetrozine for hoppers.",
+    "पायमेट्रोझिन फवारा.",
     "కార్టాప్ వాడండి.",
     "డైక్లోర్వాస్ పిచికారీ చేయండి.",
 ]

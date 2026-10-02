@@ -55,6 +55,7 @@ _ACTIVES_LATIN = (
     "tricyclazole", "azoxystrobin", "spinetoram", "lufenuron", "thiodicarb",
     "azadirachtin", "cartap", "dichlorvos", "methomyl", "chlorfenapyr", "dicofol",
     "pendimethalin", "atrazine", "chlorothalonil", "streptocycline", "validamycin",
+    "sulfoxaflor", "etofenprox", "pymetrozine",
 )
 _ACTIVES_INDIC = (
     # Devanagari (Marathi / Hindi)
@@ -85,6 +86,7 @@ _ACTIVES_INDIC = (
     "क्लोरोथॅलोनिल", "क्लोरोथालोनिल", "क्लोरोथैलोनिल",
     "स्ट्रेप्टोसायक्लिन", "स्ट्रेप्टोसाइक्लिन", "स्ट्रेप्टोसायक्लीन",
     "व्हॅलिडामायसिन", "वैलिडामाइसिन", "वॅलिडामायसिन", "व्हॅलिडामायसीन",
+    "सल्फोक्साफ्लोर", "सल्फॉक्साफ्लोर", "इटोफेनप्रॉक्स", "एटोफेनप्रोक्स", "पायमेट्रोझिन", "पाइमेट्रोजीन",
     # Telugu
     "ఇమిడాక్లోప్రిడ్", "థయామెథాక్సామ్", "థియామెథాక్సామ్", "ప్రొఫెనోఫాస్", "ప్రోఫెనోఫాస్",
     "సైపర్‌మెత్రిన్", "సైపర్మెత్రిన్", "క్లోరాంట్రానిలిప్రోల్", "క్లోరంట్రానిలిప్రోల్",
