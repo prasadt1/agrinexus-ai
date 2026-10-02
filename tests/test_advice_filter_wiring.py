@@ -139,6 +139,31 @@ def test_knowledge_base_prompts_ask_for_no_answer_marker(processor, webchat):
     assert "respond with exactly NOT_FARMING" in _kb_prompt(seen)
 
 
+SAFE_MR = "पिवळे चिकट सापळे प्रति हेक्टरी २० लावा."
+
+
+def test_whatsapp_answer_without_retrieved_documents_has_no_source_line(processor):
+    processor.table = flow._FakeDynamoTable({**processor._profile, "dialect": "mr"})
+    processor.bedrock_agent.retrieve_and_generate = lambda **_k: {
+        "output": {"text": SAFE_MR}, "citations": [{"retrievedReferences": []}], "sessionId": "s"
+    }
+    _run(processor, "text", {"text": {"body": "पांढऱ्या माशीसाठी काय करावे?"}})
+    reply = _last_reply(processor)
+    assert SAFE_MR in reply
+    assert "स्त्रोत" not in reply and "FAO/ICAR" not in reply
+
+
+def test_web_chat_answer_without_retrieved_documents_has_no_citations(webchat):
+    webchat.query_bedrock = lambda *_a, **_k: {"text": SAFE_MR, "citations": [{"retrievedReferences": []}]}
+    resp = webchat.lambda_handler(
+        {"httpMethod": "POST", "body": json.dumps({"message": "x", "language": "mr"}), "requestContext": {}},
+        None,
+    )
+    body = json.loads(resp["body"])
+    assert body["citations"] == []
+    assert "FAO/ICAR" not in body["reply"]
+
+
 def test_whatsapp_voice_answer_is_filtered_before_speech(processor):
     spoken = []
     processor.text_to_speech = lambda text, *_a, **_k: spoken.append(text) or None

@@ -1,8 +1,25 @@
 # ADR 0005: Bedrock RAG Source Attribution
 
 **Date:** 2026-04-15  
-**Status:** Accepted  
+**Status:** Superseded in part on 2026-10-02 (generic attribution removed; see Amendment)  
 **Deciders:** Development Team  
+
+## Amendment (2026-10-02)
+
+The generic "FAO/ICAR Agricultural Guidelines" line is no longer shown. Because
+`retrievedReferences` is always empty, the line was attached to every answer and
+never named the document the answer came from. A reader could fairly take it as a
+citation that was not checked. A source is now shown only when a retrieved document
+name is available; otherwise no source line is added. This applies to WhatsApp
+replies, the web chat API, and the web demo page, which had its own copy of the
+generic label.
+
+Knowledge base refusals no longer depend on phrase matching. The prompt asks for
+`NO_KB_ANSWER` (context does not cover the question) or `NOT_FARMING` (off-topic),
+and the handlers replace these with a fixed refusal in the farmer's language.
+
+The placeholder stripping (`स्त्रोत: 1`) described below still applies. Showing real
+document names would need the separate Retrieve call rejected below.
 
 ## Context
 

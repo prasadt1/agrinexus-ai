@@ -743,18 +743,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     filename = uri.split('/')[-1]
                     citations.append(filename)
 
-        # If Bedrock doesn't return usable retrievedReferences (ADR 0005),
-        # provide an explicit, truthful generic attribution so demo users
-        # still see grounding.
-        if not citations and not is_rag_refusal_response(reply_text):
-            generic = {
-                'hi': 'FAO/ICAR कृषि मार्गदर्शिका (Knowledge Base)',
-                'mr': 'FAO/ICAR शेती मार्गदर्शक (Knowledge Base)',
-                'te': 'FAO/ICAR వ్యవసాయ మార్గదర్శకం (Knowledge Base)',
-                'en': 'FAO/ICAR Agricultural Guidelines (Knowledge Base)',
-            }.get(dialect, 'FAO/ICAR Agricultural Guidelines (Knowledge Base)')
-            citations = [generic]
-
         # Return response
         return {
             'statusCode': 200,

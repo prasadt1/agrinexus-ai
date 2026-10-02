@@ -73,7 +73,7 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **REQ-CONV-003**: The system shall respond to farmer queries in Hindi, Marathi, or Telugu based on the user's profile dialect preference.
 
-**REQ-CONV-004**: Every advisory response shall include a simplified source citation (e.g., "Source: FAO Cotton Guide, Section 3").
+**REQ-CONV-004** (amended 2 Oct 2026): When a retrieved document name is available, the advisory response shall name it as the source. When none is available, the system shall not add a generic source line. Knowledge base refusals shall carry no source line.
 
 **REQ-CONV-005**: The system shall log the full source attribution (document name, chunk, confidence score) to CloudWatch for auditability.
 
@@ -445,7 +445,7 @@ The product identifies the pest or problem and gives non-chemical steps. It does
 
 **AC-001**: A new farmer can complete onboarding in under 3 minutes by providing dialect, location, and crop information via WhatsApp Interactive Buttons.
 
-**AC-002**: A farmer can send a message in Hindi, Marathi, or Telugu and receive a relevant agronomic response with FAO citation within 5 seconds.
+**AC-002**: A farmer can send a message in Hindi, Marathi, or Telugu and receive a relevant agronomic response within 5 seconds.
 
 **AC-003**: A farmer can send a crop image and receive a pest diagnosis with recommended actions within 15 seconds.
 

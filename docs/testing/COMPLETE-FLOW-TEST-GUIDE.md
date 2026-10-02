@@ -87,12 +87,16 @@ Buttons: [झाला] [नाही झाला]
 **Expect (~5-10 seconds):**
 ```
 पांढरी माशी नियंत्रित करण्यासाठी...
-[Detailed response with treatment recommendations]
+[Non-chemical steps; no product names or doses]
 
-📚 स्त्रोत: FAO/ICAR शेती मार्गदर्शक
+हे स्वयंचलित उत्तर आहे … (KVK referral)
+📞 … किसान कॉल सेंटर: 1800-180-1551
 ```
 
-**Status:** ✅ RAG query successful with source citation
+No generic "स्त्रोत: FAO/ICAR" line (ADR 0005 amendment). If the knowledge base
+has no answer, expect the fixed refusal "माझ्याकडे या विषयाची माहिती नाही…" and no footer.
+
+**Status:** ✅ RAG query successful
 
 ---
 
@@ -110,9 +114,7 @@ Buttons: [झाला] [नाही झाला]
 
 **Expect after ~30-40 seconds:**
 ```
-[Transcribed text + RAG response]
-
-📚 स्त्रोत: FAO/ICAR शेती मार्गदर्शक
+[Transcribed text + RAG response + KVK referral]
 ```
 
 **Status:** ✅ Voice transcription + RAG successful

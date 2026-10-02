@@ -692,7 +692,7 @@ def convert_floats_to_decimal(obj):
 
 def is_rag_refusal_response(text: str) -> bool:
     """
-    Detect KB no-hit / refusal replies. Generic FAO/ICAR footer must not be appended to these
+    Detect KB no-hit / refusal replies. No source line or referral footer is appended to these
     (it implies a grounded answer when there was none).
     """
     if not text or not text.strip():
@@ -1425,7 +1425,7 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             }
             source_keyword = source_keywords.get(dialect, 'Source:')
             
-            # Strip LLM citation artifacts; append doc names or generic line
+            # Strip LLM citation artifacts; name a source only when a retrieved document is known
             response_text = strip_llm_xml_citation_tags(response_text)
             response_text = strip_all_numeric_source_footers(response_text)
             has_source = source_keyword in response_text
@@ -1438,15 +1438,6 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                     if len(labels) > max_show:
                         tail += " …"
                     response_text += f"\n\n{source_keyword} {tail}"
-                else:
-                    source_attributions = {
-                        'hi': 'FAO/ICAR कृषि मार्गदर्शिका',
-                        'mr': 'FAO/ICAR शेती मार्गदर्शक',
-                        'te': 'FAO/ICAR వ్యవసాయ మార్గదర్శకం',
-                        'en': 'FAO/ICAR Agricultural Guidelines'
-                    }
-                    source_text = source_attributions.get(dialect, source_attributions['en'])
-                    response_text += f"\n\n{source_keyword} {source_text}"
 
             location = (profile.get("district") or profile.get("location")) if profile else None
             response_text = filter_advice(
