@@ -129,6 +129,8 @@ The product identifies the pest or problem and gives non-chemical steps. It does
 
 **REQ-GUARD-014**: The system may name neem, yellow sticky traps and pheromone traps as practices, and shall not state a quantity or dilution for them.
 
+**REQ-GUARD-015**: Every Bedrock model call on the WhatsApp photo path shall carry the content guardrail. If the guardrail intervenes on a diagnosis call, the system shall send only the localized farming-only refusal for that photo and no diagnosis.
+
 ### 2.5 Visual Verification (Tier 2 - Working Implementation)
 
 **REQ-VIS-001**: When a farmer sends an image via WhatsApp, the system shall process it using Claude 3 Vision via direct invoke_model API (separate from the Bedrock Agent conversation flow).

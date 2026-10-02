@@ -17,6 +17,7 @@ from messages import get_block_message, get_not_agri_message, get_safe_retake_me
 from messages import get_crop_question, get_crop_mismatch_question
 from enforcement import enforce_message_safety
 from enforcement import format_crop_message
+from common.guardrail_reply import localized_guardrail_refusal
 
 bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
 s3 = boto3.client('s3', region_name='us-east-1')
@@ -29,6 +30,30 @@ BEDROCK_MODEL_ID = os.environ.get(
     "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
 )
 RELEVANCE_MODEL_ID = os.environ.get("VISION_RELEVANCE_MODEL_ID") or "anthropic.claude-3-haiku-20240307-v1:0"
+
+
+def _guardrail_kwargs() -> Dict[str, str]:
+    gid = (os.environ.get("GUARDRAIL_ID") or "").strip()
+    if not gid:
+        return {}
+    return {"guardrailIdentifier": gid, "guardrailVersion": (os.environ.get("GUARDRAIL_VERSION") or "DRAFT").strip()}
+
+
+def _guardrail_intervened(response_body: Dict[str, Any]) -> bool:
+    return str(response_body.get("amazon-bedrock-guardrailAction") or "").upper() == "INTERVENED"
+
+
+def _guardrail_blocked_result(dialect: str) -> Dict[str, Any]:
+    return {
+        "is_real_crop_photo": False,
+        "non_photo_reason": None,
+        "inferred_crop": "unknown",
+        "crop_confidence": "low",
+        "visible_problem": False,
+        "severity": "unknown",
+        "guardrail_blocked": True,
+        "recommendations": localized_guardrail_refusal(dialect),
+    }
 
 
 def _relevance_gate_enabled() -> bool:
@@ -88,9 +113,13 @@ def classify_image_relevance(image_bytes: bytes, dialect: str) -> Dict[str, Any]
                     ],
                 }
             ),
+            **_guardrail_kwargs(),
         )
 
         response_body = json.loads(resp["body"].read())
+        if _guardrail_intervened(response_body):
+            print("Guardrail intervened on relevance check")
+            return {"relevance": "unclear", "confidence": "low", "reason": "other"}
         raw_text = response_body["content"][0]["text"].strip()
         if raw_text.startswith("```"):
             raw_text = "\n".join(raw_text.split("\n")[1:-1])
@@ -762,11 +791,15 @@ CONFIRMED CROP OVERRIDE (highest priority, replaces the 3-tier crop rules above)
                         ]
                     }
                 ]
-            })
+            }),
+            **_guardrail_kwargs(),
         )
         
         # Parse response
         response_body = json.loads(response['body'].read())
+        if _guardrail_intervened(response_body):
+            print("Guardrail intervened on vision diagnosis")
+            return _guardrail_blocked_result(dialect)
         raw_text = response_body['content'][0]['text'].strip()
 
         # Defensive fallback: strip fences if present (should be rare with temp=0)
@@ -837,6 +870,8 @@ def diagnose_with_confirmed_crop(
     produce identical text for the same image + crop + dialect + district.
     """
     vision = analyze_crop_image(image_bytes, dialect, crop, district=district, confirmed_crop=True)
+    if vision.get("guardrail_blocked"):
+        return vision["recommendations"]
     return format_crop_message(vision, crop, dialect, assumed=False)
 
 
@@ -963,6 +998,9 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
             from messages import get_error_message
             return {"text": get_error_message('model_error', dialect)}
 
+        if vision.get("guardrail_blocked"):
+            return {"text": vision["recommendations"], "guardrail_blocked": True}
+
         # Schema already validated inside analyze_crop_image()
 
         # EXISTING: _normalize_vision_metadata() already enforces metadata-level safety
@@ -1016,6 +1054,8 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
                 )
                 # Routing used the first pass's verdict; a second call that disagrees
                 # would turn an answer into a "not a crop photo" block.
+                if second.get("guardrail_blocked"):
+                    return {"text": second["recommendations"], "guardrail_blocked": True}
                 if second.get("is_real_crop_photo", True) and second.get("visible_problem", False):
                     diagnosis_vision = second
                 else:
