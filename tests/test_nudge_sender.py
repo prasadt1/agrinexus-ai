@@ -317,6 +317,53 @@ class TestSendWindow:
         assert out["nudges_sent"] == 0
 
 
+def _closed(status, created, **extra):
+    return {"SK": f"NUDGE#{created.isoformat()}#spray", "status": status, **extra}
+
+
+class TestCooldown:
+    def test_done_two_days_ago_blocks(self, sender, monkeypatch):
+        done = _closed("DONE", NOW - timedelta(days=3), completedAt=(NOW - timedelta(days=2)).isoformat())
+        out, puts, metrics, sends = _run_handler(sender, monkeypatch, nudges=[done])
+        assert out["nudges_sent"] == 0 and sends == [] and puts == []
+        assert "NudgesDeferred" not in metrics
+
+    def test_expired_eight_days_ago_allows(self, sender, monkeypatch):
+        expired = _closed("EXPIRED", NOW - timedelta(days=11), expiredAt=(NOW - timedelta(days=8)).isoformat())
+        out, *_ = _run_handler(sender, monkeypatch, nudges=[expired])
+        assert out["nudges_sent"] == 1
+
+    def test_expired_without_timestamp_counts_from_creation_plus_72h(self, sender, monkeypatch):
+        recent = _closed("EXPIRED", NOW - timedelta(days=5))
+        out, *_ = _run_handler(sender, monkeypatch, nudges=[recent])
+        assert out["nudges_sent"] == 0
+        old = _closed("EXPIRED", NOW - timedelta(days=11))
+        out, *_ = _run_handler(sender, monkeypatch, nudges=[old])
+        assert out["nudges_sent"] == 1
+
+    def test_other_activity_does_not_block(self, sender, monkeypatch):
+        other = {"SK": f"NUDGE#{(NOW - timedelta(days=2)).isoformat()}#irrigate", "status": "DONE",
+                 "completedAt": (NOW - timedelta(days=1)).isoformat()}
+        out, *_ = _run_handler(sender, monkeypatch, nudges=[other])
+        assert out["nudges_sent"] == 1
+
+    def test_cooldown_days_from_env(self, sender, monkeypatch):
+        monkeypatch.setenv("NUDGE_COOLDOWN_DAYS", "1")
+        done = _closed("DONE", NOW - timedelta(days=3), completedAt=(NOW - timedelta(days=2)).isoformat())
+        out, *_ = _run_handler(sender, monkeypatch, nudges=[done])
+        assert out["nudges_sent"] == 1
+
+    def test_unreadable_close_time_blocks(self, sender, monkeypatch):
+        bad = {"SK": "NUDGE#not-a-time#spray", "status": "DONE", "completedAt": "garbage"}
+        out, *_ = _run_handler(sender, monkeypatch, nudges=[bad])
+        assert out["nudges_sent"] == 0
+
+    def test_force_ignores_cooldown(self, sender, monkeypatch):
+        done = _closed("DONE", NOW - timedelta(days=1), completedAt=(NOW - timedelta(hours=2)).isoformat())
+        out, *_ = _run_handler(sender, monkeypatch, nudges=[done], force=True)
+        assert out["nudges_sent"] == 1
+
+
 class TestScheduleCleanup:
     @pytest.mark.parametrize("make", ["reminder", "expiry"])
     def test_one_shot_schedules_delete_themselves(self, sender, monkeypatch, make):

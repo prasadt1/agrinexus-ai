@@ -1,4 +1,4 @@
-"""Nudge send window is wired through the stack."""
+"""Nudge send window and cooldown are wired through the stack."""
 from pathlib import Path
 
 import yaml
@@ -33,10 +33,11 @@ def test_window_hours_are_stack_parameters():
     assert params["NudgeSendWindowEndHour"]["Default"] == 19
 
 
-def test_sender_receives_window():
+def test_sender_receives_window_and_cooldown():
     env = _template()["Resources"]["NudgeSender"]["Properties"]["Environment"]["Variables"]
     assert env["NUDGE_WINDOW_START_HOUR"] == {"Ref": "NudgeSendWindowStartHour"}
     assert env["NUDGE_WINDOW_END_HOUR"] == {"Ref": "NudgeSendWindowEndHour"}
+    assert env["NUDGE_COOLDOWN_DAYS"] == "7"
 
 
 def test_poll_schedule_stays_six_hourly():

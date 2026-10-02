@@ -870,6 +870,7 @@ Resources:
           NUDGE_LINER_MODEL_ID: anthropic.claude-3-haiku-20240307-v1:0
           NUDGE_WINDOW_START_HOUR: !Ref NudgeSendWindowStartHour
           NUDGE_WINDOW_END_HOUR: !Ref NudgeSendWindowEndHour
+          NUDGE_COOLDOWN_DAYS: "7"
       Policies:
         - CloudWatchPutMetricPolicy: {}
         - DynamoDBCrudPolicy:

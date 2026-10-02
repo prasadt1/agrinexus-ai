@@ -143,10 +143,18 @@ def emit_metric(name: str, value: float = 1.0):
 
 
 IST_OFFSET = timedelta(hours=5, minutes=30)  # Asia/Kolkata has no DST
+EXPIRY_HOURS = 72
 
 
 def _utcnow() -> datetime:
     return datetime.utcnow()
+
+
+def _parse_utc(value) -> datetime:
+    parsed = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+    if parsed.tzinfo is not None:
+        parsed = (parsed - parsed.utcoffset()).replace(tzinfo=None)
+    return parsed
 
 
 def in_send_window(now_utc: datetime) -> bool:
@@ -162,6 +170,45 @@ def in_send_window(now_utc: datetime) -> bool:
         return False
     local = now_utc + IST_OFFSET
     return start <= local.hour < end
+
+
+def in_cooldown(phone_number: str, activity: str, now_utc: datetime) -> bool:
+    """
+    True when the farmer's last closed (DONE/EXPIRED) nudge for this activity closed
+    within NUDGE_COOLDOWN_DAYS. Close time is completedAt/expiredAt, else creation + 72h.
+    Unreadable config or close time blocks the send.
+    """
+    try:
+        cooldown = timedelta(days=int(os.environ.get('NUDGE_COOLDOWN_DAYS', '7')))
+    except ValueError:
+        cooldown = None
+
+    response = table.query(
+        KeyConditionExpression='PK = :pk AND begins_with(SK, :sk)',
+        ExpressionAttributeValues={
+            ':pk': f'USER#{phone_number}',
+            ':sk': 'NUDGE#'
+        }
+    )
+    for item in response.get('Items', []):
+        nudge_id = item.get('SK', '').replace('NUDGE#', '')
+        created, _, nudge_activity = nudge_id.rpartition('#')
+        status = item.get('status')
+        if nudge_activity != activity or status not in ('DONE', 'EXPIRED'):
+            continue
+        if cooldown is None:
+            print("NUDGE_COOLDOWN_DAYS unreadable - treating closed nudges as cooling down")
+            return True
+        closed = item.get('completedAt') if status == 'DONE' else item.get('expiredAt')
+        try:
+            closed_at = _parse_utc(closed) if closed else _parse_utc(created) + timedelta(hours=EXPIRY_HOURS)
+        except (TypeError, ValueError):
+            print(f"Unreadable close time on {nudge_id} - treating as cooling down")
+            return True
+        if now_utc - closed_at < cooldown:
+            print(f"{activity} nudge for {redact_phone(phone_number)} closed {closed_at.isoformat()} - in cooldown")
+            return True
+    return False
 
 
 def has_open_nudge(phone_number: str, activity: str, max_age_hours: int = 96) -> bool:
@@ -217,12 +264,12 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     location = event.get('location')
     weather = convert_floats_to_decimal(event.get('weather', {}))
     activity = event.get('activity', 'spray')
-    # Demo path only: bypasses the send window, never the consent gates.
+    # Demo path only: bypasses the send window and cooldown, never the consent gates.
     force = event.get('force') is True
     now = _utcnow()
     window_open = force or in_send_window(now)
     if force:
-        print("force=true - send window bypassed")
+        print("force=true - send window and cooldown bypassed")
 
     # Query farmers in this location
     response = table.query(
@@ -274,6 +321,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Open-nudge gate: do not send a fresh nudge when one is still open.
         if has_open_nudge(phone_number, activity):
             print(f"Skipping {redact_phone(phone_number)} - already has open {activity} nudge")
+            nudges_skipped += 1
+            continue
+
+        if not force and in_cooldown(phone_number, activity, now):
             nudges_skipped += 1
             continue
 
