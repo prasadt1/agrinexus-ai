@@ -4,13 +4,14 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
-## 2 October 2026 — nudge send window and cooldown (not deployed)
+## 3 October 2026 — nudge send window and cooldown (deployed; id collision fix not deployed)
 
 - **Nudges went out at any hour and repeated after every close.** The weather poller runs every 6 hours (UTC), so a spray nudge could arrive around midnight in India. The only repeat control was the open-nudge check: as soon as a nudge was DONE or EXPIRED, the next favourable poll nudged the same farmer again. REQ-NUDGE-011 promised "max 2 per farmer per day", which was never implemented.
 - **Send window.** NudgeSender now sends only between 06:00 and 19:00 Asia/Kolkata (fixed UTC+5:30), set by the stack parameters `NudgeSendWindowStartHour` and `NudgeSendWindowEndHour`. Outside the window, each farmer who passed every other gate is skipped and counted in a new `NudgesDeferred` metric; the next poll inside the window sends. An unreadable or inverted window sends nothing. The 6-hour schedule is unchanged, and reminders are not affected.
 - **Cooldown.** `NUDGE_COOLDOWN_DAYS` (default 7) blocks a new nudge for the same farmer and activity within that many days of the last DONE or EXPIRED nudge. Close time is `completedAt` for DONE and the new `expiredAt` for EXPIRED, which both expiry paths (T+72h auto-expiry and a final "not yet") now record. Older EXPIRED rows without it count from creation + 72 hours. An unreadable close time blocks.
 - **Demo path.** `scripts/test-complete-flow.sh` invokes the weather poller with `{"force": true}`; the poller passes it through the state machine to NudgeSender, which then skips the window and cooldown only. Consent, allowlist, visitor, onboarding and open-nudge gates still apply. Only a JSON boolean `true` forces.
-- REQ-NUDGE-011 rewritten to state these rules. 31 new tests: 27 failed before the change, and 4 pin behaviour that must not change (6-hour schedule, state machine passes its full input, no force without a boolean `true`); full suite 883 passed, 30 skipped; `sam validate --lint` clean.
+- **Regression (deployed):** the window/cooldown change took one `now` before the farmer loop and built every `nudge_id` from it. Schedule names come only from `nudge_id`, so the second farmer in a district hit `ConflictException` on create_schedule (logged as "already exists (OK)"). Only the first farmer got T+24h/T+48h reminders and T+72h expiry; the others got the nudge with no follow-up, and a DONE from any of them deleted the first farmer's timers. Fix (not deployed): stamp each farmer inside the loop with `_utcnow()` plus a per-send microsecond offset so ids stay distinct when the clock does not advance; the single `now` is still used only for the send-window and cooldown decisions. Schedule name format unchanged.
+- REQ-NUDGE-011 rewritten to state these rules. Tests include the two-farmer distinct-id case; `sam validate --lint` clean.
 
 ---
 
