@@ -41,6 +41,8 @@ Parameters:
   BedrockModelId:
     Type: String
     Default: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+    AllowedPattern: '^[a-z]+\.[a-z0-9-]+\.[A-Za-z0-9:_-]+$'
+    ConstraintDescription: A cross-region inference profile ID such as us.anthropic.<model>; IAM derives the foundation-model ARN from it.
     Description: >-
       Bedrock inference profile ID for RAG (RetrieveAndGenerate) and vision
       (InvokeModel). Use an active profile from list-inference-profiles.
@@ -462,12 +464,26 @@ Resources:
                 - bedrock:InvokeModel
                 - bedrock:InvokeModelWithResponseStream
                 - bedrock:GetInferenceProfile
-                - bedrock:ListInferenceProfiles
-                - bedrock:RetrieveAndGenerate
+              Resource:
+                - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModelId}
+                # A cross-region profile invokes the model in each of its regions.
+                - !Sub
+                  - arn:aws:bedrock:*::foundation-model/${Provider}.${Model}
+                  - Provider: !Select [1, !Split [".", !Ref BedrockModelId]]
+                    Model: !Select [2, !Split [".", !Ref BedrockModelId]]
+            - Effect: Allow
+              Action:
                 - bedrock:Retrieve
+              Resource: !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/${KnowledgeBaseId}
+            - Effect: Allow
+              Action:
                 - bedrock:ApplyGuardrail
-                - bedrock-agent:Retrieve
-                - bedrock-agent:RetrieveAndGenerate
+              Resource: !Sub
+                - arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:guardrail/${Gid}
+                - Gid: !If [UseExternalGuardrail, !Ref GuardrailId, !GetAtt AgriNexusContentGuardrail.GuardrailId]
+            - Effect: Allow
+              Action:
+                - bedrock:RetrieveAndGenerate  # supports no resource-level permissions
               Resource: '*'
       Events:
         WebChatPost:
@@ -546,12 +562,28 @@ Resources:
                 - bedrock:InvokeModel
                 - bedrock:InvokeModelWithResponseStream
                 - bedrock:GetInferenceProfile
-                - bedrock:ListInferenceProfiles
-                - bedrock:RetrieveAndGenerate
+              Resource:
+                - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModelId}
+                # A cross-region profile invokes the model in each of its regions.
+                - !Sub
+                  - arn:aws:bedrock:*::foundation-model/${Provider}.${Model}
+                  - Provider: !Select [1, !Split [".", !Ref BedrockModelId]]
+                    Model: !Select [2, !Split [".", !Ref BedrockModelId]]
+                # Photo relevance check (analyzer RELEVANCE_MODEL_ID)
+                - !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0
+            - Effect: Allow
+              Action:
                 - bedrock:Retrieve
+              Resource: !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/${KnowledgeBaseId}
+            - Effect: Allow
+              Action:
                 - bedrock:ApplyGuardrail
-                - bedrock-agent:Retrieve
-                - bedrock-agent:RetrieveAndGenerate
+              Resource: !Sub
+                - arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:guardrail/${Gid}
+                - Gid: !If [UseExternalGuardrail, !Ref GuardrailId, !GetAtt AgriNexusContentGuardrail.GuardrailId]
+            - Effect: Allow
+              Action:
+                - bedrock:RetrieveAndGenerate  # supports no resource-level permissions
               Resource: '*'
             - Effect: Allow
               Action:
@@ -615,12 +647,28 @@ Resources:
                 - bedrock:InvokeModel
                 - bedrock:InvokeModelWithResponseStream
                 - bedrock:GetInferenceProfile
-                - bedrock:ListInferenceProfiles
-                - bedrock:RetrieveAndGenerate
+              Resource:
+                - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModelId}
+                # A cross-region profile invokes the model in each of its regions.
+                - !Sub
+                  - arn:aws:bedrock:*::foundation-model/${Provider}.${Model}
+                  - Provider: !Select [1, !Split [".", !Ref BedrockModelId]]
+                    Model: !Select [2, !Split [".", !Ref BedrockModelId]]
+                # Photo relevance check (analyzer RELEVANCE_MODEL_ID)
+                - !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-haiku-20240307-v1:0
+            - Effect: Allow
+              Action:
                 - bedrock:Retrieve
+              Resource: !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/${KnowledgeBaseId}
+            - Effect: Allow
+              Action:
                 - bedrock:ApplyGuardrail
-                - bedrock-agent:Retrieve
-                - bedrock-agent:RetrieveAndGenerate
+              Resource: !Sub
+                - arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:guardrail/${Gid}
+                - Gid: !If [UseExternalGuardrail, !Ref GuardrailId, !GetAtt AgriNexusContentGuardrail.GuardrailId]
+            - Effect: Allow
+              Action:
+                - bedrock:RetrieveAndGenerate  # supports no resource-level permissions
               Resource: '*'
             - Effect: Allow
               Action:
@@ -803,7 +851,9 @@ Resources:
             - Effect: Allow
               Action:
                 - scheduler:CreateSchedule
-              Resource: '*'
+              Resource:
+                - !Sub arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/default/reminder-*
+                - !Sub arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/default/expiry-*
             - Effect: Allow
               Action:
                 - iam:PassRole
@@ -871,7 +921,9 @@ Resources:
               Action:
                 - scheduler:DeleteSchedule
                 - scheduler:GetSchedule
-              Resource: '*'
+              Resource:
+                - !Sub arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/default/reminder-*
+                - !Sub arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/default/expiry-*
             - Effect: Allow
               Action:
                 - dynamodb:GetRecords

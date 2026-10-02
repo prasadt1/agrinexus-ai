@@ -1,4 +1,5 @@
 """Queue and stream failure handling declared in template.yaml."""
+import json
 from pathlib import Path
 
 import yaml
@@ -83,3 +84,36 @@ def test_every_per_user_media_prefix_expires():
     rules = _resources()["TempAudioBucket"]["Properties"]["LifecycleConfiguration"]["Rules"]
     expiring = {r["Prefix"] for r in rules if r["Status"] == "Enabled" and r.get("ExpirationInDays")}
     assert {"images/", "voice/", "voice-output/"} <= expiring
+
+
+# Actions with no resource-level permissions (AWS service reference), or where a scoped
+# resource was denied in a live session-policy probe (polly with no lexicon).
+WILDCARD_ONLY = {"bedrock:RetrieveAndGenerate", "polly:SynthesizeSpeech",
+                 "transcribe:StartTranscriptionJob", "transcribe:GetTranscriptionJob", "transcribe:DeleteTranscriptionJob"}
+
+
+def test_no_wildcard_resource_for_scopable_actions():
+    for fn in ("WebChatHandler", "MessageProcessor", "BetaMessageProcessor", "NudgeSender", "ResponseDetector"):
+        for s in _statements(fn):
+            if s["Resource"] in ("*", ["*"]):
+                assert set(s["Action"]) <= WILDCARD_ONLY, (fn, s["Action"])
+
+
+def test_bedrock_resources_are_the_model_kb_and_guardrail():
+    for fn in ("WebChatHandler", "MessageProcessor", "BetaMessageProcessor"):
+        stmts = _statements(fn)
+        by_action = {a: s for s in stmts for a in s["Action"]}
+        assert "bedrock:ListInferenceProfiles" not in by_action
+        assert not any(a.startswith("bedrock-agent:") for a in by_action)
+        assert "knowledge-base/${KnowledgeBaseId}" in json.dumps(by_action["bedrock:Retrieve"]["Resource"])
+        assert "guardrail/${Gid}" in json.dumps(by_action["bedrock:ApplyGuardrail"]["Resource"])
+        invoke = json.dumps(by_action["bedrock:InvokeModel"]["Resource"])
+        assert "inference-profile/${BedrockModelId}" in invoke and "foundation-model/${Provider}.${Model}" in invoke
+
+
+def test_scheduler_actions_limited_to_nudge_schedules():
+    for fn in ("NudgeSender", "ResponseDetector", "ReminderSender"):
+        for s in _statements(fn):
+            if any(a.startswith("scheduler:") for a in s["Action"]):
+                res = s["Resource"] if isinstance(s["Resource"], list) else [s["Resource"]]
+                assert sorted(r["Sub"].rsplit("/", 1)[-1] for r in res) == ["expiry-*", "reminder-*"], fn
