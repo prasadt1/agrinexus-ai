@@ -37,10 +37,24 @@ class TestIsApprovedUser:
         assert is_approved_user(table, "491234") is True
 
     def test_user_not_in_table(self):
-        """When get_item returns no Item, approved defaults to True (fail-open for missing rows)."""
+        """No allowlist row means not approved."""
         table = types.SimpleNamespace(get_item=lambda Key: {})
-        # Code uses .get("approved", True) on empty dict → True
+        assert is_approved_user(table, "491234") is False
+
+    @pytest.mark.parametrize("expires_at", ["2020-01-01T00:00:00", "2020-01-01T00:00:00Z", "2020-01-01T00:00:00+05:30"])
+    def test_expired_entry_is_not_approved(self, expires_at):
+        table = types.SimpleNamespace(get_item=lambda Key: {"Item": {"approved": True, "expires_at": expires_at}})
+        assert is_approved_user(table, "491234") is False
+
+    @pytest.mark.parametrize("expires_at", ["2999-01-01T00:00:00", "2999-01-01T00:00:00Z", "2999-01-01"])
+    def test_unexpired_entry_is_approved(self, expires_at):
+        table = types.SimpleNamespace(get_item=lambda Key: {"Item": {"approved": True, "expires_at": expires_at}})
         assert is_approved_user(table, "491234") is True
+
+    @pytest.mark.parametrize("expires_at", ["soon", 12345, ""])
+    def test_unreadable_expiry_fails_closed(self, expires_at):
+        table = types.SimpleNamespace(get_item=lambda Key: {"Item": {"approved": True, "expires_at": expires_at}})
+        assert is_approved_user(table, "491234") is False
 
     def test_explicitly_not_approved(self):
         table = types.SimpleNamespace(

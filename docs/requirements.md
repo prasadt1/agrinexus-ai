@@ -239,7 +239,7 @@ The product identifies the pest or problem and gives non-chemical steps. It does
 
 **REQ-VISITOR-008**: The system shall enforce a per-visitor daily answer cap and a global daily visitor answer cap (SAM parameters; defaults 10 and 300); on either cap, it shall send one fixed message and shall not call Bedrock.
 
-**REQ-VISITOR-009**: Allowlisted numbers shall be exempt from visitor caps.
+**REQ-VISITOR-009** (amended 2 Oct 2026): Allowlisted numbers shall be exempt from visitor caps. A number counts as allowlisted only while it has an approved allowlist row whose `expires_at`, if set, is in the future; a missing row, a past or unreadable `expires_at`, or a lookup error counts as not allowlisted.
 
 **REQ-VISITOR-010**: Visitor activity shall be counted separately and shall not increment farmer nudge sent/completed metrics.
 
