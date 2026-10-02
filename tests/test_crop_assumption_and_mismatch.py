@@ -260,7 +260,7 @@ def test_first_pass_prompt_keeps_crop_inference_but_drops_crop_photo_request(mon
 
 
 def test_prompt_separates_whitefly_from_aphid(monkeypatch):
-    """Whiteflies were being named aphids, and the pest name selects the pesticide."""
+    """Whiteflies were being named aphids; the pest name is what the farmer takes to the KVK."""
     from src.processor import analyzer as a
 
     seen = {}
@@ -286,10 +286,11 @@ def test_prompt_separates_whitefly_from_aphid(monkeypatch):
         assert "Whiteflies:" in prompt
         assert "Aphids:" in prompt
         assert "tiny white/green bugs in clusters" not in prompt
-        assert "advise confirming the pest" in prompt
-        # The caution needs its counterpart, or a clearly seen pest gets no product.
         assert "When you can identify the pest confidently, name it" in prompt
         assert "Only when two or more similar pests are genuinely possible" in prompt
+        assert "label rate" not in prompt
+        assert "NO PESTICIDES" in prompt
+        assert "refer the farmer to the local KVK" in prompt
 
 
 def test_mismatched_tap_is_questioned_once(monkeypatch):

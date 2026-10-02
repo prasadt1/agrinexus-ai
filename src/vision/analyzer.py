@@ -537,10 +537,16 @@ CONFIDENCE LEVELS:
 - "medium": Crop features present but not definitive
 - "low": No distinguishing features
 
+NO PESTICIDES (applies to every field):
+- Never name a pesticide, insecticide, fungicide or herbicide product, brand, active ingredient, formulation (EC, SL, WG, SC, WP, SG) or any dose, quantity or dilution.
+- Give the pest or disease, the severity, and non-chemical steps the farmer can take today. For chemical control, refer the farmer to the local KVK for the right product and quantity.
+- Neem, yellow sticky traps and pheromone traps may be named as practices, without any quantity or dilution.
+
 REMEMBER:
 - Return raw JSON only (no ``` fences)
 - Title Case crops: "Cotton", "Wheat"
 - Never name crop unless visual evidence supports it
+- Never name a pesticide product, active ingredient, formulation or dose. Chemical control goes to the local KVK.
 """
     
     # Call Claude 3 Sonnet Vision

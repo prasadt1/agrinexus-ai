@@ -118,6 +118,25 @@ def test_last_image_override_is_filtered(processor):
     _assert_filtered(_last_reply(processor), "photo")
 
 
+def _kb_prompt(kwargs):
+    cfg = kwargs["retrieveAndGenerateConfiguration"]["knowledgeBaseConfiguration"]
+    return cfg["generationConfiguration"]["promptTemplate"]["textPromptTemplate"]
+
+
+def test_whatsapp_knowledge_base_prompt_forbids_products(processor):
+    seen = {}
+
+    def _rag(**kwargs):
+        seen.update(kwargs)
+        return {"output": {"text": "ok"}, "citations": [], "sessionId": "s"}
+
+    processor.bedrock_agent.retrieve_and_generate = _rag
+    processor.query_bedrock("Which spray for whitefly?", "mr")
+    prompt = _kb_prompt(seen)
+    assert "Never name a pesticide" in prompt and "even if the Context contains one" in prompt
+    assert "local KVK" in prompt
+
+
 @pytest.fixture()
 def webchat(monkeypatch):
     monkeypatch.setenv("TABLE_NAME", "t")
@@ -150,6 +169,27 @@ def _post(mod, body):
 def test_web_chat_text_answer_is_filtered(webchat):
     webchat.query_bedrock = lambda *_a, **_k: {"text": CHEM, "citations": []}
     _assert_filtered(_post(webchat, {"message": "Which spray for bollworm?", "language": "en"}), "answer")
+
+
+def test_web_chat_prompts_forbid_products(webchat):
+    seen = {}
+
+    def _rag(**kwargs):
+        seen.update(kwargs)
+        return {"output": {"text": "ok"}, "citations": []}
+
+    webchat.bedrock_agent = types.SimpleNamespace(retrieve_and_generate=_rag)
+    webchat.query_bedrock("Which spray for whitefly?", "en")
+    assert "Never name a pesticide" in _kb_prompt(seen)
+
+    def _invoke(**kwargs):
+        seen["vision"] = json.loads(kwargs["body"])["messages"][0]["content"][1]["text"]
+        return {"body": types.SimpleNamespace(read=lambda: json.dumps({"content": [{"text": "ok"}]}).encode())}
+
+    webchat.bedrock_runtime = types.SimpleNamespace(invoke_model=_invoke)
+    webchat._decode_image_payload = lambda _raw: ("image/jpeg", "x", b"x")
+    webchat.analyze_image("x", "mr")
+    assert "Never name a pesticide" in seen["vision"] and "local KVK" in seen["vision"]
 
 
 def test_web_chat_photo_answer_is_filtered(webchat):

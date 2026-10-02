@@ -431,6 +431,7 @@ IMPORTANT RESTRICTIONS:
 - If the question is about human health, medical issues, personal problems, or non-farming topics, respond: "I can only help with farming questions. Please ask about crops, pests, fertilizers, or farm management."
 - Do NOT provide medical advice, health recommendations, or personal counseling
 - Stay strictly within agricultural domain
+- Never name a pesticide, insecticide, fungicide or herbicide product, brand, active ingredient, formulation or dose, even if the Context contains one. Give the pest or disease and the non-chemical steps the farmer can take today; for chemical control, tell the farmer to contact their local KVK (Krishi Vigyan Kendra) for the right product and quantity.
 - NEVER invent or make up information not in the Context
 
 Question: $query$
@@ -518,7 +519,11 @@ def analyze_image(image_base64: str, dialect: str = 'en') -> str:
 Provide a brief and practical answer. If the image doesn't show a crop, describe what you see.'''
     }
 
-    prompt = prompts.get(dialect, prompts['en'])
+    prompt = prompts.get(dialect, prompts['en']) + (
+        "\n\nNever name a pesticide, insecticide, fungicide or herbicide product, brand, active ingredient, "
+        "formulation or dose. Give non-chemical steps the farmer can take today; for chemical control, "
+        "refer the farmer to the local KVK (Krishi Vigyan Kendra) for the right product and quantity."
+    )
 
     request_body = {
         "anthropic_version": "bedrock-2023-05-31",

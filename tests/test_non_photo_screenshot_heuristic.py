@@ -274,7 +274,7 @@ def test_processor_prompt_makes_visible_crop_evidence_win(monkeypatch):
     assert "VISUAL CROP EVIDENCE WINS" in prompt
     assert "cotton boll/fiber" in prompt
     assert "NO VISIBLE PROBLEM IS A VALID DIAGNOSIS" in prompt
-    assert "Do not recommend pesticides" in prompt
+    assert "Never name a pesticide" in prompt
     assert "assuming this is their" not in prompt
     assert "full actionable" not in prompt
 
