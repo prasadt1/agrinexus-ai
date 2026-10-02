@@ -4,6 +4,44 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 2 October 2026 — external review, phase 2 and hygiene (not deployed)
+
+Each item below has its own commit and a test that failed before the fix.
+
+### Message delivery
+- **Photo path had no guardrail.** Both `invoke_model` calls in `src/processor/analyzer.py` now carry the content guardrail. A guardrail intervention on a diagnosis sends only the localized farming-only refusal, on every photo route (first pass, assumed-crop second pass, crop-confirm tap). Probed against the live guardrail with sample photos E, F and G in Marathi and Hindi: none blocked. REQ-GUARD-015.
+- **Webhook dedup swallowed failed enqueues.** The WAMID claim is now deleted when the SQS send fails, and a failed voice enqueue raises instead of returning 200, so Meta's retry is processed.
+- **Webhook read only the first entry and change.** Every message in a batched delivery is queued, each with the metadata of its own change.
+- **Voice queue had no DLQ.** VoiceQueue now redrives to VoiceDLQ after 3 receives, like the text queues, and the DLQ handler sends the farmer the localized error.
+- **One bad stream record could stall DONE/NOT YET handling.** The ResponseDetector mapping retries twice, bisects, reports per-record failures and sends exhausted batches to `ResponseDetectorFailureQueue`. The handler skips malformed records (`MalformedStreamRecord` metric) and stops at the first failing record so later ones are not handled twice. Its role also lacked `cloudwatch:PutMetricData`, so `NudgesCompleted` had never been recorded.
+- **Empty interactive payloads reached Bedrock.** They are now skipped before the visitor cap, the ack and the knowledge base call.
+
+### Data and state
+- **Scheduler leak.** Reminder and expiry schedules delete themselves after firing (`ActionAfterCompletion=DELETE`), and the reminder Lambda deletes a nudge's remaining schedules on expiry or when the nudge is closed or missing. Dev had 145 leftover schedules; `scripts/delete-stale-nudge-schedules.py` (dry run: 141 stale) removes them and has not been run with `--apply`.
+- **Spoken replies kept indefinitely.** `voice-output/{phone}/` is now covered by DELETE MY DATA and by a 1-day lifecycle rule (36 objects in dev). REQ-PRIV-001 amended.
+- **`location_coords` stored `['lat','lon']`.** Profiles now store `[lat, lon]` as Decimals.
+- **Visitor cap refusal discarded the pending crop confirmation.** The cap is checked before the block that deletes the pending row.
+
+### Policy and access
+- **Allowlist failed open.** `is_approved_user` returned True for any number without an allowlist row, so every WhatsApp number got voice, photo diagnosis and nudges, and every visitor bypassed the daily caps. It now requires an approved row and enforces `expires_at`; anything else, including a lookup error, means not approved. **This changes live behaviour once deployed:** only allowlisted numbers get voice, photo and nudges, and visitors are capped. REQ-VISITOR-009 amended.
+- **Pesticide policy reply carried sources.** When a refused pesticide question is answered with the policy line, the refused answer's citations are no longer shown (WhatsApp source line, web chat `citations`). The KVK referral and Kisan Call Centre footer stay.
+- **IAM scoped.** `bedrock:InvokeModel` is limited to the inference profile and its foundation model (plus the Haiku relevance model on the processors), `Retrieve` to the knowledge base, `ApplyGuardrail` to the stack guardrail, scheduler actions to `reminder-*` and `expiry-*`. Verified with a session-policy probe against live Bedrock: every call the stack makes succeeded, and a control without the foundation-model ARN was denied. `bedrock:RetrieveAndGenerate` (no resource-level permissions) and `polly:SynthesizeSpeech` (a lexicon-scoped policy was denied) remain on `*`.
+- **Banned pesticides.** REQ-GUARD-001 promised input-side blocking that was never built; it now states the output-side guarantee. Making that true needed 29 of 43 names on India's CIB&RC banned list, and their Devanagari and Telugu spellings, added to the filter. On the stored replies the filter removes no sentence it kept before.
+
+### Docs and hygiene
+- README and the quality metrics doc now say 167 active requirements (169 defined, 2 retired or folded); `scripts/count_requirements.py` computes it and a test checks every stated count.
+- README no longer claims WAF on the webhook; WAF covers web chat only.
+- `src/vision/` and `src/voice/output.py` (not deployed) are deleted. The tests that imported them now test `src/processor/`.
+- CI runs the full suite (826 passed, 30 skipped in a clean Python 3.11 environment without AWS credentials).
+
+### Found during this work, not fixed
+- **Photo relevance check is dead.** Claude 3 Haiku has reached end of life, so `classify_image_relevance` always fails and returns `unclear`. In the last 14 days of logs every check did. Non-farming photos still reach the main vision model, which rejects them, but the cheap pre-check never runs. Needs a current model ID.
+- **Python 3.11 Lambda runtime.** `cfn-lint` reports it deprecated (June 2026), with function updates disabled from 31 August 2026. Deploys succeeded this week, but the runtime needs upgrading.
+- `scripts/delete-user-data.sh` (operator erasure) deletes no S3 media.
+- `BetaMessageDLQ` has no consumer, so failures on the beta queue get no farmer-facing error.
+
+---
+
 ## 2 October 2026 — external review, phase 1: weather fails closed, filter gaps (not deployed)
 
 An external code review verified these against source.
