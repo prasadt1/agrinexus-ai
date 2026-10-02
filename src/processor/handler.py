@@ -1347,9 +1347,10 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                     bucket = pending.get("bucket") or os.environ.get("TEMP_AUDIO_BUCKET")
                     key = pending.get("key")
                     if bucket and key:
+                        # Refuse before the try: its finally would drop the pending photo.
+                        if not _consume_visitor_or_refuse(from_number, profile, approved):
+                            continue
                         try:
-                            if not _consume_visitor_or_refuse(from_number, profile, approved):
-                                continue
                             obj = s3.get_object(Bucket=bucket, Key=key)
                             image_bytes = obj["Body"].read()
                             district = profile.get("district") or profile.get("location")

@@ -65,3 +65,21 @@ def test_empty_payload_never_reaches_bedrock_or_acks(message, kind):
     mod.query_bedrock = lambda *a, **k: (_ for _ in ()).throw(AssertionError("query_bedrock called"))
     _send(mod, message, kind)
     assert not any("received" in (m["text"] or "").lower() for m in sent)
+
+
+def test_visitor_cap_refusal_keeps_pending_crop_confirm(monkeypatch):
+    sent = []
+    visitor = {"onboarding_complete": True, "dialect": "en", "user_type": "visitor", "crop": "Cotton"}
+    mod = _load(sent, visitor)
+    monkeypatch.setattr(mod.visitor_mod, "is_visitor_profile", lambda p: True)
+    monkeypatch.setattr(mod, "is_approved_user", lambda *a, **k: False)
+    monkeypatch.setattr(mod.visitor_mod, "try_consume_visitor_answer", lambda *a, **k: (False, "user"))
+    monkeypatch.setattr(mod.visitor_mod, "emit_visitor_metric", lambda *a, **k: None)
+    key = (f"USER#{PHONE}", mod._PENDING_CROP_CONFIRM_SK)
+    mod.table._items[key] = {
+        "PK": key[0], "SK": key[1], "bucket": "tmp-bucket", "key": "images/p/1.jpg",
+        "profile_crop": "", "inferred_crop": "Cotton", "model_crop": "Cotton",
+    }
+    _send(mod, {"text": {"body": "Cotton"}}, "text")
+    assert any(m["text"] == mod.visitor_mod.CAP_MSG for m in sent)
+    assert key in mod.table._items
