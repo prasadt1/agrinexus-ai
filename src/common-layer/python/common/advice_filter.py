@@ -212,7 +212,10 @@ def _filter_line(line: str, hits: List[Tuple[str, Set[str]]]) -> Optional[str]:
             hits.append((seg.strip(), kinds))
             end = re.search(r"[।.?!॥]$", seg.strip())
             if end and kept:
-                kept[-1] = re.sub(r"[\s,;:]+$", "", kept[-1]) + end.group() + " "
+                prev = re.sub(r"[\s,;:]+$", "", kept[-1])
+                if not re.search(r"[।.?!॥]$", prev):
+                    prev += end.group()
+                kept[-1] = prev + " "
         else:
             kept.append(seg)
     if len(kept) == len(segments):

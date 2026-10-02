@@ -100,6 +100,12 @@ def test_dropped_step_that_ended_a_sentence_does_not_leave_a_dangling_comma():
     assert "२) पिवळे चिकट सापळे लावा. पानाच्या खालच्या बाजूला" in out
 
 
+def test_dropped_sentence_after_a_full_stop_does_not_double_it():
+    text = "आठवड्यातून एकदा १० झाडांवर पांढऱ्या माशींची संख्या तपासा. नीम तेल (Azadirachtin 1500 ppm) 2.5 लिटर/हेक्टर फवारा."
+    out = af.filter_advice(text, "mr", "test", add_referral=False)
+    assert out == "आठवड्यातून एकदा १० झाडांवर पांढऱ्या माशींची संख्या तपासा."
+
+
 def test_traps_and_field_sanitation_survive():
     out = af.filter_advice(LIVE_MR[2], "mr", "test", kind="photo")
     assert "शेतात फेरोमोन सापळे (८-१० प्रति एकर) लावावे." in out
