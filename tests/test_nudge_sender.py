@@ -364,6 +364,58 @@ class TestCooldown:
         assert out["nudges_sent"] == 1
 
 
+class TestPerFarmerNudgeIds:
+    def test_two_farmers_get_distinct_ids_and_schedules(self, sender, monkeypatch):
+        """Each farmer needs their own nudge_id; schedule names are global per account."""
+        farmers = [
+            {"phone_number": "491111", "dialect": "en"},
+            {"phone_number": "492222", "dialect": "en"},
+        ]
+        profile = {
+            "onboarding_complete": True, "consent": True, "crop": "Cotton",
+            "location": "Latur", "demo_tier": "full",
+        }
+        puts, schedules = [], []
+
+        def query(**kw):
+            if kw.get("IndexName") == "GSI1":
+                return {"Items": farmers}
+            return {"Items": []}
+
+        monkeypatch.setattr(sender, "table", types.SimpleNamespace(
+            query=query,
+            get_item=lambda **kw: {"Item": profile},
+            put_item=lambda **kw: puts.append(kw["Item"]),
+        ))
+        # Wall clock stuck: both farmers share an id if the handler stamps
+        # once before the loop (or reuses that single value for every farmer).
+        monkeypatch.setattr(sender, "_utcnow", lambda: NOW)
+        monkeypatch.setattr(sender, "emit_metric", lambda *a, **k: None)
+        monkeypatch.setattr(sender, "send_whatsapp_buttons", lambda *a, **k: True)
+        monkeypatch.setattr(sender.scheduler, "create_schedule",
+                            lambda **kw: schedules.append(kw) or {})
+
+        out = sender.lambda_handler(
+            {"location": "Latur", "weather": {"wind_speed": 5.0}, "activity": "spray"},
+            None,
+        )
+
+        assert out["nudges_sent"] == 2
+        ids = [item["SK"].removeprefix("NUDGE#") for item in puts]
+        assert len(ids) == 2 and ids[0] != ids[1]
+
+        assert len(schedules) == 6
+        names = [s["Name"] for s in schedules]
+        assert len(set(names)) == 6
+
+        for phone in ("491111", "492222"):
+            phone_schedules = [
+                s for s in schedules
+                if json.loads(s["Target"]["Input"]).get("phone_number") == phone
+            ]
+            assert len(phone_schedules) == 3
+
+
 class TestScheduleCleanup:
     @pytest.mark.parametrize("make", ["reminder", "expiry"])
     def test_one_shot_schedules_delete_themselves(self, sender, monkeypatch, make):
