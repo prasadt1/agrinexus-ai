@@ -70,6 +70,11 @@ def is_rag_refusal_response(text: str) -> bool:
         return True
     if "कृषि" in t and ("सिर्फ" in t and "सवाल" in t):
         return True
+    # Marathi (both spellings of ज्ञानकोश appear in model output)
+    if ("ज्ञानकोषात" in t or "ज्ञानकोशात" in t) and "नाही" in t:
+        return True
+    if "माझ्याकडे" in t and "माहिती नाही" in t:
+        return True
     return False
 
 

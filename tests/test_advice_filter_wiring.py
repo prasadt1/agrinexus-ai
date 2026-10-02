@@ -73,6 +73,28 @@ def test_whatsapp_text_answer_is_filtered(processor):
     _assert_filtered(_last_reply(processor), "answer")
 
 
+MR_REFUSAL = (
+    "मला या विषयाची माहिती माझ्या ज्ञानकोशात नाही. कृपया तुमच्या जवळच्या कृषी विज्ञान केंद्र (KVK) "
+    "किंवा कृषी विस्तार अधिकाऱ्यांशी संपर्क साधा."
+)
+
+
+def test_whatsapp_marathi_refusal_gets_no_source_line_or_second_referral(processor):
+    processor._profile["dialect"] = "mr"
+    processor.bedrock_agent.retrieve_and_generate = lambda **_k: {
+        "output": {"text": MR_REFUSAL}, "citations": [], "sessionId": "s"
+    }
+    _run(processor, "text", {"text": {"body": "कापसावरील पांढऱ्या माशीसाठी कोणते कीटकनाशक फवारावे?"}})
+    reply = _last_reply(processor)
+    assert reply.strip() == MR_REFUSAL
+
+
+def test_web_chat_marathi_refusal_gets_no_referral(webchat):
+    webchat.query_bedrock = lambda *_a, **_k: {"text": MR_REFUSAL, "citations": []}
+    reply = _post(webchat, {"message": "कापसावरील पांढऱ्या माशीसाठी कोणते कीटकनाशक फवारावे?", "language": "mr"})
+    assert reply.strip() == MR_REFUSAL
+
+
 def test_whatsapp_voice_answer_is_filtered_before_speech(processor):
     spoken = []
     processor.text_to_speech = lambda text, *_a, **_k: spoken.append(text) or None

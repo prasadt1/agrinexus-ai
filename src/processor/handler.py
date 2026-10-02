@@ -708,7 +708,7 @@ def is_rag_refusal_response(text: str) -> bool:
         "विशिष्ट जानकारी नहीं" in text or "जानकारी नहीं दी गई" in text
     ):
         return True
-    if "ज्ञानकोषात" in text and ("माहिती नाही" in text or "नाही" in text):
+    if ("ज्ञानकोषात" in text or "ज्ञानकोशात" in text) and "नाही" in text:
         return True
     if "माझ्याकडे" in text and "माहिती नाही" in text:
         return True
