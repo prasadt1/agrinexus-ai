@@ -156,7 +156,7 @@ pytest tests/ -v
 - **Least privilege IAM:** DynamoDB/S3/Bedrock resource-scoped, no wildcard `Resource: '*'`
 - **Cost controls:** $5/day cost alarm, SQS long polling, Lambda memory right-sizing
 - **Monitoring:** 8 CloudWatch alarms, X-Ray tracing, SNS alerts
-- **Security:** Meta HMAC-SHA256 verification, per-user rate limiting, WAF
+- **Security:** Meta HMAC-SHA256 verification and per-user rate limiting on the webhook; WAF on the web chat API only
 
 ---
 
