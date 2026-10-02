@@ -295,7 +295,7 @@ The product identifies the pest or problem and gives non-chemical steps. It does
 
 **REQ-ERROR-007**: If Claude Vision cannot analyze an image, then the system shall explain the issue in the user's dialect and provide guidance for better photos.
 
-**REQ-ERROR-008**: When the weather API is unavailable, the system shall use cached weather data and inform farmers that data may be outdated.
+**REQ-ERROR-008** (amended 2 Oct 2026): When the weather API key is missing, the request fails, or the response has no usable wind reading, the system shall treat that district as unfavorable (reason `weather_unavailable`), send no spray nudge for it in that cycle, and emit the `AgriNexus/Weather` `WeatherFetchFailed` metric. Demo weather shall be used only when `MOCK_WEATHER=true` is set explicitly, never as an error fallback.
 
 **REQ-ERROR-009**: The system shall gracefully handle unsupported message types (e.g., videos, documents) by informing the farmer of supported formats.
 

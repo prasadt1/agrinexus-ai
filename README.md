@@ -502,7 +502,7 @@ The production build made deliberate tradeoffs to keep running costs low. Callin
 
 3. **Single-region deployment**: Multi-region is architected but deployed single-region (us-east-1) for cost efficiency while it is a prototype. Failover and multi-region deployment patterns are documented in [docs/architecture.md](docs/architecture.md).
 
-4. **Weather API with demo fallback**: Production uses OpenWeatherMap via Secrets Manager. The `MOCK_WEATHER=true` flag exists for demo reliability and is explicitly logged so test traffic is never confused with production readings.
+4. **Weather API, fail closed**: Production uses OpenWeatherMap via Secrets Manager. If the key is missing, the request fails or the response has no wind reading, the district is treated as unfavorable, no spray nudge is sent, and `AgriNexus/Weather` `WeatherFetchFailed` is emitted. The `MOCK_WEATHER=true` flag exists for demo reliability, is set explicitly, and is logged so test traffic is never confused with production readings; it is never used as an error fallback.
    - **Setup**: Store the OpenWeatherMap API key in Secrets Manager (`WEATHER_API_KEY_SECRET`, e.g. `agrinexus/weather/api-key`) — never in `samconfig` or git. Set `MOCK_WEATHER=true` on the Weather Lambda only for deterministic demo weather. See [docs/guides/WEATHER-API-SETUP.md](docs/guides/WEATHER-API-SETUP.md).
 
 5. **WhatsApp test numbers limited**: Meta's WhatsApp Business test numbers don't support media (voice/images). End-to-end voice and vision testing requires a real WhatsApp Business number — which AgriNexus has provisioned for production.

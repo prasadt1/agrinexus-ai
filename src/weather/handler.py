@@ -1,8 +1,11 @@
 """
 Weather Poller
-Polls OpenWeatherMap for current conditions (or optional mock) and triggers the nudge
-workflow when spray conditions are favorable (wind < 10 km/h, no recent rain).
-Set MOCK_WEATHER=true for deterministic demo weather; production uses real API when key is set.
+Polls OpenWeatherMap for current conditions and triggers the nudge workflow when spray
+conditions are favorable (wind < 10 km/h, no recent rain).
+
+Fails closed: a missing key, request error or unusable response means no nudge for that
+district and an AgriNexus/Weather WeatherFetchFailed metric. Mock weather is used only
+when MOCK_WEATHER=true is set explicitly, never as an error fallback.
 """
 import json
 import os
@@ -14,6 +17,7 @@ import urllib.parse
 dynamodb = boto3.resource('dynamodb')
 stepfunctions = boto3.client('stepfunctions')
 secretsmanager = boto3.client('secretsmanager')
+cloudwatch = boto3.client('cloudwatch')
 
 TABLE_NAME = os.environ['TABLE_NAME']
 STATE_MACHINE_ARN = os.environ.get('STATE_MACHINE_ARN')
@@ -102,17 +106,41 @@ def check_weather_mock(location: str) -> Dict[str, Any]:
     }
 
 
+def _weather_unavailable(location: str, reason: str) -> Dict[str, Any]:
+    print(f"Weather unavailable for {location}: {reason}; no nudge this cycle")
+    try:
+        cloudwatch.put_metric_data(
+            Namespace='AgriNexus/Weather',
+            MetricData=[{
+                'MetricName': 'WeatherFetchFailed',
+                'Dimensions': [
+                    {'Name': 'Location', 'Value': location},
+                    {'Name': 'Reason', 'Value': reason},
+                ],
+                'Value': 1,
+                'Unit': 'Count',
+            }],
+        )
+    except Exception as e:
+        print(f"Weather: failed to emit WeatherFetchFailed metric: {e!r}")
+    return {
+        'location': location,
+        'coordinates': DISTRICT_COORDS.get(location),
+        'favorable': False,
+        'reason': 'weather_unavailable',
+        'mock': False,
+    }
+
+
 def check_weather_real(location: str) -> Dict[str, Any]:
-    """Fetch current weather from OpenWeatherMap; fall back to mock on missing key or HTTP errors."""
+    """Fetch current weather from OpenWeatherMap. Any failure is unfavorable."""
     coords = DISTRICT_COORDS.get(location)
     if not coords:
-        print(f"Weather: no coordinates for {location}, using mock")
-        return check_weather_mock(location)
-    
+        return _weather_unavailable(location, 'no_coordinates')
+
     weather_api_key = get_weather_api_key()
     if not weather_api_key:
-        print("Weather: WEATHER_API_KEY not available, using mock fallback")
-        return check_weather_mock(location)
+        return _weather_unavailable(location, 'missing_key')
 
     query = urllib.parse.urlencode({
         'lat': coords['lat'],
@@ -127,10 +155,13 @@ def check_weather_real(location: str) -> Dict[str, Any]:
         with urllib.request.urlopen(req, timeout=5) as response:
             data = json.loads(response.read())
     except Exception as e:
-        print(f"Weather: OpenWeatherMap request failed ({e!r}), using mock fallback")
-        return check_weather_mock(location)
+        print(f"Weather: OpenWeatherMap request failed ({e!r})")
+        return _weather_unavailable(location, 'request_error')
 
-    wind_mps = float(data.get('wind', {}).get('speed', 0))
+    try:
+        wind_mps = float(data['wind']['speed'])
+    except (KeyError, TypeError, ValueError):
+        return _weather_unavailable(location, 'bad_response')
     wind_kmh = wind_mps * 3.6
     rain_mm = 0
     if 'rain' in data:
@@ -171,6 +202,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     print(f"Checking weather for {len(locations)} locations")
 
     favorable_locations = []
+
+    if MOCK_WEATHER:
+        print("Weather poller: MOCK_WEATHER=true, using demo weather (not real conditions)")
 
     for location in locations:
         if MOCK_WEATHER:

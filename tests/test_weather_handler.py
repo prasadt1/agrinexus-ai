@@ -137,3 +137,107 @@ class TestRealWeatherParsing:
     def test_unfavorable_high_wind(self, weather_module):
         """Wind >= 10 km/h = not favorable."""
         assert 3 * 3.6 > 10  # 10.8 km/h, not favorable
+
+
+# ---------------------------------------------------------------------------
+# Fail closed: no real weather means no spray nudge
+# ---------------------------------------------------------------------------
+
+class _Metrics:
+    def __init__(self):
+        self.calls = []
+
+    def put_metric_data(self, **kw):
+        self.calls.append(kw)
+
+
+def _real_mode(weather_module, monkeypatch, *, key="key", urlopen=None):
+    monkeypatch.setattr(weather_module, "MOCK_WEATHER", False)
+    monkeypatch.setattr(weather_module, "get_unique_locations", lambda: ["Latur"])
+    monkeypatch.setattr(weather_module, "get_weather_api_key", lambda: key)
+    executions, metrics = [], _Metrics()
+    monkeypatch.setattr(weather_module, "stepfunctions",
+                        types.SimpleNamespace(start_execution=lambda **kw: executions.append(kw)))
+    monkeypatch.setattr(weather_module, "cloudwatch", metrics)
+    if urlopen is not None:
+        monkeypatch.setattr(weather_module.urllib.request, "urlopen", urlopen)
+    return executions, metrics
+
+
+def _failed_reasons(metrics):
+    out = []
+    for call in metrics.calls:
+        assert call["Namespace"] == "AgriNexus/Weather"
+        for d in call["MetricData"]:
+            assert d["MetricName"] == "WeatherFetchFailed"
+            out.append({x["Name"]: x["Value"] for x in d["Dimensions"]}["Reason"])
+    return out
+
+
+class _Resp:
+    def __init__(self, payload):
+        self._b = json.dumps(payload).encode()
+
+    def read(self):
+        return self._b
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+class TestFailClosed:
+    def test_missing_key_no_nudge_and_metric(self, weather_module, monkeypatch):
+        executions, metrics = _real_mode(weather_module, monkeypatch, key=None)
+        result = weather_module.lambda_handler({}, None)
+        assert executions == []
+        assert result["favorable_locations"] == 0
+        assert _failed_reasons(metrics) == ["missing_key"]
+
+    def test_http_error_no_nudge_and_metric(self, weather_module, monkeypatch):
+        def boom(*a, **k):
+            raise OSError("HTTP Error 401: Unauthorized")
+
+        executions, metrics = _real_mode(weather_module, monkeypatch, urlopen=boom)
+        result = weather_module.lambda_handler({}, None)
+        assert executions == []
+        assert result["favorable_locations"] == 0
+        assert _failed_reasons(metrics) == ["request_error"]
+
+    def test_response_without_wind_is_unavailable(self, weather_module, monkeypatch):
+        executions, metrics = _real_mode(
+            weather_module, monkeypatch, urlopen=lambda *a, **k: _Resp({"main": {"temp": 30}})
+        )
+        weather_module.lambda_handler({}, None)
+        assert executions == []
+        assert _failed_reasons(metrics) == ["bad_response"]
+
+    def test_unavailable_result_shape(self, weather_module, monkeypatch):
+        _real_mode(weather_module, monkeypatch, key=None)
+        w = weather_module.check_weather_real("Latur")
+        assert w["favorable"] is False
+        assert w["reason"] == "weather_unavailable"
+        assert w["mock"] is False
+
+    def test_unknown_district_is_unavailable_not_mock(self, weather_module, monkeypatch):
+        _real_mode(weather_module, monkeypatch)
+        w = weather_module.check_weather_real("UnknownCity")
+        assert w["favorable"] is False and w["reason"] == "weather_unavailable"
+        assert w["mock"] is False
+
+    def test_real_calm_dry_weather_still_nudges(self, weather_module, monkeypatch):
+        executions, metrics = _real_mode(
+            weather_module, monkeypatch,
+            urlopen=lambda *a, **k: _Resp({"wind": {"speed": 2}, "main": {"temp": 28, "humidity": 60}}),
+        )
+        result = weather_module.lambda_handler({}, None)
+        assert result["favorable_locations"] == 1 and len(executions) == 1
+        assert metrics.calls == []
+
+    def test_mock_never_reached_from_error_path(self, weather_module, monkeypatch):
+        _real_mode(weather_module, monkeypatch, key=None)
+        monkeypatch.setattr(weather_module, "check_weather_mock",
+                            lambda *_a: pytest.fail("mock reached from error path"))
+        weather_module.lambda_handler({}, None)

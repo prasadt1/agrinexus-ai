@@ -731,6 +731,7 @@ Resources:
             TableName: !Ref TableName
         - StepFunctionsExecutionPolicy:
             StateMachineName: !GetAtt NudgeStateMachine.Name
+        - CloudWatchPutMetricPolicy: {}
         - Statement:
             - Effect: Allow
               Action:
