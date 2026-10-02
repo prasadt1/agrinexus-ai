@@ -29,7 +29,7 @@ BEDROCK_MODEL_ID = os.environ.get(
     "BEDROCK_MODEL_ID",
     "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
 )
-RELEVANCE_MODEL_ID = os.environ.get("VISION_RELEVANCE_MODEL_ID") or "anthropic.claude-3-haiku-20240307-v1:0"
+RELEVANCE_MODEL_ID = os.environ.get("VISION_RELEVANCE_MODEL_ID") or "us.anthropic.claude-haiku-4-5-20251001-v1:0"
 
 
 def _guardrail_kwargs() -> Dict[str, str]:
@@ -90,8 +90,10 @@ def classify_image_relevance(image_bytes: bytes, dialect: str) -> Dict[str, Any]
             '  "confidence": "high" | "medium" | "low"\n'
             "}\n\n"
             "Guidelines:\n"
-            "- agri_photo: real photo of plant/leaf/crop/field/plant damage/pest on plant.\n"
-            "- not_agri: UI/screenshot, logo/graphic, document, selfie/person, animals, food, underwater, random objects.\n"
+            "- agri_photo: real photo of a plant, leaf, crop, fruit, boll, pod, grain, field or plant damage, or of an insect, "
+            "larva, caterpillar, mite or other crop pest, including close-ups where the pest fills the frame.\n"
+            "- not_agri: UI/screenshot, logo/graphic/diagram, document, selfie/person, livestock, pets or other animals that "
+            "are not crop pests, cooked food, underwater, random objects.\n"
             "- unclear: too blurry/dark/cropped to be sure.\n"
         )
 

@@ -145,6 +145,8 @@ The product identifies the pest or problem and gives non-chemical steps. It does
 
 **REQ-VIS-006**: One working happy path (cotton pest image → diagnosis in user's dialect) is sufficient for MVP demo.
 
+**REQ-VIS-007** (added 2 Oct 2026): Before diagnosis, the system shall classify each photo as farm photo, not a farm photo, or unclear, using a model that is in service on Bedrock. Photos of crop pests (insects, larvae, caterpillars, mites) shall count as farm photos. When the check errors or is blocked by the guardrail, the photo shall be treated as unclear and still pass through the diagnosis model's own non-photo check.
+
 ### 2.6 Behavioral Nudge Engine (Tier 1 - Full Depth)
 
 **REQ-NUDGE-001**: The system shall poll weather data via EventBridge scheduled rules at 6-hour intervals.

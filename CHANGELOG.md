@@ -4,6 +4,14 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 2 October 2026 — photo relevance check restored (not deployed)
+
+- **Relevance check ran on an end-of-life model.** `classify_image_relevance` called Claude 3 Haiku, which Bedrock now rejects ("This model version has reached the end of its life"), so every check returned `unclear`. It now uses the Claude Haiku 4.5 inference profile, set by the new stack parameter `RelevanceModelId` and passed to both processors as `VISION_RELEVANCE_MODEL_ID`. IAM on both processors is limited to that profile and its foundation model; a session-policy probe against live Bedrock succeeded 6 of 6 times, and a control without the foundation-model ARN was denied.
+- **Swapping the model alone would have blocked a real pest photo.** With the old prompt, Haiku 4.5 labelled the pink bollworm sample `not_agri`/`animal` with high confidence in 3 of 3 runs; confident `not_agri` is a hard block. The prompt now counts insects, larvae, caterpillars and mites on crops as farm photos and excludes crop pests from "animals". Live, 3 runs each: all 8 crop and pest photos `agri_photo`/high; logo, diagram and app screenshot `not_agri`/high; a WhatsApp screenshot containing a leaf photo `agri_photo`, which the diagnosis model's non-photo check still handles.
+- **Guardrail on the relevance call.** The guardrail's non-farming topic often intervenes when the model answers `not_agri`, and an intervention is read as `unclear`. The gate therefore mostly confirms farm photos and rarely hard-blocks; the diagnosis model stays the check for non-farm images. REQ-VIS-007 added (168 active requirements); ADR 0010 updated.
+
+---
+
 ## 2 October 2026 — external review, phase 2 and hygiene (deployed 2 October)
 
 Each item below has its own commit and a test that failed before the fix. Deployed together with phase 1 at 67cc97a; after the deploy the stale-schedule script ran with `--apply` and deleted 141 schedules, leaving 4.
@@ -35,7 +43,7 @@ Each item below has its own commit and a test that failed before the fix. Deploy
 - CI runs the full suite (826 passed, 30 skipped in a clean Python 3.11 environment without AWS credentials).
 
 ### Found during this work, not fixed
-- **Photo relevance check is dead.** Claude 3 Haiku has reached end of life, so `classify_image_relevance` always fails and returns `unclear`. In the last 14 days of logs all 15 checks did (all from the beta processor; the main processor logged none). Non-farming photos still reach the main vision model, which rejects them, but the cheap pre-check never runs. Needs a current model ID.
+- **Photo relevance check is dead.** Claude 3 Haiku has reached end of life, so `classify_image_relevance` always fails and returns `unclear`. In the last 14 days of logs all 15 checks did (all from the beta processor; the main processor logged none). Non-farming photos still reach the main vision model, which rejects them, but the cheap pre-check never runs. Fixed in the entry above.
 - **Nudge liner model.** `NUDGE_LINER_MODEL_ID` is also Claude 3 Haiku. The liner is off (`NUDGE_BEDROCK_LINER=false`) and falls back to the static hint on any error, so nothing is broken today, but enabling it would still send only the static hint until the model ID is changed.
 - **Advice filter can strip a non-chemical step.** On the deployed web chat, "which pesticide and dose for pink bollworm" removed one segment as a dose, and the reply kept the follow-on sentence "Repeat two more times at 30-day intervals" without the step it refers to. The reply was otherwise correct (no product, no dose, non-chemical steps, KVK, Kisan Call Centre).
 - **Python 3.11 Lambda runtime.** `cfn-lint` reports it deprecated (June 2026), with function updates disabled from 31 August 2026. Deploys succeeded this week, but the runtime needs upgrading.
