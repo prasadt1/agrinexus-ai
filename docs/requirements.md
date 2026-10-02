@@ -99,11 +99,11 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **REQ-GUARD-001**: The guardrails shall block 100% of requests for banned pesticides including Paraquat, Endosulfan, and other substances on India's banned list.
 
-**REQ-GUARD-002**: The system shall include explicit disclaimers when providing pesticide dosage information, directing farmers to read product labels.
+**REQ-GUARD-002** (retired 2 Oct 2026, superseded by REQ-GUARD-008): ~~The system shall include explicit disclaimers when providing pesticide dosage information, directing farmers to read product labels.~~
 
 **REQ-GUARD-003**: The system shall escalate to "contact your local Krishi Vigyan Kendra (KVK)" for severe infestations, unknown diseases, livestock health, and human health concerns.
 
-**REQ-GUARD-004**: The system shall not recommend specific pesticide brands or commercial products.
+**REQ-GUARD-004** (folded into REQ-GUARD-008, 2 Oct 2026): The system shall not recommend specific pesticide brands or commercial products.
 
 **REQ-GUARD-005**: The system shall include a disclaimer that advice is supplementary and does not replace professional agricultural extension services.
 
@@ -111,11 +111,29 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **REQ-GUARD-007**: The guardrail test suite shall include at minimum: 5 banned pesticide scenarios, 5 medical/veterinary advice attempts, 5 dosage-specific queries, 5 edge cases (e.g., mixing chemicals, organic certification claims).
 
+#### Identify and refer (added 2 Oct 2026)
+
+The product identifies the pest or problem and gives non-chemical steps. It does not name pesticide products or doses on any channel; chemical choice and rate are referred to the farmer's local KVK. The photo path has no retrieval and no citations, so any product name or rate it produced came from the model's own knowledge.
+
+**REQ-GUARD-008**: The system shall not include a pesticide product name, brand, active ingredient, formulation strength or application dose in any farmer-facing advice message on WhatsApp text, WhatsApp voice, WhatsApp photo, or web chat.
+
+**REQ-GUARD-009**: When a farmer-facing advice message is ready to send, the system shall pass it through the advice output filter before sending it and before converting it to speech.
+
+**REQ-GUARD-010**: If the output filter detects an active ingredient name, a brand, a formulation strength or a dilution in a sentence, then the system shall remove that sentence and keep the rest of the message. A bare quantity shall be removed only when the same sentence concerns spraying, mixing, a pesticide, neem or a trap.
+
+**REQ-GUARD-011**: When the output filter removes content, the system shall emit the CloudWatch metric `AgriNexus/Advice` `AdviceFilterHit` with the channel and the kind of match.
+
+**REQ-GUARD-012**: The system shall end every advice message with a line in the farmer's language stating that the answer is automated and can be wrong and directing the farmer to the nearest KVK for the pesticide and quantity, and shall carry any contact details in that same footer rather than adding a second one.
+
+**REQ-GUARD-013**: When a farmer asks which pesticide to use or how much, the system shall reply with the identification and non-chemical steps it can give plus the KVK referral, and shall not name a product.
+
+**REQ-GUARD-014**: The system may name neem, yellow sticky traps and pheromone traps as practices, and shall not state a quantity or dilution for them.
+
 ### 2.5 Visual Verification (Tier 2 - Working Implementation)
 
 **REQ-VIS-001**: When a farmer sends an image via WhatsApp, the system shall process it using Claude 3 Vision via direct invoke_model API (separate from the Bedrock Agent conversation flow).
 
-**REQ-VIS-002**: The system shall respond with diagnosis, confidence level, and recommended actions in the user's dialect.
+**REQ-VIS-002** (amended 2 Oct 2026): The system shall respond with diagnosis, severity, non-chemical steps, confidence and the KVK referral, in the user's dialect.
 
 **REQ-VIS-003**: When confidence is below 70%, the system shall request a clearer image with specific guidance in the user's dialect (e.g., Hindi: "Photo thoda paas se lein" / "Take a closer photo").
 

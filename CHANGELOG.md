@@ -4,6 +4,36 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 2 October 2026 — no pesticide recommendations: identify and refer (code; not deployed)
+
+### Decision
+The product identifies the pest and gives non-chemical steps. It does not name pesticide products or doses on any path. Chemical choice and rate are referred to the farmer's local KVK (Krishi Vigyan Kendra). This applies to photo, text and voice.
+
+### Why
+The photo path has no retrieval and no citations, so every product name and rate it gave came from the model's own knowledge (replays on 1–2 Oct: profenofos, emamectin benzoate, chlorpyrifos, imidacloprid, thiamethoxam, chlorantraniliprole, with rates and brand names such as Confidor and Actara). Naming a chemical carries the highest liability and the least differentiation. Pest identification is both defensible and the useful part.
+
+### What changed
+- **Output filter (the control).** New `common/advice_filter.py` in the common layer. Every farmer-facing advice message passes through it before it is sent and before Polly speaks it: WhatsApp text and voice answers, photo answers (direct, assumed-crop, crop-confirmed, visitor sample, last-image override), web chat text and photo answers, and the optional nudge liner. A sentence or numbered step is dropped if it names an active ingredient or brand (Latin, Devanagari, Telugu), gives a formulation strength (`50% EC`, `१७.८ एसएल`, `1500 ppm`) or a dilution (`2 मिली/लिटर`, `0.3 ml per litre`); Devanagari and Telugu digits are matched. A bare quantity is dropped only when the sentence is about spraying, mixing, a pesticide, neem or a trap, so fertilizer and irrigation amounts survive. Each removal logs a line and emits `AgriNexus/Advice` `AdviceFilterHit` by channel and kind.
+- **Referral line.** Every advice reply ends with, in the farmer's language: "This is an automated reading of your photo and it can be wrong. For the correct pesticide and quantity, contact your nearest KVK." Text and voice say "automated answer" instead. The contact comes from the existing district helpline block when the district is curated, otherwise the national Kisan Call Centre number; the buy-keyword footer is not added a second time. Crop questions and knowledge-base refusals carry no referral.
+- **Prompts (first line of defence).** The WhatsApp photo prompt no longer asks for a product with its label rate; it, both knowledge-base prompts and the web chat photo prompt now forbid product, ingredient, formulation and dose and ask for pest, severity and non-chemical steps.
+- **Permissions.** Neither processor, the web chat nor the nudge sender had `cloudwatch:PutMetricData`; all four now do. The existing `AgriNexus/Visitor` metrics were probably never recorded for the same reason (the namespace is empty).
+
+### Evidence
+- Unit tests feed every recommendation and reply stored in `docs/try/replays/` and the live Marathi replies, including `(५०० ग्रॅम निंबोळी १० लिटर पाण्यात)`, through the filter and assert no product, formulation or dose survives. Wiring tests drive each send path with chemical text from the model.
+- Photo replay against Bedrock, Marathi, profile Cotton (`docs/try/replays/2026-10-02-no-pesticide.json`): 5 first-pass and 2 crop-confirmed runs per photo. Pink bollworm (F) and whitefly (G) were named in 14/14; product 0/14, dose 0/14, non-chemical steps 14/14, referral 14/14. The model followed the new prompt in every run, so the filter had nothing to remove.
+- Text questions against the knowledge base (`docs/try/replays/2026-10-02-text-pesticide-question.json`): an explicit "which pesticide and how much" in English, Marathi and Hindi, plus "How do I control whitefly on cotton?", all returned no product and the referral. The filter removed two sentences: a Marathi "Azadirachtin 1500 ppm … 2.5 लिटर/हेक्टर" neem-product rate and a Hindi neem-leaf dilution.
+
+### Known limits
+- The filter drops the whole sentence, so a sentence that combines a trap and a neem dose loses the trap advice too (seen once in the Hindi text answer).
+- The ingredient list is finite. A product the list does not know, written without a dose or formulation, would pass; the metric and the stored replies are how new names get found.
+- Nudge copy still says "please spray" without naming a product; unchanged by decision.
+- The referral names the nearest KVK but gives no KVK phone number; no per-district KVK directory is loaded yet.
+
+### Requirements
+REQ-GUARD-008 to REQ-GUARD-014 added; REQ-GUARD-002 (dosage disclaimers) retired; REQ-GUARD-004 folded into 008; REQ-VIS-002 amended.
+
+---
+
 ## 1 October 2026 — crop identity asked only when it is in doubt (code; not deployed)
 
 ### What was wrong

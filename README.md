@@ -10,6 +10,8 @@
 
 **What I built.** An advisor that runs on the WhatsApp a farmer already has, no app install, grounded in [ICAR](https://icar.org.in/) + [FAO](https://www.fao.org/) research, responsive in Hindi / Marathi / Telugu / English, and most importantly — a closed accountability loop that follows up until the farmer confirms "हो गया" (done) or opts out.
 
+**What it refuses to do.** It does not recommend pesticides. It identifies the pest or problem and gives non-chemical steps the farmer can take today; for which chemical to use and how much, every reply sends the farmer to their nearest [KVK (Krishi Vigyan Kendra)](https://en.wikipedia.org/wiki/Krishi_Vigyan_Kendra), the district farm science centre run under ICAR. An output filter in code removes product names, active ingredients, formulation strengths and doses from every reply before it is sent or spoken, whatever the model writes.
+
 **Designed for scale.** Modeled at **[~$0.54 per farmer per year at 10,000 active farmers](#cost-breakdown)** on fully serverless AWS. Measured running cost in April 2026: about $1.70 a day. No app to install; onboarding is a few button taps in the farmer's language.
 
 **The differentiator.** The closed-loop nudge engine. Most agri-AI tools stop at delivering advice. AgriNexus tracks whether the advice was acted on — advice plus accountability, not just information.
@@ -176,6 +178,7 @@ AgriNexus is a deployed, functional prototype with production-grade observabilit
 | Encryption at rest | ✅ Active | DynamoDB default encryption |
 | Encryption in transit | ✅ Active | HTTPS only |
 | Data retention TTL | ✅ Active | Farmer conversations 90d / webhook MSG copies 7d / Nudges 180d / WAMID dedup 24h / **re:Invent visitor profile+MSG: 7d** (`VisitorTtlDays`) |
+| No pesticide recommendations | ⏳ Code ready 2 Oct 2026; not deployed | Every advice reply (WhatsApp text, voice, photo; web chat) passes through `common/advice_filter.py`, which drops sentences naming an active ingredient, brand, formulation or dose (Latin, Devanagari and Telugu) and ends the reply with a KVK referral. Each removal emits `AgriNexus/Advice` `AdviceFilterHit`. Requirements REQ-GUARD-008 to 014. |
 | Log retention | ✅ Active (set 27 Sept 2026) | CloudWatch Logs kept 90 days on all Lambda and canary log groups ([`scripts/set-log-retention.sh`](scripts/set-log-retention.sh)); previously never expired |
 
 ### Verification Note
@@ -235,7 +238,7 @@ Bot: कपास में कीटों को नियंत्रित �
 Send a voice note asking your question - it will be transcribed and answered.
 
 ### Image Analysis
-Send a photo of your crop - the bot will identify pests/diseases and provide recommendations.
+Send a photo of your crop - the bot identifies the pest or disease, says how severe it looks, and gives non-chemical steps. It does not name pesticides or doses; the reply ends with a referral to the nearest KVK for chemical control.
 
 ### Behavioral Nudges
 If you consent during onboarding, you'll receive weather-based spray reminders:
