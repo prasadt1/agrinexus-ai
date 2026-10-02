@@ -1430,12 +1430,14 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             result = query_bedrock(text, dialect, session_id=rag_session)
             
             response_text = result["text"]
-            if (
+            policy_reply = (
                 is_pesticide_question(text)
                 and is_rag_refusal_response(response_text)
                 and not result.get("kb_not_farming")
                 and not result.get("guardrail_localized")
-            ):
+            )
+            if policy_reply:
+                # Replaces a refused answer, so that answer's retrievals are not its source.
                 response_text = pesticide_policy(dialect)
             source_keywords = {
                 'hi': 'स्रोत:',
@@ -1449,7 +1451,7 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             response_text = strip_llm_xml_citation_tags(response_text)
             response_text = strip_source_lines(response_text)
 
-            if not is_rag_refusal_response(response_text):
+            if not policy_reply and not is_rag_refusal_response(response_text):
                 labels = source_labels_from_citations(result.get("citations"))
                 if labels:
                     max_show = 5

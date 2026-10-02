@@ -724,12 +724,14 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         result = query_bedrock(message, dialect)
 
         reply_text = result.get('text') or ''
-        if (
+        policy_reply = (
             is_pesticide_question(message)
             and is_rag_refusal_response(reply_text)
             and not result.get('kb_not_farming')
             and not result.get('guardrail_localized')
-        ):
+        )
+        if policy_reply:
+            # Replaces a refused answer, so that answer's retrievals are not its source.
             reply_text = pesticide_policy(dialect)
         reply_text = strip_llm_xml_citation_tags(reply_text)
         reply_text = strip_source_lines(reply_text)
@@ -740,7 +742,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         # Format citations
         citations = []
-        for citation in result.get('citations', []):
+        for citation in ([] if policy_reply else result.get('citations', [])):
             retrieved_refs = citation.get('retrievedReferences', [])
             for ref in retrieved_refs:
                 location = ref.get('location', {})
