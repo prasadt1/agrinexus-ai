@@ -110,7 +110,7 @@ Conditions:
 
 Globals:
   Function:
-    Runtime: python3.11
+    Runtime: python3.13
     Timeout: 30
     MemorySize: 512
     Tracing: Active  # Enable AWS X-Ray distributed tracing
@@ -199,7 +199,7 @@ Resources:
       Description: Common utilities for WhatsApp integration (caching, PII redaction, district helplines)
       ContentUri: src/common-layer/
       CompatibleRuntimes:
-        - python3.11
+        - python3.13
 
   # ============================================================================
   # Note: WhatsApp secrets are already created in Secrets Manager:

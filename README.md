@@ -37,7 +37,7 @@
 [![AWS Serverless](https://img.shields.io/badge/AWS-Serverless-232F3E?logo=amazonaws&logoColor=white)](https://aws.amazon.com/serverless/)
 [![Amazon Bedrock](https://img.shields.io/badge/Amazon%20Bedrock-Claude%20(BedrockModelId)-FF9900?logo=amazonaws&logoColor=white)](https://aws.amazon.com/bedrock/)
 [![WhatsApp Business Platform](https://img.shields.io/badge/WhatsApp-Business%20Platform-25D366?logo=whatsapp&logoColor=white)](https://www.whatsapp.com/business/platform/)
-[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![AWS SQS](https://img.shields.io/badge/AWS-SQS-232F3E?logo=amazonaws&logoColor=white)](https://aws.amazon.com/sqs/)
 [![AWS DynamoDB](https://img.shields.io/badge/AWS-DynamoDB-4053D6?logo=amazondynamodb&logoColor=white)](https://aws.amazon.com/dynamodb/)
 [![Kiro](https://img.shields.io/badge/Kiro-Requirements%20to%20Code-6E56CF)](https://kiro.ai/)

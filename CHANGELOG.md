@@ -4,6 +4,12 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 2 October 2026 — Lambda runtime Python 3.13 (not deployed)
+
+- **Runtime was past its update cut-off.** Every function and the common layer ran `python3.11`, which AWS deprecated on 30 June 2026 with function updates disabled from 31 August 2026; `sam validate --lint` failed on it, so the lint step at the end of CI failed too. All functions (one global setting, no per-function overrides) and the layer now use `python3.13`, and CI tests on 3.13. In a clean Python 3.13 environment without AWS credentials the suite passes (839 passed, 30 skipped) and the template lints clean. `sam build` packages Pillow 11.3.0 as the `cp313` manylinux x86_64 wheel. Remaining 3.13 warnings are deprecations only (`datetime.utcnow`, `utcfromtimestamp`). A test keeps functions, layer and CI on one supported version.
+
+---
+
 ## 2 October 2026 — photo relevance check restored (not deployed)
 
 - **Relevance check ran on an end-of-life model.** `classify_image_relevance` called Claude 3 Haiku, which Bedrock now rejects ("This model version has reached the end of its life"), so every check returned `unclear`. It now uses the Claude Haiku 4.5 inference profile, set by the new stack parameter `RelevanceModelId` and passed to both processors as `VISION_RELEVANCE_MODEL_ID`. IAM on both processors is limited to that profile and its foundation model; a session-policy probe against live Bedrock succeeded 6 of 6 times, and a control without the foundation-model ARN was denied.
@@ -46,7 +52,7 @@ Each item below has its own commit and a test that failed before the fix. Deploy
 - **Photo relevance check is dead.** Claude 3 Haiku has reached end of life, so `classify_image_relevance` always fails and returns `unclear`. In the last 14 days of logs all 15 checks did (all from the beta processor; the main processor logged none). Non-farming photos still reach the main vision model, which rejects them, but the cheap pre-check never runs. Fixed in the entry above.
 - **Nudge liner model.** `NUDGE_LINER_MODEL_ID` is also Claude 3 Haiku. The liner is off (`NUDGE_BEDROCK_LINER=false`) and falls back to the static hint on any error, so nothing is broken today, but enabling it would still send only the static hint until the model ID is changed.
 - **Advice filter can strip a non-chemical step.** On the deployed web chat, "which pesticide and dose for pink bollworm" removed one segment as a dose, and the reply kept the follow-on sentence "Repeat two more times at 30-day intervals" without the step it refers to. The reply was otherwise correct (no product, no dose, non-chemical steps, KVK, Kisan Call Centre).
-- **Python 3.11 Lambda runtime.** `cfn-lint` reports it deprecated (June 2026), with function updates disabled from 31 August 2026. Deploys succeeded this week, but the runtime needs upgrading.
+- **Python 3.11 Lambda runtime.** `cfn-lint` reports it deprecated (June 2026), with function updates disabled from 31 August 2026. Deploys succeeded this week, but the runtime needs upgrading. Fixed in the Python 3.13 entry above.
 - `scripts/delete-user-data.sh` (operator erasure) deletes no S3 media.
 - `BetaMessageDLQ` has no consumer, so failures on the beta queue get no farmer-facing error.
 
