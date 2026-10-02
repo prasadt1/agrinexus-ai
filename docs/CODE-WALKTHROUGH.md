@@ -68,7 +68,7 @@ Key responsibilities:
 - Start Transcribe job + poll
 - Queue transcript into `MessageQueue`
 
-### 3.4 Vision Analyzer (`src/vision/analyzer.py`)
+### 3.4 Vision Analyzer (`src/processor/analyzer.py`)
 **Purpose**: Diagnose crop images.
 
 Key responsibilities:

@@ -57,7 +57,7 @@ AgriNexus AI demonstrates **production-grade implementation quality** across tes
 | `common/district_helplines.py` | `test_district_helplines.py`, `test_district_helplines_extended.py` | 34+ | Helpline data, buy-keyword detection, footer append |
 | `src/nudge/` (flow) | `test_nudge_flow.py` | 10+ | Dedup, context-aware messages, template fallback |
 | `src/processor/` | `test_e2e_happy_path_mocked.py` | 1 | Full webhook→processor→response flow |
-| `src/vision/` | `test_vision_quality_gate.py`, `test_non_photo_screenshot_heuristic.py`, `test_pest_macro_crop_prompt.py`, `test_crop_override_confirmation_flow.py` | 15+ | Quality gates, non-photo detection, crop confirmation |
+| `src/processor/analyzer.py` (vision) | `tests/vision/`, `test_vision_quality_gate.py`, `test_non_photo_screenshot_heuristic.py`, `test_pest_macro_crop_prompt.py`, `test_crop_override_confirmation_flow.py` | 15+ | Quality gates, non-photo detection, crop confirmation |
 | RAG quality | `test_golden_questions.py`, `test_golden_questions_realistic.py` | 50+ | 4-language golden questions, hallucination prevention |
 | Voice pipeline | `test_voice_*.py` (4 files) | 4+ | Transcribe, Polly, end-to-end round-trip |
 

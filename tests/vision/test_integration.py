@@ -4,9 +4,9 @@ import os
 # Set env before importing analyzer (module reads at import time)
 os.environ['TEMP_AUDIO_BUCKET'] = 'test-bucket'
 
-from src.vision.analyzer import process_image_message
-from src.vision.enforcement import enforce_message_safety
-from src.vision.messages import get_safe_structured_template
+from src.processor.analyzer import process_image_message
+from src.processor.enforcement import enforce_message_safety
+from src.processor.messages import get_safe_structured_template
 from tests.vision.test_heuristics import generate_dark_github_screenshot, generate_cotton_boll_photo
 
 
@@ -16,7 +16,7 @@ def test_screenshot_blocked_before_vision_call():
     user_profile = {'dialect': 'en', 'crop': 'cotton', 'phone_number': '1234567890'}
 
     # Mock download to return screenshot
-    import src.vision.analyzer as analyzer
+    import src.processor.analyzer as analyzer
     original_download = analyzer.download_whatsapp_image
     original_s3_put = analyzer.s3.put_object
 
@@ -45,7 +45,7 @@ def test_cotton_boll_passes_to_vision():
     """Real cotton boll should pass heuristics, call vision model"""
     # This test will need vision model mocking
     # For now, just verify heuristics don't block it
-    from src.vision.heuristics import run_heuristics
+    from src.processor.heuristics import run_heuristics
 
     image_bytes = generate_cotton_boll_photo()
     heuristics_result = run_heuristics(image_bytes)
@@ -79,7 +79,7 @@ def test_full_3_layer_defense_screenshot():
     user_profile = {'dialect': 'en', 'crop': 'wheat', 'phone_number': '9876543210'}
 
     # Mock download
-    import src.vision.analyzer as analyzer
+    import src.processor.analyzer as analyzer
     original = analyzer.download_whatsapp_image
     original_s3 = analyzer.s3.put_object
 
@@ -109,7 +109,7 @@ def test_full_3_layer_defense_real_crop_low_confidence():
     """Full integration: real crop but low confidence → safe template"""
     # This would require mocking Bedrock, which is complex
     # For now, verify enforcement works independently
-    from src.vision.enforcement import enforce_message_safety
+    from src.processor.enforcement import enforce_message_safety
 
     vision = {
         'is_real_crop_photo': True,

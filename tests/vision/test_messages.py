@@ -1,5 +1,5 @@
 import pytest
-from src.vision.messages import get_safe_retake_message, get_block_message, get_error_message
+from src.processor.messages import get_safe_retake_message, get_block_message, get_error_message
 
 
 def test_safe_retake_message_hindi():

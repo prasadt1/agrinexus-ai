@@ -1,7 +1,7 @@
 # tests/vision/test_vision_schema.py
 import pytest
 import json
-from src.vision.analyzer import validate_vision_schema
+from src.processor.analyzer import validate_vision_schema
 
 
 def test_valid_schema_passes():
@@ -12,7 +12,8 @@ def test_valid_schema_passes():
         'crop_confidence': 'high',
         'visible_problem': True,
         'severity': 'medium',
-        'recommendations': 'Bollworm detected.'
+        'recommendations': 'Bollworm detected.',
+        'insects_visible': [],
     }
 
     # Should not raise
@@ -39,7 +40,8 @@ def test_invalid_crop_confidence_fails():
         'crop_confidence': 'maybe',  # Invalid
         'visible_problem': True,
         'severity': 'medium',
-        'recommendations': 'Test'
+        'recommendations': 'Test',
+        'insects_visible': [],
     }
 
     with pytest.raises(ValueError, match="Invalid crop_confidence"):
@@ -56,7 +58,8 @@ def test_fence_stripping_works():
     "crop_confidence": "high",
     "visible_problem": true,
     "severity": "medium",
-    "recommendations": "Test message"
+    "recommendations": "Test message",
+    "insects_visible": []
 }
 ```'''
 

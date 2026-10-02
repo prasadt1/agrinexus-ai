@@ -1,5 +1,5 @@
 import pytest
-from src.vision.heuristics import run_heuristics, _calculate_image_metrics
+from src.processor.heuristics import run_heuristics, _calculate_image_metrics
 
 
 def generate_dark_github_screenshot():

@@ -10,7 +10,7 @@ import json
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.voice.output import text_to_speech
+from src.processor.output import text_to_speech
 import boto3
 
 transcribe = boto3.client('transcribe', region_name='us-east-1')

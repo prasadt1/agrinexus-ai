@@ -8,7 +8,7 @@ import os
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.voice.output import text_to_speech, get_polly_voice
+from src.processor.output import text_to_speech, get_polly_voice
 import boto3
 
 s3 = boto3.client('s3', region_name='us-east-1')
