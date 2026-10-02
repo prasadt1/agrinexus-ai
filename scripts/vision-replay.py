@@ -19,6 +19,10 @@ Usage:
 "names_product" matches a short list of common active ingredients (Latin and Marathi /
 Hindi spellings). "gives_dose" matches a rate such as "2 मिली/लिटर" or "0.3 ml/L", or a
 formulation code such as EC / SL / WG. Both are heuristics; check the stored text.
+
+Flags are taken twice: on the model's raw recommendations ("model_*", how often the
+prompt is ignored) and on "farmer_text", the reply after the same advice filter the
+handler applies before sending ("farmer_*"). The filter metric is stubbed, not sent.
 """
 from __future__ import annotations
 
@@ -56,6 +60,10 @@ ACTIVES = (
     "pyriproxyfen", "पायरीप्रॉक्सिफेन", "diafenthiuron", "डायफेन्थियुरॉन",
 )
 PHOTO_WORDS = ("फोटो", "photo")
+PEST_WORDS = {
+    "F": ("गुलाबी", "बोंडअळी", "बोंड अळी", "बॉलवर्म", "इल्ली", "इळ", "bollworm", "caterpillar", "larva"),
+    "G": ("पांढरी माशी", "पांढऱ्या माश", "व्हाईटफ्लाय", "whitefl"),
+}
 
 
 def _setup_env() -> None:
@@ -81,6 +89,30 @@ def _flags(recommendations: str) -> dict:
     }
 
 
+def _farmer_flags(photo: str, raw_rec: str, farmer_text: str, kind_referral: bool, dialect: str) -> dict:
+    from common import advice_filter, district_helplines
+
+    model = _flags(raw_rec)
+    farmer = _flags(farmer_text)
+    rec_line = next((l for l in farmer_text.split("\n") if "Recommendations" in l), "")
+    rec_body = rec_line.split(":*", 1)[-1].strip() if rec_line else ""
+    return {
+        "model_names_product": model["names_product"],
+        "model_gives_dose": model["gives_dose"],
+        "model_filter_kinds": sorted({k for s in re.split(r"(?<=[.।])\s+", raw_rec) for k in advice_filter.classify(s)}),
+        "farmer_names_product": farmer["names_product"] or any(
+            "active" in advice_filter.classify(l) for l in farmer_text.split("\n")
+        ),
+        "farmer_gives_dose": farmer["gives_dose"] or any(
+            advice_filter.classify(l) & {"dose", "formulation"} for l in farmer_text.split("\n")
+        ),
+        "farmer_pest_named": any(w in farmer_text.lower() for w in PEST_WORDS.get(photo, ())),
+        "farmer_non_chemical_steps": bool(rec_body) and rec_body != "—",
+        "farmer_referral": district_helplines.referral_line(dialect, "photo") in farmer_text,
+        "referral_expected": kind_referral,
+    }
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--photo", action="append", choices=sorted(PHOTOS), help="repeatable; default all")
@@ -95,6 +127,9 @@ def main() -> int:
     _setup_env()
     import analyzer  # noqa: E402
     from enforcement import format_crop_message  # noqa: E402
+    from common import advice_filter  # noqa: E402
+
+    advice_filter._cloudwatch = MagicMock()
 
     analyzer.TEMP_BUCKET = os.environ["TEMP_AUDIO_BUCKET"]
     fake_s3 = MagicMock()
@@ -128,6 +163,11 @@ def main() -> int:
         shown = calls[-1] if calls else {}
         pending = out.get("pending_crop_confirm") or {}
         rec = shown.get("recommendations") or ""
+        # Same call the handler makes before sending.
+        referral = not pending or bool(pending.get("assumed"))
+        farmer_text = advice_filter.filter_advice(
+            out.get("text") or "", args.dialect, "replay", kind="photo", district="Latur", add_referral=referral
+        )
         return {
             "branch": "ask" if out.get("buttons") else ("assume" if pending.get("assumed") else "direct"),
             "vision_calls": len(calls),
@@ -139,20 +179,26 @@ def main() -> int:
             "recommendations": rec,
             "confidence_text": shown.get("confidence_text"),
             "reply_text": out.get("text"),
+            "farmer_text": farmer_text,
             **_flags(rec),
+            **_farmer_flags(tag[0], rec, farmer_text, referral, args.dialect),
         }
 
-    def confirmed(image: bytes) -> dict:
+    def confirmed(image: bytes, photo: str) -> dict:
         v = vision_call(image, args.dialect, args.crop, district="Latur", confirmed_crop=True)
         rec = v.get("recommendations") or ""
+        reply = format_crop_message(v, args.crop, args.dialect, assumed=False)
+        farmer_text = advice_filter.filter_advice(reply, args.dialect, "replay", kind="photo", district="Latur")
         return {
             "inferred_crop": v.get("inferred_crop"),
             "insects_visible": v.get("insects_visible"),
             "diagnosis": v.get("diagnosis"),
             "recommendations": rec,
             "confidence_text": v.get("confidence_text"),
-            "reply_text": format_crop_message(v, args.crop, args.dialect, assumed=False),
+            "reply_text": reply,
+            "farmer_text": farmer_text,
             **_flags(rec),
+            **_farmer_flags(photo, rec, farmer_text, True, args.dialect),
         }
 
     photos = args.photo or sorted(PHOTOS)
@@ -165,7 +211,7 @@ def main() -> int:
     def run(job):
         path, name, i, image = job
         try:
-            r = first_pass(image, f"{name}{i}") if path == "first" else confirmed(image)
+            r = first_pass(image, f"{name}{i}") if path == "first" else confirmed(image, name)
         except Exception as e:
             r = {"error": f"{type(e).__name__}: {e}"}
         return {"photo": name, "path": path, "run": i + 1, **r}
@@ -199,9 +245,12 @@ def main() -> int:
                 insects[x] = insects.get(x, 0) + 1
         def rates(rows):
             n = len(rows)
-            return (f"names_product={sum(r['names_product'] for r in rows)}/{n}"
-                    f"  gives_dose={sum(r['gives_dose'] for r in rows)}/{n}"
-                    f"  asks_photo={sum(r['asks_photo'] for r in rows)}/{n}")
+            c = lambda k: f"{sum(bool(r.get(k)) for r in rows)}/{n}"  # noqa: E731
+            return (f"model: product={c('model_names_product')} dose={c('model_gives_dose')}"
+                    f" filter_would_fire={sum(bool(r.get('model_filter_kinds')) for r in rows)}/{n}\n"
+                    f"              farmer: product={c('farmer_names_product')} dose={c('farmer_gives_dose')}"
+                    f" pest_named={c('farmer_pest_named')} non_chemical_steps={c('farmer_non_chemical_steps')}"
+                    f" referral={c('farmer_referral')} asks_photo={c('asks_photo')}")
 
         print(f"Photo {name}")
         print(f"  first pass  n={len(first)}  branches={branches}  inferred_crop={crops}")
