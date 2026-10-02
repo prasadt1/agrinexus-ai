@@ -553,6 +553,7 @@ Resources:
           Type: SQS
           Properties:
             Queue: !GetAtt MessageQueue.Arn
+            Enabled: true
             BatchSize: 1  # Process one message at a time to maintain strict ordering
 
   # ============================================================================
@@ -621,6 +622,7 @@ Resources:
           Type: SQS
           Properties:
             Queue: !GetAtt BetaMessageQueue.Arn
+            Enabled: true
             BatchSize: 1
 
   # ============================================================================
@@ -669,6 +671,7 @@ Resources:
           Type: SQS
           Properties:
             Queue: !GetAtt VoiceQueue.Arn
+            Enabled: true
             BatchSize: 1  # Process one voice note at a time
 
   # ============================================================================
@@ -702,6 +705,7 @@ Resources:
           Type: SQS
           Properties:
             Queue: !GetAtt MessageDLQ.Arn
+            Enabled: true
             BatchSize: 10
 
   # ============================================================================
