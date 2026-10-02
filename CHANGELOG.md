@@ -35,7 +35,7 @@ Each item below has its own commit and a test that failed before the fix.
 - CI runs the full suite (826 passed, 30 skipped in a clean Python 3.11 environment without AWS credentials).
 
 ### Found during this work, not fixed
-- **Photo relevance check is dead.** Claude 3 Haiku has reached end of life, so `classify_image_relevance` always fails and returns `unclear`. In the last 14 days of logs every check did. Non-farming photos still reach the main vision model, which rejects them, but the cheap pre-check never runs. Needs a current model ID.
+- **Photo relevance check is dead.** Claude 3 Haiku has reached end of life, so `classify_image_relevance` always fails and returns `unclear`. In the last 14 days of logs all 15 checks did (all from the beta processor; the main processor logged none). Non-farming photos still reach the main vision model, which rejects them, but the cheap pre-check never runs. Needs a current model ID.
 - **Python 3.11 Lambda runtime.** `cfn-lint` reports it deprecated (June 2026), with function updates disabled from 31 August 2026. Deploys succeeded this week, but the runtime needs upgrading.
 - `scripts/delete-user-data.sh` (operator erasure) deletes no S3 media.
 - `BetaMessageDLQ` has no consumer, so failures on the beta queue get no farmer-facing error.
