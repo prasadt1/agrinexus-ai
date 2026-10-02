@@ -164,6 +164,32 @@ def test_web_chat_answer_without_retrieved_documents_has_no_citations(webchat):
     assert "FAO/ICAR" not in body["reply"]
 
 
+MODEL_SOURCE = "**स्त्रोत:** ICAR-Central Institute for Cotton Research, Nagpur"
+KB_REF = {"retrievedReferences": [{"location": {"s3Location": {"uri": "s3://kb/cicr-cotton-ipm.pdf"}}}]}
+
+
+def test_whatsapp_model_written_source_removed_metadata_source_kept(processor):
+    processor.table = flow._FakeDynamoTable({**processor._profile, "dialect": "mr"})
+    processor.bedrock_agent.retrieve_and_generate = lambda **_k: {
+        "output": {"text": f"{SAFE_MR}\n\n{MODEL_SOURCE}"}, "citations": [KB_REF], "sessionId": "s"
+    }
+    _run(processor, "text", {"text": {"body": "पांढऱ्या माशीसाठी काय करावे?"}})
+    reply = _last_reply(processor)
+    assert "ICAR-Central Institute" not in reply
+    assert "स्त्रोत: cicr-cotton-ipm.pdf" in reply
+
+
+def test_web_chat_model_written_source_removed_metadata_source_kept(webchat):
+    webchat.query_bedrock = lambda *_a, **_k: {"text": f"{SAFE_MR}\n\n{MODEL_SOURCE}", "citations": [KB_REF]}
+    resp = webchat.lambda_handler(
+        {"httpMethod": "POST", "body": json.dumps({"message": "x", "language": "mr"}), "requestContext": {}},
+        None,
+    )
+    body = json.loads(resp["body"])
+    assert "ICAR-Central Institute" not in body["reply"]
+    assert body["citations"] == ["cicr-cotton-ipm.pdf"]
+
+
 def test_whatsapp_voice_answer_is_filtered_before_speech(processor):
     spoken = []
     processor.text_to_speech = lambda text, *_a, **_k: spoken.append(text) or None

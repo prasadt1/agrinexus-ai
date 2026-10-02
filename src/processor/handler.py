@@ -21,6 +21,7 @@ from common.whatsapp import send_whatsapp_message, send_whatsapp_list
 from common.whatsapp import send_whatsapp_buttons as _send_whatsapp_buttons
 from common.district_helplines import maybe_append_helpline_footer
 from common.advice_filter import filter_advice
+from common.source_line import strip_source_lines
 from common.allowlist import is_approved_user, allowlist_expiry_hint
 from common.redact import redact_phone
 from common.nudge_keywords import is_nudge_reply
@@ -1425,12 +1426,11 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             }
             source_keyword = source_keywords.get(dialect, 'Source:')
             
-            # Strip LLM citation artifacts; name a source only when a retrieved document is known
+            # Model-written source lines are removed; a source is named only from retrieval metadata
             response_text = strip_llm_xml_citation_tags(response_text)
-            response_text = strip_all_numeric_source_footers(response_text)
-            has_source = source_keyword in response_text
+            response_text = strip_source_lines(response_text)
 
-            if not has_source and not is_rag_refusal_response(response_text):
+            if not is_rag_refusal_response(response_text):
                 labels = source_labels_from_citations(result.get("citations"))
                 if labels:
                     max_show = 5

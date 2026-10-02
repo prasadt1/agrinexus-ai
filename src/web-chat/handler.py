@@ -23,6 +23,7 @@ from common.guardrail_reply import (
     apply_localized_guardrail_reply,
 )
 from common.advice_filter import filter_advice
+from common.source_line import strip_source_lines
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -724,7 +725,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Clean model output: remove placeholder "Source: 3" style leaks.
         reply_text = result.get('text') or ''
         reply_text = strip_llm_xml_citation_tags(reply_text)
-        reply_text = strip_all_numeric_source_footers(reply_text)
+        reply_text = strip_source_lines(reply_text)
         reply_text = filter_advice(
             reply_text, dialect, "web_text", kind="answer",
             add_referral=not is_rag_refusal_response(reply_text),
