@@ -623,6 +623,8 @@ NO PESTICIDES (applies to every field):
 - Give the pest or disease, the severity, and non-chemical steps the farmer can take today. The app ends every reply with a referral to the local KVK for chemical control, so do not write that referral yourself.
 - Neem, yellow sticky traps and pheromone traps may be named as practices, without any quantity or dilution.
 
+MARATHI TERMS: when writing Marathi, call a larva or caterpillar अळी (pink bollworm: गुलाबी बोंडअळी; bollworm: बोंडअळी), never इल्ली or इळी.
+
 **insects_visible RULES:**
 - List EVERY insect/creature you see (beetles, grasshoppers, caterpillars, moths, aphids, worms, etc.)
 - Even if tiny/small, LIST IT
