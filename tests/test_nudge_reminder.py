@@ -113,6 +113,20 @@ class TestReminderHandler:
         assert "expired" in result["message"].lower()
         assert len(updates) == 1
 
+    def test_expiry_records_when_it_closed(self, reminder, monkeypatch):
+        updates = []
+        monkeypatch.setattr(reminder, "table", types.SimpleNamespace(
+            get_item=lambda **kw: {"Item": {"status": "SENT"}},
+            update_item=lambda **kw: updates.append(kw),
+        ))
+        reminder.lambda_handler({
+            "phone_number": "491234", "nudge_id": "2026-04-20T10:00:00#spray", "reminder_type": "EXPIRY",
+        }, None)
+        values = updates[0]["ExpressionAttributeValues"]
+        assert "expiredAt" in updates[0]["UpdateExpression"]
+        stamp = next(v for k, v in values.items() if k != ":status")
+        assert stamp[:4].isdigit() and "T" in stamp
+
     def test_expiry_skips_if_already_done(self, reminder, monkeypatch):
         updates = []
         mock_table = types.SimpleNamespace(

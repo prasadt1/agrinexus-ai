@@ -152,3 +152,17 @@ class TestKeywordLists:
         en = [k.lower() for k in det.DONE_KEYWORDS["en"]]
         assert "done" in en
         assert "completed" in en
+
+
+def test_final_not_yet_records_when_the_nudge_closed(det, monkeypatch):
+    updates = []
+    monkeypatch.setattr(det, "table", types.SimpleNamespace(update_item=lambda **kw: updates.append(kw)))
+    monkeypatch.setattr(det, "get_active_nudges", lambda phone: [
+        {"SK": "NUDGE#2026-10-01T04:30:00#spray", "lastReminder": "T+48h", "status": "REMINDED"}
+    ])
+    monkeypatch.setattr(det, "get_user_dialect", lambda phone: "en")
+    monkeypatch.setattr(det, "delete_scheduled_reminders", lambda nudge_id: None)
+    monkeypatch.setattr(det, "send_whatsapp_message", lambda *a, **k: None)
+    det._handle_reply("USER#491234", "491234", "MSG#2026-10-03T05:00:00", "not yet")
+    assert updates and "expiredAt" in updates[0]["UpdateExpression"]
+    assert "2026-10-03T05:00:00" in updates[0]["ExpressionAttributeValues"].values()

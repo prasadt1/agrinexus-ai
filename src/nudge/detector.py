@@ -194,10 +194,11 @@ def _handle_reply(pk: str, phone_number: str, sk: str, text: str) -> None:
                         'PK': pk,
                         'SK': nudge_sk
                     },
-                    UpdateExpression='SET #status = :status',
+                    UpdateExpression='SET #status = :status, expiredAt = :expired',
                     ExpressionAttributeNames={'#status': 'status'},
                     ExpressionAttributeValues={
-                        ':status': 'EXPIRED'
+                        ':status': 'EXPIRED',
+                        ':expired': sk.replace('MSG#', '')
                     }
                 )
                 print(f"Marked nudge as EXPIRED (farmer declined after T+48h)")

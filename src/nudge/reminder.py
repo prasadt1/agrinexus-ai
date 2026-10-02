@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import boto3
+from datetime import datetime
 from typing import Dict, Any
 from common.whatsapp import send_whatsapp_message, send_whatsapp_buttons
 
@@ -59,10 +60,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'PK': f'USER#{phone_number}',
                     'SK': f'NUDGE#{nudge_id}'
                 },
-                UpdateExpression='SET #status = :status',
+                UpdateExpression='SET #status = :status, expiredAt = :expired',
                 ExpressionAttributeNames={'#status': 'status'},
                 ExpressionAttributeValues={
-                    ':status': 'EXPIRED'
+                    ':status': 'EXPIRED',
+                    ':expired': datetime.utcnow().isoformat()
                 }
             )
             print(f"Auto-expired nudge {nudge_id} (no response after T+48h)")
