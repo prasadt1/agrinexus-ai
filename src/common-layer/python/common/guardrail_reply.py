@@ -162,14 +162,14 @@ def apply_kb_no_answer(response: Dict[str, Any], dialect: str) -> Dict[str, Any]
     farmer's language and clear citations. Otherwise return response unchanged.
     """
     text = str(response.get("text") or "")
+    out = dict(response)
     if KB_NOT_FARMING_MARKER in text:
-        replacement = localized_guardrail_refusal(dialect)
+        out["text"] = localized_guardrail_refusal(dialect)
+        out["kb_not_farming"] = True
     elif KB_NO_ANSWER_MARKER in text or text.strip() == KB_DECLINE_FALLBACK_EN:
-        replacement = localized_no_answer(dialect)
+        out["text"] = localized_no_answer(dialect)
+        out["kb_no_answer"] = True
     else:
         return response
-    out = dict(response)
-    out["text"] = replacement
     out["citations"] = []
-    out["kb_no_answer"] = True
     return out

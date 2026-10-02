@@ -84,15 +84,29 @@ def test_whatsapp_marathi_refusal_gets_no_source_line_or_second_referral(process
     processor.bedrock_agent.retrieve_and_generate = lambda **_k: {
         "output": {"text": MR_REFUSAL}, "citations": [], "sessionId": "s"
     }
-    _run(processor, "text", {"text": {"body": "कापसावरील पांढऱ्या माशीसाठी कोणते कीटकनाशक फवारावे?"}})
+    _run(processor, "text", {"text": {"body": "कापसाची पेरणी कधी करावी?"}})
     reply = _last_reply(processor)
     assert reply.strip() == MR_REFUSAL
 
 
 def test_web_chat_marathi_refusal_gets_no_referral(webchat):
     webchat.query_bedrock = lambda *_a, **_k: {"text": MR_REFUSAL, "citations": []}
-    reply = _post(webchat, {"message": "कापसावरील पांढऱ्या माशीसाठी कोणते कीटकनाशक फवारावे?", "language": "mr"})
+    reply = _post(webchat, {"message": "कापसाची पेरणी कधी करावी?", "language": "mr"})
     assert reply.strip() == MR_REFUSAL
+
+
+def test_paraphrased_refusal_to_pesticide_question_gets_policy(processor, webchat):
+    from common.advice_filter import PESTICIDE_POLICY
+
+    q = "कापसावरील पांढऱ्या माशीसाठी कोणते कीटकनाशक फवारावे?"
+    processor.table = flow._FakeDynamoTable({**processor._profile, "dialect": "mr"})
+    processor.bedrock_agent.retrieve_and_generate = lambda **_k: {
+        "output": {"text": MR_REFUSAL}, "citations": [], "sessionId": "s"
+    }
+    _run(processor, "text", {"text": {"body": q}})
+    assert _last_reply(processor).startswith(PESTICIDE_POLICY["mr"])
+    webchat.query_bedrock = lambda *_a, **_k: {"text": MR_REFUSAL, "citations": []}
+    assert _post(webchat, {"message": q, "language": "mr"}).startswith(PESTICIDE_POLICY["mr"])
 
 
 def test_whatsapp_no_answer_marker_becomes_fixed_refusal(processor):
@@ -102,8 +116,36 @@ def test_whatsapp_no_answer_marker_becomes_fixed_refusal(processor):
     processor.bedrock_agent.retrieve_and_generate = lambda **_k: {
         "output": {"text": "NO_KB_ANSWER"}, "citations": [], "sessionId": "s"
     }
-    _run(processor, "text", {"text": {"body": "पांढऱ्या माशीसाठी निंबोळी तेल किती मिली प्रति लिटर?"}})
+    _run(processor, "text", {"text": {"body": "कापसाची पेरणी कधी करावी?"}})
     assert _last_reply(processor).strip() == LOCALIZED_NO_ANSWER["mr"]
+
+
+NEEM_MR = "पांढऱ्या माशीसाठी निंबोळी तेल किती मिली प्रति लिटर पाण्यात मिसळून फवारावे?"
+
+
+def test_whatsapp_pesticide_question_without_answer_gets_policy_and_helpline(processor):
+    from common.advice_filter import PESTICIDE_POLICY
+
+    processor.table = flow._FakeDynamoTable({**processor._profile, "dialect": "mr"})
+    processor.bedrock_agent.retrieve_and_generate = lambda **_k: {
+        "output": {"text": "NO_KB_ANSWER"}, "citations": [], "sessionId": "s"
+    }
+    _run(processor, "text", {"text": {"body": NEEM_MR}})
+    reply = _last_reply(processor)
+    assert reply.startswith(PESTICIDE_POLICY["mr"])
+    assert "KVK" in reply and "1800-180-1551" in reply
+    assert "स्त्रोत" not in reply
+
+
+def test_whatsapp_off_topic_medicine_question_is_not_given_pesticide_policy(processor):
+    from common.guardrail_reply import LOCALIZED_REFUSAL
+
+    processor.table = flow._FakeDynamoTable({**processor._profile, "dialect": "hi"})
+    processor.bedrock_agent.retrieve_and_generate = lambda **_k: {
+        "output": {"text": "NOT_FARMING"}, "citations": [], "sessionId": "s"
+    }
+    _run(processor, "text", {"text": {"body": "बुखार की दवा कौन सी लूँ?"}})
+    assert _last_reply(processor).strip() == LOCALIZED_REFUSAL["hi"]
 
 
 def test_web_chat_no_answer_marker_becomes_fixed_refusal(webchat):
@@ -113,12 +155,23 @@ def test_web_chat_no_answer_marker_becomes_fixed_refusal(webchat):
         retrieve_and_generate=lambda **_k: {"output": {"text": "NO_KB_ANSWER"}, "citations": []}
     )
     resp = webchat.lambda_handler(
-        {"httpMethod": "POST", "body": json.dumps({"message": "नीम तेल कितना?", "language": "hi"}), "requestContext": {}},
+        {"httpMethod": "POST", "body": json.dumps({"message": "गेहूं की बुवाई कब करें?", "language": "hi"}), "requestContext": {}},
         None,
     )
     body = json.loads(resp["body"])
     assert body["reply"].strip() == LOCALIZED_NO_ANSWER["hi"]
     assert body["citations"] == []
+
+
+def test_web_chat_pesticide_question_without_answer_gets_policy_and_helpline(webchat):
+    from common.advice_filter import PESTICIDE_POLICY
+
+    webchat.bedrock_agent = types.SimpleNamespace(
+        retrieve_and_generate=lambda **_k: {"output": {"text": "NO_KB_ANSWER"}, "citations": []}
+    )
+    reply = _post(webchat, {"message": NEEM_MR, "language": "mr"})
+    assert reply.startswith(PESTICIDE_POLICY["mr"])
+    assert "KVK" in reply and "1800-180-1551" in reply
 
 
 def test_knowledge_base_prompts_ask_for_no_answer_marker(processor, webchat):
@@ -132,11 +185,13 @@ def test_knowledge_base_prompts_ask_for_no_answer_marker(processor, webchat):
     processor.query_bedrock("x", "mr")
     assert "respond with exactly NO_KB_ANSWER" in _kb_prompt(seen)
     assert "respond with exactly NOT_FARMING" in _kb_prompt(seen)
+    assert "cannot give pesticide names or quantities" in _kb_prompt(seen)
     seen.clear()
     webchat.bedrock_agent = types.SimpleNamespace(retrieve_and_generate=_rag)
     webchat.query_bedrock("x", "mr")
     assert "respond with exactly NO_KB_ANSWER" in _kb_prompt(seen)
     assert "respond with exactly NOT_FARMING" in _kb_prompt(seen)
+    assert "cannot give pesticide names or quantities" in _kb_prompt(seen)
 
 
 SAFE_MR = "पिवळे चिकट सापळे प्रति हेक्टरी २० लावा."

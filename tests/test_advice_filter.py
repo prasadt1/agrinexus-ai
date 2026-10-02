@@ -209,3 +209,31 @@ def test_metric_emitted_per_kind_when_filter_fires(_no_cloudwatch):
 def test_no_metric_when_nothing_removed(_no_cloudwatch):
     af.filter_advice("Remove affected bolls.", "en", "whatsapp_text")
     assert _no_cloudwatch == []
+
+
+@pytest.mark.parametrize(
+    "question,expected",
+    [
+        ("पांढऱ्या माशीसाठी निंबोळी तेल किती मिली प्रति लिटर पाण्यात मिसळून फवारावे?", True),
+        ("कापसावरील पांढऱ्या माशीसाठी कोणते कीटकनाशक फवारावे?", True),
+        ("कपास में सफेद मक्खी के लिए कौन सी दवा छिड़कें?", True),
+        ("పత్తిలో తెల్ల దోమకు ఏ మందు పిచికారీ చేయాలి?", True),
+        ("Which pesticide for whitefly on cotton?", True),
+        ("कापसाची पेरणी कधी करावी?", False),
+        ("गेहूं में यूरिया कितना डालें?", False),
+        ("When should I irrigate soybean?", False),
+    ],
+)
+def test_is_pesticide_question(question, expected):
+    from common.advice_filter import is_pesticide_question
+
+    assert is_pesticide_question(question) is expected
+
+
+@pytest.mark.parametrize("dialect", ["en", "hi", "mr", "te"])
+def test_pesticide_policy_survives_filter_and_is_not_a_refusal(dialect):
+    from common.advice_filter import PESTICIDE_POLICY, filter_advice
+
+    out = filter_advice(PESTICIDE_POLICY[dialect], dialect, "whatsapp_text")
+    assert out.startswith(PESTICIDE_POLICY[dialect])
+    assert "1800-180-1551" in out

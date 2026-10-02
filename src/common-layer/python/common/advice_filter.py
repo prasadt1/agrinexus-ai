@@ -230,6 +230,47 @@ def _filter_line(line: str, hits: List[Tuple[str, Set[str]]]) -> Optional[str]:
     return label + joined
 
 
+_PESTICIDE_QUESTION = tuple(
+    _normalize(w)
+    for w in (
+        "spray", "pesticide", "insecticide", "fungicide", "herbicide", "weedicide", "chemical", "dose", "neem",
+        "फवार", "कीटकनाशक", "कीटनाशक", "किटकनाशक", "बुरशीनाशक", "फफूंदनाशक", "तणनाशक", "खरपतवारनाशक",
+        "छिडक", "छिड़क", "स्प्रे", "औषध", "दवा", "दवाई", "निंबोळी", "लिंबोळी", "नीम", "कडुलिंब", "कडूलिंब",
+        "పిచికారీ", "స్ప్రే", "పురుగుమందు", "క్రిమిసంహారక", "మందు", "వేప",
+    )
+)
+
+# Used instead of a knowledge-base refusal when the farmer asked about a pesticide or spray,
+# so the reply states the policy rather than implying the system would answer if it knew.
+PESTICIDE_POLICY = {
+    "en": (
+        "I can't give pesticide names or quantities. Send a photo of the affected plant and "
+        "I will try to identify the pest or disease."
+    ),
+    "hi": (
+        "मैं कीटनाशक के नाम या मात्रा नहीं बता सकता। प्रभावित पौधे की फोटो भेजें, "
+        "मैं कीट या रोग पहचानने की कोशिश करूँगा।"
+    ),
+    "mr": (
+        "मी कीटकनाशकांची नावे किंवा प्रमाण सांगू शकत नाही. बाधित झाडाचा फोटो पाठवा, "
+        "मी कीड किंवा रोग ओळखण्याचा प्रयत्न करेन."
+    ),
+    "te": (
+        "నేను పురుగుమందుల పేర్లు లేదా మోతాదులు చెప్పలేను. ప్రభావిత మొక్క ఫోటో పంపండి, "
+        "పురుగు లేదా తెగులును గుర్తించడానికి ప్రయత్నిస్తాను."
+    ),
+}
+
+
+def is_pesticide_question(text: str) -> bool:
+    t = _normalize(text or "")
+    return any(w in t for w in _PESTICIDE_QUESTION)
+
+
+def pesticide_policy(dialect: str) -> str:
+    return PESTICIDE_POLICY.get((dialect or "en").strip().lower(), PESTICIDE_POLICY["en"])
+
+
 def _has_referral(text: str) -> bool:
     return any(line in text for lines in REFERRAL_LINES.values() for line in lines.values())
 

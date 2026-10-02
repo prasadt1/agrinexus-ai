@@ -22,7 +22,7 @@ from common.guardrail_reply import (
     apply_kb_no_answer,
     apply_localized_guardrail_reply,
 )
-from common.advice_filter import filter_advice
+from common.advice_filter import filter_advice, is_pesticide_question, pesticide_policy
 from common.source_line import strip_source_lines
 
 logger = logging.getLogger()
@@ -450,6 +450,7 @@ IMPORTANT RESTRICTIONS:
 - Do NOT provide medical advice, health recommendations, or personal counseling
 - Stay strictly within agricultural domain
 - Never name a pesticide, insecticide, fungicide or herbicide product, brand, active ingredient, formulation or dose, even if the Context contains one. Give the pest or disease and the non-chemical steps the farmer can take today; for chemical control, tell the farmer to contact their local KVK (Krishi Vigyan Kendra) for the right product and quantity.
+- If the question asks which pesticide or spray to use, or how much, begin your answer with one short sentence saying you cannot give pesticide names or quantities, then give the non-chemical steps.
 - NEVER invent or make up information not in the Context
 
 Question: $query$
@@ -722,8 +723,14 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Query Bedrock for text
         result = query_bedrock(message, dialect)
 
-        # Clean model output: remove placeholder "Source: 3" style leaks.
         reply_text = result.get('text') or ''
+        if (
+            is_pesticide_question(message)
+            and is_rag_refusal_response(reply_text)
+            and not result.get('kb_not_farming')
+            and not result.get('guardrail_localized')
+        ):
+            reply_text = pesticide_policy(dialect)
         reply_text = strip_llm_xml_citation_tags(reply_text)
         reply_text = strip_source_lines(reply_text)
         reply_text = filter_advice(

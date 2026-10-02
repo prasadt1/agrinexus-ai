@@ -20,7 +20,7 @@ import analyzer
 from common.whatsapp import send_whatsapp_message, send_whatsapp_list
 from common.whatsapp import send_whatsapp_buttons as _send_whatsapp_buttons
 from common.district_helplines import maybe_append_helpline_footer
-from common.advice_filter import filter_advice
+from common.advice_filter import filter_advice, is_pesticide_question, pesticide_policy
 from common.source_line import strip_source_lines
 from common.allowlist import is_approved_user, allowlist_expiry_hint
 from common.redact import redact_phone
@@ -995,6 +995,7 @@ IMPORTANT RESTRICTIONS:
 - Do NOT provide medical advice, health recommendations, or personal counseling
 - Stay strictly within agricultural domain
 - Never name a pesticide, insecticide, fungicide or herbicide product, brand, active ingredient, formulation or dose, even if the Context contains one. Give the pest or disease and the non-chemical steps the farmer can take today; for chemical control, tell the farmer to contact their local KVK (Krishi Vigyan Kendra) for the right product and quantity.
+- If the question asks which pesticide or spray to use, or how much, begin your answer with one short sentence saying you cannot give pesticide names or quantities, then give the non-chemical steps.
 
 Question: $query$
 
@@ -1416,8 +1417,14 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             )
             result = query_bedrock(text, dialect, session_id=rag_session)
             
-            # Extract source citation from response or add generic attribution
             response_text = result["text"]
+            if (
+                is_pesticide_question(text)
+                and is_rag_refusal_response(response_text)
+                and not result.get("kb_not_farming")
+                and not result.get("guardrail_localized")
+            ):
+                response_text = pesticide_policy(dialect)
             source_keywords = {
                 'hi': 'स्रोत:',
                 'mr': 'स्त्रोत:',
