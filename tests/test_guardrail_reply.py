@@ -83,3 +83,45 @@ class TestLocalizedRefusal:
         out = apply_localized_guardrail_reply(resp, "mr")
         assert out["text"] == LOCALIZED_REFUSAL["mr"]
         assert out["citations"] == []
+
+
+class TestKbNoAnswer:
+    def test_marker_becomes_localized_refusal(self):
+        from common.guardrail_reply import LOCALIZED_NO_ANSWER, apply_kb_no_answer
+
+        out = apply_kb_no_answer({"text": "NO_KB_ANSWER", "citations": [{"x": 1}]}, "mr")
+        assert out["text"] == LOCALIZED_NO_ANSWER["mr"]
+        assert out["citations"] == [] and out["kb_no_answer"] is True
+
+    def test_marker_with_stray_words_still_replaced(self):
+        from common.guardrail_reply import LOCALIZED_NO_ANSWER, apply_kb_no_answer
+
+        out = apply_kb_no_answer({"text": "NO_KB_ANSWER\n\nस्त्रोत: 1"}, "te")
+        assert out["text"] == LOCALIZED_NO_ANSWER["te"]
+
+    def test_bedrock_decline_becomes_localized_refusal(self):
+        from common.guardrail_reply import (
+            KB_DECLINE_FALLBACK_EN,
+            LOCALIZED_NO_ANSWER,
+            apply_kb_no_answer,
+        )
+
+        out = apply_kb_no_answer({"text": KB_DECLINE_FALLBACK_EN}, "hi")
+        assert out["text"] == LOCALIZED_NO_ANSWER["hi"]
+
+    def test_real_answer_unchanged(self):
+        from common.guardrail_reply import apply_kb_no_answer
+
+        resp = {"text": "पिवळे चिकट सापळे लावा.", "citations": []}
+        assert apply_kb_no_answer(resp, "mr") is resp
+
+    def test_unknown_dialect_falls_back_to_english(self):
+        from common.guardrail_reply import LOCALIZED_NO_ANSWER, localized_no_answer
+
+        assert localized_no_answer("xx") == LOCALIZED_NO_ANSWER["en"]
+
+    def test_not_farming_marker_becomes_localized_off_topic_refusal(self):
+        from common.guardrail_reply import apply_kb_no_answer
+
+        out = apply_kb_no_answer({"text": "NOT_FARMING", "citations": []}, "hi")
+        assert out["text"] == LOCALIZED_REFUSAL["hi"]

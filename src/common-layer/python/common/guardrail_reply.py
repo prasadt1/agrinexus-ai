@@ -120,3 +120,56 @@ def apply_localized_guardrail_reply(
     out["citations"] = []
     out["guardrail_localized"] = True
     return out
+
+
+# The knowledge-base prompt asks the model to reply with exactly this marker when
+# the Context does not answer the question. Must match the prompt in both handlers.
+KB_NO_ANSWER_MARKER = "NO_KB_ANSWER"
+KB_NOT_FARMING_MARKER = "NOT_FARMING"
+
+# What RetrieveAndGenerate returns when the model declines outright.
+KB_DECLINE_FALLBACK_EN = "Sorry, I am unable to assist you with this request."
+
+# Each string must stay detectable by is_rag_refusal_response in both handlers.
+LOCALIZED_NO_ANSWER = {
+    "en": (
+        "I don't have information about this in my knowledge base. Please contact your nearest "
+        "KVK (Krishi Vigyan Kendra) or agricultural extension officer."
+    ),
+    "hi": (
+        "मेरे पास इस बारे में जानकारी नहीं है। कृपया अपने नज़दीकी कृषि विज्ञान केंद्र (KVK) "
+        "या कृषि विस्तार अधिकारी से संपर्क करें।"
+    ),
+    "mr": (
+        "माझ्याकडे या विषयाची माहिती नाही. कृपया जवळच्या कृषी विज्ञान केंद्र (KVK) "
+        "किंवा कृषी विस्तार अधिकाऱ्यांशी संपर्क साधा."
+    ),
+    "te": (
+        "ఈ విషయం గురించి నా దగ్గర సమాచారం లేదు. దయచేసి మీ దగ్గరలోని కృషి విజ్ఞాన కేంద్రం (KVK) "
+        "లేదా వ్యవసాయ విస్తరణ అధికారిని సంప్రదించండి."
+    ),
+}
+
+
+def localized_no_answer(dialect: str) -> str:
+    d = (dialect or "en").strip().lower()
+    return LOCALIZED_NO_ANSWER.get(d, LOCALIZED_NO_ANSWER["en"])
+
+
+def apply_kb_no_answer(response: Dict[str, Any], dialect: str) -> Dict[str, Any]:
+    """
+    Replace a prompt marker or Bedrock's English decline with a fixed refusal in the
+    farmer's language and clear citations. Otherwise return response unchanged.
+    """
+    text = str(response.get("text") or "")
+    if KB_NOT_FARMING_MARKER in text:
+        replacement = localized_guardrail_refusal(dialect)
+    elif KB_NO_ANSWER_MARKER in text or text.strip() == KB_DECLINE_FALLBACK_EN:
+        replacement = localized_no_answer(dialect)
+    else:
+        return response
+    out = dict(response)
+    out["text"] = replacement
+    out["citations"] = []
+    out["kb_no_answer"] = True
+    return out

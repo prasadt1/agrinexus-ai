@@ -80,7 +80,7 @@ MR_REFUSAL = (
 
 
 def test_whatsapp_marathi_refusal_gets_no_source_line_or_second_referral(processor):
-    processor._profile["dialect"] = "mr"
+    processor.table = flow._FakeDynamoTable({**processor._profile, "dialect": "mr"})
     processor.bedrock_agent.retrieve_and_generate = lambda **_k: {
         "output": {"text": MR_REFUSAL}, "citations": [], "sessionId": "s"
     }
@@ -93,6 +93,50 @@ def test_web_chat_marathi_refusal_gets_no_referral(webchat):
     webchat.query_bedrock = lambda *_a, **_k: {"text": MR_REFUSAL, "citations": []}
     reply = _post(webchat, {"message": "कापसावरील पांढऱ्या माशीसाठी कोणते कीटकनाशक फवारावे?", "language": "mr"})
     assert reply.strip() == MR_REFUSAL
+
+
+def test_whatsapp_no_answer_marker_becomes_fixed_refusal(processor):
+    from common.guardrail_reply import LOCALIZED_NO_ANSWER
+
+    processor.table = flow._FakeDynamoTable({**processor._profile, "dialect": "mr"})
+    processor.bedrock_agent.retrieve_and_generate = lambda **_k: {
+        "output": {"text": "NO_KB_ANSWER"}, "citations": [], "sessionId": "s"
+    }
+    _run(processor, "text", {"text": {"body": "पांढऱ्या माशीसाठी निंबोळी तेल किती मिली प्रति लिटर?"}})
+    assert _last_reply(processor).strip() == LOCALIZED_NO_ANSWER["mr"]
+
+
+def test_web_chat_no_answer_marker_becomes_fixed_refusal(webchat):
+    from common.guardrail_reply import LOCALIZED_NO_ANSWER
+
+    webchat.bedrock_agent = types.SimpleNamespace(
+        retrieve_and_generate=lambda **_k: {"output": {"text": "NO_KB_ANSWER"}, "citations": []}
+    )
+    resp = webchat.lambda_handler(
+        {"httpMethod": "POST", "body": json.dumps({"message": "नीम तेल कितना?", "language": "hi"}), "requestContext": {}},
+        None,
+    )
+    body = json.loads(resp["body"])
+    assert body["reply"].strip() == LOCALIZED_NO_ANSWER["hi"]
+    assert body["citations"] == []
+
+
+def test_knowledge_base_prompts_ask_for_no_answer_marker(processor, webchat):
+    seen = {}
+
+    def _rag(**kwargs):
+        seen.update(kwargs)
+        return {"output": {"text": "ok"}, "citations": [], "sessionId": "s"}
+
+    processor.bedrock_agent.retrieve_and_generate = _rag
+    processor.query_bedrock("x", "mr")
+    assert "respond with exactly NO_KB_ANSWER" in _kb_prompt(seen)
+    assert "respond with exactly NOT_FARMING" in _kb_prompt(seen)
+    seen.clear()
+    webchat.bedrock_agent = types.SimpleNamespace(retrieve_and_generate=_rag)
+    webchat.query_bedrock("x", "mr")
+    assert "respond with exactly NO_KB_ANSWER" in _kb_prompt(seen)
+    assert "respond with exactly NOT_FARMING" in _kb_prompt(seen)
 
 
 def test_whatsapp_voice_answer_is_filtered_before_speech(processor):

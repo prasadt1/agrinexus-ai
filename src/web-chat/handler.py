@@ -14,7 +14,14 @@ from datetime import datetime
 from decimal import Decimal
 import hashlib
 from botocore.exceptions import ClientError
-from common.guardrail_reply import apply_localized_guardrail_reply
+from common.guardrail_reply import (
+    KB_NO_ANSWER_MARKER,
+    KB_NOT_FARMING_MARKER,
+    LOCALIZED_NO_ANSWER,
+    LOCALIZED_REFUSAL,
+    apply_kb_no_answer,
+    apply_localized_guardrail_reply,
+)
 from common.advice_filter import filter_advice
 
 logger = logging.getLogger()
@@ -58,6 +65,10 @@ def is_rag_refusal_response(text: str) -> bool:
     """
     t = (text or "").strip()
     if not t:
+        return True
+    if t in (*LOCALIZED_NO_ANSWER.values(), *LOCALIZED_REFUSAL.values()):
+        return True
+    if KB_NO_ANSWER_MARKER in t or KB_NOT_FARMING_MARKER in t:
         return True
     low = t.lower()
     # English refusals from prompt rules
@@ -417,9 +428,9 @@ def query_bedrock(query: str, dialect: str = 'en') -> Dict[str, Any]:
 
 CRITICAL RULES - READ CAREFULLY:
 1. ONLY use information from the Context provided below. DO NOT use any external knowledge.
-2. If the Context does not contain relevant information to answer the question, you MUST respond: "I don't have information about this in my knowledge base. Please contact your local KVK (Krishi Vigyan Kendra) or agricultural extension officer."
+2. If the Context does not contain relevant information to answer the question, you MUST respond with exactly NO_KB_ANSWER and nothing else. Do not translate it or add any other words.
 3. NEVER make up or invent information. NEVER hallucinate.
-4. If the question is about people, places, or things not related to farming, respond: "I can only help with farming questions. Please ask about crops, pests, fertilizers, or farm management."
+4. If the question is about people, places, or things not related to farming, respond with exactly NOT_FARMING and nothing else.
 
 RESPONSE STYLE (when you DO have relevant context):
 - Sound like a calm, practical TV or radio farm advisory (DD Kisan / extension bulletin style): direct and trustworthy, not a research paper.
@@ -430,11 +441,11 @@ RESPONSE STYLE (when you DO have relevant context):
 - Avoid long paragraphs, dense lists, and copying long passages from the context.
 - ONLY if you answered the question using the Context: End with exactly ONE final line for traceability: Look at the search_results metadata and extract the actual document name or source title. Write a single compact line starting with "Source:" (or "स्रोत:" in Hindi, "स्त्रोत:" in Marathi, "మూలం:" in Telugu) followed by the actual document name from the metadata (e.g., "Source: FAO Cotton IPM Guide" or "स्रोत: ICAR कीट प्रबंधन सलाह"). Do NOT just write "Source: 1" or "स्रोत: 1".
 
-CRITICAL: If you said "I don't have information" OR "I can only help with farming questions", DO NOT ADD ANY SOURCE CITATION. NO "स्रोत:", NO "Source:", NOTHING. Just end your response immediately after the refusal message.
+CRITICAL: If you respond NO_KB_ANSWER OR NOT_FARMING, DO NOT ADD ANY SOURCE CITATION. NO "स्रोत:", NO "Source:", NOTHING.
 
 IMPORTANT RESTRICTIONS:
 - ONLY answer questions about agriculture, farming, crops, pests, diseases, fertilizers, weather, and farm management
-- If the question is about human health, medical issues, personal problems, or non-farming topics, respond: "I can only help with farming questions. Please ask about crops, pests, fertilizers, or farm management."
+- If the question is about human health, medical issues, personal problems, or non-farming topics, respond with exactly NOT_FARMING.
 - Do NOT provide medical advice, health recommendations, or personal counseling
 - Stay strictly within agricultural domain
 - Never name a pesticide, insecticide, fungicide or herbicide product, brand, active ingredient, formulation or dose, even if the Context contains one. Give the pest or disease and the non-chemical steps the farmer can take today; for chemical control, tell the farmer to contact their local KVK (Krishi Vigyan Kendra) for the right product and quantity.
@@ -444,7 +455,7 @@ Question: $query$
 
 Context: $search_results$
 
-REMEMBER: If the Context above does not contain information to answer the Question, you MUST say "I don't have information about this in my knowledge base." DO NOT make up answers.'''
+REMEMBER: If the Context above does not contain information to answer the Question, you MUST respond with exactly NO_KB_ANSWER. DO NOT make up answers.'''
         }
     }
     
@@ -478,7 +489,7 @@ REMEMBER: If the Context above does not contain information to answer the Questi
         'citations': response.get('citations', []),
         'guardrailAction': response.get('guardrailAction'),
     }
-    return apply_localized_guardrail_reply(result, dialect)
+    return apply_kb_no_answer(apply_localized_guardrail_reply(result, dialect), dialect)
 
 
 def analyze_image(image_base64: str, dialect: str = 'en') -> str:

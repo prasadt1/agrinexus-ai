@@ -25,7 +25,14 @@ from common.allowlist import is_approved_user, allowlist_expiry_hint
 from common.redact import redact_phone
 from common.nudge_keywords import is_nudge_reply
 from common import visitor as visitor_mod
-from common.guardrail_reply import apply_localized_guardrail_reply
+from common.guardrail_reply import (
+    KB_NO_ANSWER_MARKER,
+    KB_NOT_FARMING_MARKER,
+    LOCALIZED_NO_ANSWER,
+    LOCALIZED_REFUSAL,
+    apply_kb_no_answer,
+    apply_localized_guardrail_reply,
+)
 
 
 def send_whatsapp_buttons(phone_number: str, body_text: str, buttons: list):
@@ -690,6 +697,10 @@ def is_rag_refusal_response(text: str) -> bool:
     """
     if not text or not text.strip():
         return True
+    if text.strip() in (*LOCALIZED_NO_ANSWER.values(), *LOCALIZED_REFUSAL.values()):
+        return True
+    if KB_NO_ANSWER_MARKER in text or KB_NOT_FARMING_MARKER in text:
+        return True
     low = text.lower()
     if "don't have information" in low or "do not have information" in low:
         return True
@@ -961,9 +972,9 @@ def query_bedrock(query: str, dialect: str = 'hi', session_id: Optional[str] = N
 
 CRITICAL RULES - READ CAREFULLY:
 1. ONLY use information from the Context provided below. DO NOT use any external knowledge.
-2. If the Context does not contain relevant information to answer the question, you MUST respond: "I don't have information about this in my knowledge base. Please contact your local KVK (Krishi Vigyan Kendra) or agricultural extension officer."
+2. If the Context does not contain relevant information to answer the question, you MUST respond with exactly NO_KB_ANSWER and nothing else. Do not translate it or add any other words.
 3. NEVER make up or invent information. NEVER hallucinate.
-4. If the question is about people, places, or things not related to farming, respond: "I can only help with farming questions. Please ask about crops, pests, fertilizers, or farm management."
+4. If the question is about people, places, or things not related to farming, respond with exactly NOT_FARMING and nothing else.
 
 RESPONSE STYLE (when you DO have relevant context):
 - Sound like a calm, practical TV or radio farm advisory (DD Kisan / extension bulletin style): direct and trustworthy, not a research paper.
@@ -975,11 +986,11 @@ RESPONSE STYLE (when you DO have relevant context):
 - DO NOT add any source citation or reference line at the end. The system will add it automatically.
 - NEVER end with a "source" line that lists only numbers or citation indices (e.g. comma-separated digits like 3, 4, 5). No Devanagari or English label before such numbers.
 
-CRITICAL: If you said "I don't have information" OR "I can only help with farming questions", DO NOT ADD ANY SOURCE CITATION. NO "स्रोत:", NO "Source:", NOTHING. Just end your response immediately after the refusal message.
+CRITICAL: If you respond NO_KB_ANSWER OR NOT_FARMING, DO NOT ADD ANY SOURCE CITATION. NO "स्रोत:", NO "Source:", NOTHING.
 
 IMPORTANT RESTRICTIONS:
 - ONLY answer questions about agriculture, farming, crops, pests, diseases, fertilizers, weather, and farm management
-- If the question is about human health, medical issues, personal problems, or non-farming topics, respond: "I can only help with farming questions. Please ask about crops, pests, fertilizers, or farm management."
+- If the question is about human health, medical issues, personal problems, or non-farming topics, respond with exactly NOT_FARMING.
 - Do NOT provide medical advice, health recommendations, or personal counseling
 - Stay strictly within agricultural domain
 - Never name a pesticide, insecticide, fungicide or herbicide product, brand, active ingredient, formulation or dose, even if the Context contains one. Give the pest or disease and the non-chemical steps the farmer can take today; for chemical control, tell the farmer to contact their local KVK (Krishi Vigyan Kendra) for the right product and quantity.
@@ -988,7 +999,7 @@ Question: $query$
 
 Context: $search_results$
 
-REMEMBER: If the Context above does not contain information to answer the Question, you MUST say "I don't have information about this in my knowledge base." DO NOT make up answers.'''
+REMEMBER: If the Context above does not contain information to answer the Question, you MUST respond with exactly NO_KB_ANSWER. DO NOT make up answers.'''
         }
     }
     
@@ -1030,7 +1041,7 @@ REMEMBER: If the Context above does not contain information to answer the Questi
                 'sessionId': response.get('sessionId'),
                 'guardrailAction': response.get('guardrailAction'),
             }
-            return apply_localized_guardrail_reply(result, dialect)
+            return apply_kb_no_answer(apply_localized_guardrail_reply(result, dialect), dialect)
         except bedrock_agent.exceptions.ValidationException as e:
             # Session doesn't exist yet, create new one by calling without sessionId
             if 'Session with Id' in str(e) and 'is not valid' in str(e):
@@ -1051,7 +1062,7 @@ REMEMBER: If the Context above does not contain information to answer the Questi
         'sessionId': response.get('sessionId'),
         'guardrailAction': response.get('guardrailAction'),
     }
-    return apply_localized_guardrail_reply(result, dialect)
+    return apply_kb_no_answer(apply_localized_guardrail_reply(result, dialect), dialect)
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
