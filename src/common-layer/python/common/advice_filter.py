@@ -262,6 +262,28 @@ _ABBREVIATIONS = tuple(_normalize(a) for a in ("मि", "ली", "ग्रा
 _ENUM_RE = re.compile(r"(?:^|(?<=[\s,;:]))(\(?)([0-9०-९౦-౯]{1,2})([).])(?=\s)")
 _LABEL_RE = re.compile(r"^\s*\*[^*\n]+\*\s*")
 
+# A step that only says to do it again refers to the step before it; when that step
+# was removed, the repeat is dropped too. Repeating a check or inspection stands alone.
+_REPEAT_LATIN_RE = re.compile(r"(?<![a-z])(?:repeat\w*|re-?appl\w*|again|more times?)(?![a-z])")
+_REPEAT_INDIC = tuple(
+    _normalize(w)
+    for w in ("दोहरा", "दोबारा", "फिर से", "पुनः", "पुन्हा", "మళ్ళీ", "మళ్లీ", "పునరావృత")
+)
+_MONITOR = tuple(
+    _normalize(w)
+    for w in (
+        "check", "inspect", "monitor", "scout", "count", "observe",
+        "तपास", "जांच", "जाँच", "निरीक्षण", "देखें", "पाहणी", "పరిశీల", "తనిఖీ", "గమనించ",
+    )
+)
+
+
+def _is_orphan_repeat(segment: str) -> bool:
+    norm = _normalize(segment)
+    if not (_REPEAT_LATIN_RE.search(norm) or any(w in norm for w in _REPEAT_INDIC)):
+        return False
+    return not any(w in norm for w in _MONITOR)
+
 
 def classify(segment: str) -> Set[str]:
     """Kinds of chemical advice found in one sentence: active, formulation, dose."""
@@ -311,14 +333,22 @@ def _segments(text: str) -> List[str]:
     return [text[a:b] for a, b in zip(ordered, ordered[1:]) if text[a:b]]
 
 
-def _renumber(parts: List[str]) -> List[str]:
-    n = 0
+def _renumber(parts: List[str], counter: List[int]) -> List[str]:
+    """
+    Number steps 1, 2, 3 across the whole message. counter is [current, last original].
+    A heading ending in ":" or an original number that does not go up starts a new list.
+    """
     out = []
     for p in parts:
         m = _ENUM_RE.match(p)
+        if not m and p.strip().endswith(":"):
+            counter[:] = [0, 0]
         if m:
-            n += 1
             digits = m.group(2)
+            original = int(digits.translate(_DIGITS))
+            counter[0] = 1 if counter[0] == 0 or original <= counter[1] else counter[0] + 1
+            counter[1] = original
+            n = counter[0]
             if digits[0] in "०१२३४५६७८९":
                 num = str(n).translate(str.maketrans("0123456789", "०१२३४५६७८९"))
             elif digits[0] in "౦౧౨౩౪౫౬౭౮౯":
@@ -330,18 +360,24 @@ def _renumber(parts: List[str]) -> List[str]:
     return out
 
 
-def _filter_line(line: str, hits: List[Tuple[str, Set[str]]]) -> Optional[str]:
+def _split_line(line: str, hits: List[Tuple[str, Set[str]]], state: Dict[str, int]):
+    """Return (label, kept segments, removed anything) for one line, or None for a blank line."""
     label_m = _LABEL_RE.match(line)
     label = label_m.group(0) if label_m else ""
     body = line[len(label):]
     if not body.strip():
-        return line
+        return None
     kept = []
     segments = _segments(body)
     for seg in segments:
         kinds = classify(seg)
-        if kinds:
-            hits.append((seg.strip(), kinds))
+        orphan = not kinds and state["after_removal"] and _is_orphan_repeat(seg)
+        if kinds or orphan:
+            if kinds:
+                hits.append((seg.strip(), kinds))
+            else:
+                state["orphans"] += 1
+            state["after_removal"] = 1
             end = re.search(r"[।.?!॥]$", seg.strip())
             if end and kept:
                 prev = re.sub(r"[\s,;:]+$", "", kept[-1])
@@ -350,9 +386,14 @@ def _filter_line(line: str, hits: List[Tuple[str, Set[str]]]) -> Optional[str]:
                 kept[-1] = prev + " "
         else:
             kept.append(seg)
-    if len(kept) == len(segments):
-        return line
-    kept = _renumber(kept)
+            if seg.strip():
+                state["after_removal"] = 0
+    return label, kept, len(kept) != len(segments)
+
+
+def _join_line(line: str, label: str, kept: List[str], removed: bool) -> Optional[str]:
+    if not removed:
+        return label + "".join(kept)
     joined = re.sub(r" {2,}", " ", "".join(kept)).strip()
     joined = re.sub(r"[\s,;:]+$", "", joined)
     if joined and not re.search(r"[।.?!॥]$", joined):
@@ -422,9 +463,17 @@ def filter_advice(
     if not text:
         return text
     hits: List[Tuple[str, Set[str]]] = []
+    state = {"after_removal": 0, "orphans": 0}
+    lines = text.split("\n")
+    parsed = [_split_line(line, hits, state) for line in lines]
+    counter = [0, 0]
     out_lines = []
-    for line in text.split("\n"):
-        filtered = _filter_line(line, hits)
+    for line, p in zip(lines, parsed):
+        if p is None or not (hits or state["orphans"]):
+            out_lines.append(line)
+            continue
+        label, kept, removed = p
+        filtered = _join_line(line, label, _renumber(kept, counter), removed)
         if filtered is not None:
             out_lines.append(filtered)
     out = re.sub(r"\n{3,}", "\n\n", "\n".join(out_lines)).strip()
@@ -433,6 +482,8 @@ def filter_advice(
         kinds = sorted({k for _, ks in hits for k in ks})
         print(f"Advice filter removed {len(hits)} segment(s) channel={channel} kinds={','.join(kinds)}")
         _emit_metric(channel, hits)
+    if state["orphans"]:
+        print(f"Advice filter removed {state['orphans']} repeat step(s) left without their step channel={channel}")
 
     if add_referral and not _has_referral(out):
         footer = referral_footer(dialect, kind, district)

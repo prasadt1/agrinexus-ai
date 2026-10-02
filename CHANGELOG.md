@@ -4,6 +4,12 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 2 October 2026 — filter leaves no orphaned repeat steps (not deployed)
+
+- **Removing a chemical step left its follow-up behind.** On the deployed web chat, a pink bollworm reply lost a dose sentence and kept "Repeat two more times at 30-day intervals", which then pointed at nothing. Separately, steps were renumbered only within one line: when a whole numbered line was dropped, the list read 1, 3, 4, and a kept line such as "2. Destroy crop residue." became "1." because numbering restarted on each line. The filter now drops a step directly after a removed one when it only says to repeat or reapply (English, Hindi, Marathi, Telugu); repeating a check or inspection stays. Numbering runs across the whole message and restarts after a heading ending in ":" or when the original numbers start over. Replies with nothing removed are returned unchanged. Orphan drops are logged but not counted in `AdviceFilterHit`, which still counts chemical advice only. On the 119 stored and live replies, one output changed: a Marathi "(३) …३-४ दिवसांनी पुन्हा फवारणी करा" (spray again after 3-4 days) that followed a removed insecticide step. REQ-GUARD-010 amended.
+
+---
+
 ## 2 October 2026 — Lambda runtime Python 3.13 (not deployed)
 
 - **Runtime was past its update cut-off.** Every function and the common layer ran `python3.11`, which AWS deprecated on 30 June 2026 with function updates disabled from 31 August 2026; `sam validate --lint` failed on it, so the lint step at the end of CI failed too. All functions (one global setting, no per-function overrides) and the layer now use `python3.13`, and CI tests on 3.13. In a clean Python 3.13 environment without AWS credentials the suite passes (839 passed, 30 skipped) and the template lints clean. `sam build` packages Pillow 11.3.0 as the `cp313` manylinux x86_64 wheel. Remaining 3.13 warnings are deprecations only (`datetime.utcnow`, `utcfromtimestamp`). A test keeps functions, layer and CI on one supported version.
@@ -51,7 +57,7 @@ Each item below has its own commit and a test that failed before the fix. Deploy
 ### Found during this work, not fixed
 - **Photo relevance check is dead.** Claude 3 Haiku has reached end of life, so `classify_image_relevance` always fails and returns `unclear`. In the last 14 days of logs all 15 checks did (all from the beta processor; the main processor logged none). Non-farming photos still reach the main vision model, which rejects them, but the cheap pre-check never runs. Fixed in the entry above.
 - **Nudge liner model.** `NUDGE_LINER_MODEL_ID` is also Claude 3 Haiku. The liner is off (`NUDGE_BEDROCK_LINER=false`) and falls back to the static hint on any error, so nothing is broken today, but enabling it would still send only the static hint until the model ID is changed.
-- **Advice filter can strip a non-chemical step.** On the deployed web chat, "which pesticide and dose for pink bollworm" removed one segment as a dose, and the reply kept the follow-on sentence "Repeat two more times at 30-day intervals" without the step it refers to. The reply was otherwise correct (no product, no dose, non-chemical steps, KVK, Kisan Call Centre).
+- **Advice filter can strip a non-chemical step.** On the deployed web chat, "which pesticide and dose for pink bollworm" removed one segment as a dose, and the reply kept the follow-on sentence "Repeat two more times at 30-day intervals" without the step it refers to. The reply was otherwise correct (no product, no dose, non-chemical steps, KVK, Kisan Call Centre). Fixed in the orphaned-repeat entry above.
 - **Python 3.11 Lambda runtime.** `cfn-lint` reports it deprecated (June 2026), with function updates disabled from 31 August 2026. Deploys succeeded this week, but the runtime needs upgrading. Fixed in the Python 3.13 entry above.
 - `scripts/delete-user-data.sh` (operator erasure) deletes no S3 media.
 - `BetaMessageDLQ` has no consumer, so failures on the beta queue get no farmer-facing error.
