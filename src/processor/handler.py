@@ -343,9 +343,16 @@ def update_user_profile(phone_number: str, updates: Dict[str, Any]):
     )
 
 
+def _location_coords(location: str) -> Optional[List[Decimal]]:
+    """[lat, lon] for a known district, as Decimals (DynamoDB rejects floats)."""
+    coords = DISTRICT_COORDS.get(location)
+    if not coords:
+        return None
+    return [Decimal(str(coords['lat'])), Decimal(str(coords['lon']))]
+
+
 def create_user_profile(phone_number: str, dialect: str, location: str, crop: str, consent: bool):
     """Create complete user profile"""
-    coords = DISTRICT_COORDS.get(location)
     table.put_item(
         Item={
             'PK': f'USER#{phone_number}',
@@ -353,7 +360,7 @@ def create_user_profile(phone_number: str, dialect: str, location: str, crop: st
             'phone_number': phone_number,
             'dialect': dialect,
             'location': location,
-            'location_coords': list(coords) if coords else None,
+            'location_coords': _location_coords(location),
             'crop': crop,
             'consent': consent,
             'onboarding_complete': True,
@@ -563,10 +570,9 @@ Please choose your language / कृपया अपनी भाषा चु�
             location = message_text.strip().title()
         
         if location:
-            coords = DISTRICT_COORDS.get(location)
             update_user_profile(phone_number, {
                 'location': location,
-                'location_coords': list(coords) if coords else None,
+                'location_coords': _location_coords(location),
                 'onboarding_state': 'crop'
             })
             # Ask for crop with buttons in user's dialect
