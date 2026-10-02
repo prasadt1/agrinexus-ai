@@ -283,6 +283,10 @@ Resources:
             Status: Enabled
             Prefix: voice/
             ExpirationInDays: 1  # Delete voice files after 1 day
+          - Id: DeleteOldVoiceReplies
+            Status: Enabled
+            Prefix: voice-output/
+            ExpirationInDays: 1  # Polly replies; presigned URL lasts 1 hour
           - Id: DeleteOldImages
             Status: Enabled
             Prefix: images/

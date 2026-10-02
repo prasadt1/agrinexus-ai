@@ -98,12 +98,27 @@ class TestDelete:
                 ]
             },
             {"Contents": [{"Key": "voice/15551234567/c.ogg"}]},
+            {"Contents": [{"Key": "voice-output/15551234567/d.mp3"}]},
         ]
         n = visitor_mod.delete_user_media_objects(s3, "bucket", "15551234567")
-        assert n == 3
-        assert s3.delete_objects.call_count == 2
-        assert s3.list_objects_v2.call_args_list[0][1]["Prefix"] == "images/15551234567/"
-        assert s3.list_objects_v2.call_args_list[1][1]["Prefix"] == "voice/15551234567/"
+        assert n == 4
+        assert s3.delete_objects.call_count == 3
+        prefixes = [c[1]["Prefix"] for c in s3.list_objects_v2.call_args_list]
+        assert prefixes == ["images/15551234567/", "voice/15551234567/", "voice-output/15551234567/"]
+
+    def test_erasure_covers_every_per_user_prefix_written(self):
+        import re
+        from pathlib import Path
+        src = Path(__file__).resolve().parents[1] / "src"
+        written = set()
+        for py in src.rglob("*.py"):
+            for m in re.finditer(r"""s3_key\s*=\s*f["']([a-z\-]+)/\{""", py.read_text()):
+                written.add(m.group(1))
+        s3 = MagicMock()
+        s3.list_objects_v2.return_value = {}
+        visitor_mod.delete_user_media_objects(s3, "bucket", "1")
+        erased = {c[1]["Prefix"].split("/")[0] for c in s3.list_objects_v2.call_args_list}
+        assert written and written <= erased
 
 
 class TestVisitorMetrics:

@@ -257,7 +257,7 @@ The product identifies the pest or problem and gives non-chemical steps. It does
 
 **REQ-I18N-001**: Section labels shall use the farmer's own language; Marathi output shall not reuse Hindi labels.
 
-**REQ-PRIV-001**: When any number sends `DELETE` or `DELETE MY DATA`, the system shall erase that number’s profile and conversation rows and confirm in one message.
+**REQ-PRIV-001** (amended 2 Oct 2026): When any number sends `DELETE` or `DELETE MY DATA`, the system shall erase that number’s profile and conversation rows and its stored photos (`images/`), voice notes (`voice/`) and spoken replies (`voice-output/`), and confirm in one message. Media under those prefixes also expires automatically (photos 7 days, voice notes and spoken replies 1 day).
 
 **REQ-SEC-GUARD-001**: WhatsApp RAG and web-chat RAG shall invoke the configured Bedrock Guardrail (content filters, prompt-attack filter, and a polite redirect for non-farming questions).
 

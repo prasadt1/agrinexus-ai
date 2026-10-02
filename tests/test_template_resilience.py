@@ -77,3 +77,9 @@ def test_reminder_can_delete_only_nudge_schedules():
         resources = s["Resource"] if isinstance(s["Resource"], list) else [s["Resource"]]
         assert resources and all(isinstance(r, dict) and "Sub" in r for r in resources)
         assert sorted(r["Sub"].rsplit("/", 1)[-1] for r in resources) == ["expiry-*", "reminder-*"]
+
+
+def test_every_per_user_media_prefix_expires():
+    rules = _resources()["TempAudioBucket"]["Properties"]["LifecycleConfiguration"]["Rules"]
+    expiring = {r["Prefix"] for r in rules if r["Status"] == "Enabled" and r.get("ExpirationInDays")}
+    assert {"images/", "voice/", "voice-output/"} <= expiring
