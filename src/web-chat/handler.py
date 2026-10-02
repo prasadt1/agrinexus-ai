@@ -392,7 +392,6 @@ def query_bedrock(query: str, dialect: str = 'en') -> Dict[str, Any]:
             'धान': 'rice', 'भात': 'rice', 'వరి': 'rice',
             'कीट': 'pest', 'कीड': 'pest', 'పురుగు': 'pest',
             'रोग': 'disease', 'रोग': 'disease', 'వ్యాధి': 'disease',
-            'कीटनाशक': 'pest management', 'कीटकनाशक': 'pest management', 'పురుగుమందు': 'pest management',
             'सफेद मक्खी': 'whitefly', 'पांढरी माशी': 'whitefly', 'पांढऱ्या माशी': 'whitefly', 'తెల్ల దోమ': 'whitefly',
             'स्प्रे': 'spray', 'फवार': 'spray', 'స్ప్రే': 'spray',
             'खाद': 'fertilizer', 'खत': 'fertilizer', 'ఎరువు': 'fertilizer',

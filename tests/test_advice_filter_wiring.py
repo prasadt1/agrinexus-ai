@@ -231,9 +231,9 @@ def test_whatsapp_marathi_whitefly_question_gets_english_retrieval_hints(process
     processor.bedrock_agent.retrieve_and_generate = _rag
     processor.query_bedrock(WHITEFLY_MR, "mr")
     q = _retrieval_text(seen)
-    for hint in ("cotton", "whitefly", "spray", "pest management"):
+    for hint in ("cotton", "whitefly", "spray"):
         assert hint in q
-    assert "pesticide" not in q
+    assert "pesticide" not in q and "pest management" not in q
 
 
 def test_web_chat_marathi_whitefly_question_gets_english_retrieval_hints(webchat):
@@ -246,8 +246,9 @@ def test_web_chat_marathi_whitefly_question_gets_english_retrieval_hints(webchat
     webchat.bedrock_agent = types.SimpleNamespace(retrieve_and_generate=_rag)
     webchat.query_bedrock(WHITEFLY_MR, "mr")
     q = _retrieval_text(seen)
-    for hint in ("cotton", "whitefly", "spray", "pest management"):
+    for hint in ("cotton", "whitefly", "spray"):
         assert hint in q
+    assert "pest management" not in q
 
 
 def test_web_chat_photo_answer_is_filtered(webchat):
