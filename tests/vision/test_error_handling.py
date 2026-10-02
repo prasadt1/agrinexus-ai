@@ -3,13 +3,13 @@ Tests for error handling in vision pipeline.
 Ensures all error paths return user-friendly messages.
 """
 import pytest
-from src.vision.analyzer import process_image_message, validate_vision_schema
-from src.vision.messages import get_error_message
+from src.processor.analyzer import process_image_message, validate_vision_schema
+from src.processor.messages import get_error_message
 
 
 def test_download_failure_returns_error_message():
     """Download failure should return user-friendly error"""
-    import src.vision.analyzer as analyzer
+    import src.processor.analyzer as analyzer
     import urllib.error
 
     original = analyzer.download_whatsapp_image
@@ -66,7 +66,8 @@ def test_schema_validation_valid_schema():
         'crop_confidence': 'high',
         'visible_problem': 'pest',
         'severity': 'medium',
-        'recommendations': 'Test recommendations'
+        'recommendations': 'Test recommendations',
+        'insects_visible': [],
     }
 
     # Should not raise

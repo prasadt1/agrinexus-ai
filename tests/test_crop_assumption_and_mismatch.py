@@ -70,6 +70,86 @@ def test_assumed_crop_answers_without_asking(monkeypatch):
     assert pending["profile_crop"] == "Cotton"
 
 
+def _analyzer_two_pass(monkeypatch, first, second):
+    """First call is the blind first pass; a confirmed_crop call gets `second`."""
+    a = _analyzer(monkeypatch, first)
+    calls = []
+
+    def _fake(_image, _dialect, crop, district=None, confirmed_crop=False):
+        calls.append({"crop": crop, "confirmed_crop": confirmed_crop})
+        if confirmed_crop:
+            if isinstance(second, Exception):
+                raise second
+            return second
+        return first
+
+    monkeypatch.setattr(a, "analyze_crop_image", _fake)
+    return a, calls
+
+
+def test_assumed_crop_is_diagnosed_again_with_the_crop_as_given(monkeypatch):
+    first = _vision(diagnosis="Pink larvae feeding.", recommendations="Ask the officer.")
+    second = _vision(
+        inferred_crop="Cotton",
+        crop_confidence="high",
+        diagnosis="Pink bollworm larvae inside a cotton boll.",
+        recommendations="Remove infested bolls; spray as per label.",
+    )
+    a, calls = _analyzer_two_pass(monkeypatch, first, second)
+    out = a.process_image_message(
+        {"image": {"id": "m"}, "from": "1555"},
+        {"dialect": "en", "crop": "Cotton", "district": "Latur", "phone_number": "1555"},
+    )
+
+    assert calls == [
+        {"crop": "Cotton", "confirmed_crop": False},
+        {"crop": "Cotton", "confirmed_crop": True},
+    ]
+    assert "Pink bollworm larvae inside a cotton boll." in out["text"]
+    assert "Ask the officer." not in out["text"]
+    assert "Taking your crop as Cotton" in out["text"]
+    assert out["pending_crop_confirm"]["assumed"] is True
+
+
+def test_assumed_crop_falls_back_to_first_pass_if_second_call_fails(monkeypatch):
+    first = _vision(diagnosis="Pink larvae feeding.")
+    a, _calls = _analyzer_two_pass(monkeypatch, first, RuntimeError("throttled"))
+    out = a.process_image_message(
+        {"image": {"id": "m"}, "from": "1555"},
+        {"dialect": "en", "crop": "Cotton", "district": "Latur", "phone_number": "1555"},
+    )
+
+    assert "Pink larvae feeding." in out["text"]
+    assert "Taking your crop as Cotton" in out["text"]
+
+
+def test_second_call_that_disagrees_with_first_pass_is_ignored(monkeypatch):
+    first = _vision(diagnosis="Pink larvae feeding.")
+    for flipped in (
+        _vision(is_real_crop_photo=False, non_photo_reason="logo", diagnosis="Not a crop."),
+        _vision(visible_problem=False, diagnosis="Looks healthy."),
+    ):
+        a, _calls = _analyzer_two_pass(monkeypatch, first, flipped)
+        out = a.process_image_message(
+            {"image": {"id": "m"}, "from": "1555"},
+            {"dialect": "en", "crop": "Cotton", "district": "Latur", "phone_number": "1555"},
+        )
+        assert "Pink larvae feeding." in out["text"]
+        assert "Taking your crop as Cotton" in out["text"]
+
+
+def test_crop_question_does_not_make_a_second_call(monkeypatch):
+    first = _vision(inferred_crop="Sugarcane", crop_confidence="high")
+    a, calls = _analyzer_two_pass(monkeypatch, first, _vision())
+    out = a.process_image_message(
+        {"image": {"id": "m"}, "from": "1555"},
+        {"dialect": "en", "crop": "Cotton", "district": "Latur", "phone_number": "1555"},
+    )
+
+    assert out["buttons"][0] == "Sugarcane"
+    assert calls == [{"crop": "Cotton", "confirmed_crop": False}]
+
+
 def test_contradicting_image_asks_and_leads_with_the_observation(monkeypatch):
     a = _analyzer(monkeypatch, _vision(inferred_crop="Wheat", crop_confidence="medium"))
     out = a.process_image_message(
@@ -145,6 +225,72 @@ def test_confirmed_crop_prompt_tells_the_model_not_to_ask(monkeypatch):
     prompt = seen.get("prompt", "")
     assert "CONFIRMED CROP OVERRIDE" in prompt
     assert "Do NOT ask for another photo to identify the crop" in prompt
+
+
+def test_first_pass_prompt_keeps_crop_inference_but_drops_crop_photo_request(monkeypatch):
+    """The first call must still let the model name a different crop (the contradiction
+    question depends on it), but must not ask the farmer for a crop-identification photo."""
+    from src.processor import analyzer as a
+
+    seen = {}
+
+    def _fake_invoke(**kwargs):
+        import json as _json
+
+        body = _json.loads(kwargs["body"])
+        seen["prompt"] = body["messages"][0]["content"][1]["text"]
+        raise RuntimeError("stop after prompt capture")
+
+    monkeypatch.setattr(a, "_looks_like_screenshot_or_ui", lambda _b: False)
+    monkeypatch.setattr(a, "_looks_like_logo_or_graphic", lambda _b: False, raising=False)
+    monkeypatch.setattr(a.bedrock, "invoke_model", _fake_invoke)
+
+    try:
+        a.analyze_crop_image(b"\xff\xd8fake", "en", "Cotton")
+    except Exception:
+        pass
+
+    prompt = seen.get("prompt", "")
+    assert "CONFIRMED CROP OVERRIDE" not in prompt
+    assert "Visual overrides profile" in prompt
+    assert "Do NOT ask for another photo to identify the crop" in prompt
+    assert "Never ask in \"recommendations\" for a photo of the whole plant" in prompt
+    assert "Suggest clearer/closer photo" not in prompt
+    assert "send better photo" not in prompt
+
+
+def test_prompt_separates_whitefly_from_aphid(monkeypatch):
+    """Whiteflies were being named aphids; the pest name is what the farmer takes to the KVK."""
+    from src.processor import analyzer as a
+
+    seen = {}
+
+    def _fake_invoke(**kwargs):
+        import json as _json
+
+        body = _json.loads(kwargs["body"])
+        seen["prompt"] = body["messages"][0]["content"][1]["text"]
+        raise RuntimeError("stop after prompt capture")
+
+    monkeypatch.setattr(a, "_looks_like_screenshot_or_ui", lambda _b: False)
+    monkeypatch.setattr(a, "_looks_like_logo_or_graphic", lambda _b: False, raising=False)
+    monkeypatch.setattr(a.bedrock, "invoke_model", _fake_invoke)
+
+    for confirmed in (False, True):
+        seen.clear()
+        try:
+            a.analyze_crop_image(b"\xff\xd8fake", "en", "Cotton", confirmed_crop=confirmed)
+        except Exception:
+            pass
+        prompt = seen.get("prompt", "")
+        assert "Whiteflies:" in prompt
+        assert "Aphids:" in prompt
+        assert "tiny white/green bugs in clusters" not in prompt
+        assert "When you can identify the pest confidently, name it" in prompt
+        assert "Only when two or more similar pests are genuinely possible" in prompt
+        assert "label rate" not in prompt
+        assert "NO PESTICIDES" in prompt
+        assert "referral to the local KVK" in prompt
 
 
 def test_mismatched_tap_is_questioned_once(monkeypatch):
@@ -258,12 +404,12 @@ def test_marathi_labels_are_marathi_not_hindi(monkeypatch):
 def test_assumed_answer_does_not_claim_confidence_in_the_crop(monkeypatch):
     from src.processor import enforcement as e
 
-    vision = _vision(confidence_text="high - pest clearly visible")
+    vision = _vision(confidence_text="high - cotton boll clearly visible")
     out = e.format_crop_message(vision, "Cotton", "mr", assumed=True)
     # The crop half is named as an assumption inside the confidence section itself.
     assert "गृहीत धरले आहे" in out.split("विश्वास")[1]
-    # The model's own wording is kept rather than discarded.
-    assert "high - pest clearly visible" in out
+    # The diagnosing call was told the crop; its wording would vouch for the assumption.
+    assert "cotton boll clearly visible" not in out
 
 
 def test_confirmed_answer_keeps_the_model_confidence_wording(monkeypatch):

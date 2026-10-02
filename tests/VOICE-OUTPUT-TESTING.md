@@ -58,7 +58,7 @@ Available voices:
 - **Hindi/Marathi/Telugu**: Aditi (female, Indian accent)
 - **English**: Raveena (female, Indian accent)
 
-To change voices, edit `src/voice/output.py`:
+To change voices, edit `src/processor/output.py`:
 
 ```python
 def get_polly_voice(dialect: str) -> Tuple[str, str]:
@@ -116,5 +116,5 @@ For competition judges:
 1. Run test script and show all 4 languages working
 2. Play 1-2 audio samples (English + Hindi)
 3. Explain: "Voice responses sent automatically when user sends voice note"
-4. Show code: `src/voice/output.py` (simple, clean implementation)
+4. Show code: `src/processor/output.py` (simple, clean implementation)
 5. Mention: "WhatsApp test numbers don't support media, but code is production-ready"

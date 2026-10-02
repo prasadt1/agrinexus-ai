@@ -30,20 +30,14 @@ if COMMON_LAYER not in sys.path:
 
 class TestNoRetiredModelLiteral:
     def test_no_claude_3_sonnet_in_active_source(self):
-        """Assert no source file (excluding stale src/vision/) contains the retired model id substring."""
+        """Assert no source file contains the retired model id substring."""
         offenders = []
-        vision_root = (REPO / "src" / "vision").resolve()
         scan_roots = [REPO / "src", REPO / "template.yaml"]
         for root in scan_roots:
             paths = [root] if root.is_file() else root.rglob("*")
             for path in paths:
                 if not path.is_file():
                     continue
-                try:
-                    path.resolve().relative_to(vision_root)
-                    continue  # under src/vision/
-                except ValueError:
-                    pass
                 if path.suffix not in {".py", ".yaml", ".yml", ".sh", ".json"} and path.name != "template.yaml":
                     continue
                 try:

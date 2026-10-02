@@ -4,6 +4,151 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 2 October 2026 — nudge send window and cooldown (not deployed)
+
+- **Nudges went out at any hour and repeated after every close.** The weather poller runs every 6 hours (UTC), so a spray nudge could arrive around midnight in India. The only repeat control was the open-nudge check: as soon as a nudge was DONE or EXPIRED, the next favourable poll nudged the same farmer again. REQ-NUDGE-011 promised "max 2 per farmer per day", which was never implemented.
+- **Send window.** NudgeSender now sends only between 06:00 and 19:00 Asia/Kolkata (fixed UTC+5:30), set by the stack parameters `NudgeSendWindowStartHour` and `NudgeSendWindowEndHour`. Outside the window, each farmer who passed every other gate is skipped and counted in a new `NudgesDeferred` metric; the next poll inside the window sends. An unreadable or inverted window sends nothing. The 6-hour schedule is unchanged, and reminders are not affected.
+- **Cooldown.** `NUDGE_COOLDOWN_DAYS` (default 7) blocks a new nudge for the same farmer and activity within that many days of the last DONE or EXPIRED nudge. Close time is `completedAt` for DONE and the new `expiredAt` for EXPIRED, which both expiry paths (T+72h auto-expiry and a final "not yet") now record. Older EXPIRED rows without it count from creation + 72 hours. An unreadable close time blocks.
+- **Demo path.** `scripts/test-complete-flow.sh` invokes the weather poller with `{"force": true}`; the poller passes it through the state machine to NudgeSender, which then skips the window and cooldown only. Consent, allowlist, visitor, onboarding and open-nudge gates still apply. Only a JSON boolean `true` forces.
+- REQ-NUDGE-011 rewritten to state these rules. 31 new tests: 27 failed before the change, and 4 pin behaviour that must not change (6-hour schedule, state machine passes its full input, no force without a boolean `true`); full suite 883 passed, 30 skipped; `sam validate --lint` clean.
+
+---
+
+## 2 October 2026 — filter leaves no orphaned repeat steps (not deployed)
+
+- **Removing a chemical step left its follow-up behind.** On the deployed web chat, a pink bollworm reply lost a dose sentence and kept "Repeat two more times at 30-day intervals", which then pointed at nothing. Separately, steps were renumbered only within one line: when a whole numbered line was dropped, the list read 1, 3, 4, and a kept line such as "2. Destroy crop residue." became "1." because numbering restarted on each line. The filter now drops a step directly after a removed one when it only says to repeat or reapply (English, Hindi, Marathi, Telugu); repeating a check or inspection stays. Numbering runs across the whole message and restarts after a heading ending in ":" or when the original numbers start over. Replies with nothing removed are returned unchanged. Orphan drops are logged but not counted in `AdviceFilterHit`, which still counts chemical advice only. On the 119 stored and live replies, one output changed: a Marathi "(३) …३-४ दिवसांनी पुन्हा फवारणी करा" (spray again after 3-4 days) that followed a removed insecticide step. REQ-GUARD-010 amended.
+
+---
+
+## 2 October 2026 — Lambda runtime Python 3.13 (not deployed)
+
+- **Runtime was past its update cut-off.** Every function and the common layer ran `python3.11`, which AWS deprecated on 30 June 2026 with function updates disabled from 31 August 2026; `sam validate --lint` failed on it, so the lint step at the end of CI failed too. All functions (one global setting, no per-function overrides) and the layer now use `python3.13`, and CI tests on 3.13. In a clean Python 3.13 environment without AWS credentials the suite passes (839 passed, 30 skipped) and the template lints clean. `sam build` packages Pillow 11.3.0 as the `cp313` manylinux x86_64 wheel. Remaining 3.13 warnings are deprecations only (`datetime.utcnow`, `utcfromtimestamp`). A test keeps functions, layer and CI on one supported version.
+
+---
+
+## 2 October 2026 — photo relevance check restored (not deployed)
+
+- **Relevance check ran on an end-of-life model.** `classify_image_relevance` called Claude 3 Haiku, which Bedrock now rejects ("This model version has reached the end of its life"), so every check returned `unclear`. It now uses the Claude Haiku 4.5 inference profile, set by the new stack parameter `RelevanceModelId` and passed to both processors as `VISION_RELEVANCE_MODEL_ID`. IAM on both processors is limited to that profile and its foundation model; a session-policy probe against live Bedrock succeeded 6 of 6 times, and a control without the foundation-model ARN was denied.
+- **Swapping the model alone would have blocked a real pest photo.** With the old prompt, Haiku 4.5 labelled the pink bollworm sample `not_agri`/`animal` with high confidence in 3 of 3 runs; confident `not_agri` is a hard block. The prompt now counts insects, larvae, caterpillars and mites on crops as farm photos and excludes crop pests from "animals". Live, 3 runs each: all 8 crop and pest photos `agri_photo`/high; logo, diagram and app screenshot `not_agri`/high; a WhatsApp screenshot containing a leaf photo `agri_photo`, which the diagnosis model's non-photo check still handles.
+- **Guardrail on the relevance call.** The guardrail's non-farming topic often intervenes when the model answers `not_agri`, and an intervention is read as `unclear`. The gate therefore mostly confirms farm photos and rarely hard-blocks; the diagnosis model stays the check for non-farm images. REQ-VIS-007 added (168 active requirements); ADR 0010 updated.
+
+---
+
+## 2 October 2026 — external review, phase 2 and hygiene (deployed 2 October)
+
+Each item below has its own commit and a test that failed before the fix. Deployed together with phase 1 at 67cc97a; after the deploy the stale-schedule script ran with `--apply` and deleted 141 schedules, leaving 4.
+
+### Message delivery
+- **Photo path had no guardrail.** Both `invoke_model` calls in `src/processor/analyzer.py` now carry the content guardrail. A guardrail intervention on a diagnosis sends only the localized farming-only refusal, on every photo route (first pass, assumed-crop second pass, crop-confirm tap). Probed against the live guardrail with sample photos E, F and G in Marathi and Hindi: none blocked. REQ-GUARD-015.
+- **Webhook dedup swallowed failed enqueues.** The WAMID claim is now deleted when the SQS send fails, and a failed voice enqueue raises instead of returning 200, so Meta's retry is processed.
+- **Webhook read only the first entry and change.** Every message in a batched delivery is queued, each with the metadata of its own change.
+- **Voice queue had no DLQ.** VoiceQueue now redrives to VoiceDLQ after 3 receives, like the text queues, and the DLQ handler sends the farmer the localized error.
+- **One bad stream record could stall DONE/NOT YET handling.** The ResponseDetector mapping retries twice, bisects, reports per-record failures and sends exhausted batches to `ResponseDetectorFailureQueue`. The handler skips malformed records (`MalformedStreamRecord` metric) and stops at the first failing record so later ones are not handled twice. Its role also lacked `cloudwatch:PutMetricData`, so `NudgesCompleted` had never been recorded.
+- **Empty interactive payloads reached Bedrock.** They are now skipped before the visitor cap, the ack and the knowledge base call.
+
+### Data and state
+- **Scheduler leak.** Reminder and expiry schedules delete themselves after firing (`ActionAfterCompletion=DELETE`), and the reminder Lambda deletes a nudge's remaining schedules on expiry or when the nudge is closed or missing. Dev had 145 leftover schedules; `scripts/delete-stale-nudge-schedules.py` (dry run: 141 stale) removes them and has not been run with `--apply`.
+- **Spoken replies kept indefinitely.** `voice-output/{phone}/` is now covered by DELETE MY DATA and by a 1-day lifecycle rule (36 objects in dev). REQ-PRIV-001 amended.
+- **`location_coords` stored `['lat','lon']`.** Profiles now store `[lat, lon]` as Decimals.
+- **Visitor cap refusal discarded the pending crop confirmation.** The cap is checked before the block that deletes the pending row.
+
+### Policy and access
+- **Allowlist failed open.** `is_approved_user` returned True for any number without an allowlist row, so every WhatsApp number got voice, photo diagnosis and nudges, and every visitor bypassed the daily caps. It now requires an approved row and enforces `expires_at`; anything else, including a lookup error, means not approved. **This changes live behaviour once deployed:** only allowlisted numbers get voice, photo and nudges, and visitors are capped. REQ-VISITOR-009 amended.
+- **Pesticide policy reply carried sources.** When a refused pesticide question is answered with the policy line, the refused answer's citations are no longer shown (WhatsApp source line, web chat `citations`). The KVK referral and Kisan Call Centre footer stay.
+- **IAM scoped.** `bedrock:InvokeModel` is limited to the inference profile and its foundation model (plus the Haiku relevance model on the processors), `Retrieve` to the knowledge base, `ApplyGuardrail` to the stack guardrail, scheduler actions to `reminder-*` and `expiry-*`. Verified with a session-policy probe against live Bedrock: every call the stack makes succeeded, and a control without the foundation-model ARN was denied. `bedrock:RetrieveAndGenerate` (no resource-level permissions) and `polly:SynthesizeSpeech` (a lexicon-scoped policy was denied) remain on `*`.
+- **Banned pesticides.** REQ-GUARD-001 promised input-side blocking that was never built; it now states the output-side guarantee. Making that true needed 29 of 43 names on India's CIB&RC banned list, and their Devanagari and Telugu spellings, added to the filter. On the stored replies the filter removes no sentence it kept before.
+
+### Docs and hygiene
+- README and the quality metrics doc now say 167 active requirements (169 defined, 2 retired or folded); `scripts/count_requirements.py` computes it and a test checks every stated count.
+- README no longer claims WAF on the webhook; WAF covers web chat only.
+- `src/vision/` and `src/voice/output.py` (not deployed) are deleted. The tests that imported them now test `src/processor/`.
+- CI runs the full suite (826 passed, 30 skipped in a clean Python 3.11 environment without AWS credentials).
+
+### Found during this work, not fixed
+- **Photo relevance check is dead.** Claude 3 Haiku has reached end of life, so `classify_image_relevance` always fails and returns `unclear`. In the last 14 days of logs all 15 checks did (all from the beta processor; the main processor logged none). Non-farming photos still reach the main vision model, which rejects them, but the cheap pre-check never runs. Fixed in the entry above.
+- **Nudge liner model.** `NUDGE_LINER_MODEL_ID` is also Claude 3 Haiku. The liner is off (`NUDGE_BEDROCK_LINER=false`) and falls back to the static hint on any error, so nothing is broken today, but enabling it would still send only the static hint until the model ID is changed.
+- **Advice filter can strip a non-chemical step.** On the deployed web chat, "which pesticide and dose for pink bollworm" removed one segment as a dose, and the reply kept the follow-on sentence "Repeat two more times at 30-day intervals" without the step it refers to. The reply was otherwise correct (no product, no dose, non-chemical steps, KVK, Kisan Call Centre). Fixed in the orphaned-repeat entry above.
+- **Python 3.11 Lambda runtime.** `cfn-lint` reports it deprecated (June 2026), with function updates disabled from 31 August 2026. Deploys succeeded this week, but the runtime needs upgrading. Fixed in the Python 3.13 entry above.
+- `scripts/delete-user-data.sh` (operator erasure) deletes no S3 media.
+- `BetaMessageDLQ` has no consumer, so failures on the beta queue get no farmer-facing error.
+
+---
+
+## 2 October 2026 — external review, phase 1: weather fails closed, filter gaps (deployed 2 October)
+
+An external code review verified these against source.
+
+### Weather invented good weather
+`check_weather_real` fell back to `check_weather_mock` on a missing API key or any request error, and the mock reports 8.5 km/h wind and no rain for every configured district. A dead key or an OpenWeatherMap outage would have sent spray nudges regardless of real conditions. A response without a `wind` field was also read as 0 km/h. Now each of these marks the district unfavorable (`reason: weather_unavailable`), sends no nudge for it, and emits `AgriNexus/Weather` `WeatherFetchFailed` with `Location` and `Reason`. The mock is reachable only through `MOCK_WEATHER=true`, which is logged. REQ-ERROR-008 previously promised cached weather that was never built; amended.
+
+### Advice filter gaps
+Five sentences classified as clean and would have reached a farmer verbatim: "Use cartap hydrochloride granules in the maize whorl.", "Spray dichlorvos on the affected plants.", "Rogor is effective against aphids.", "Mix two ml per litre of water and spray.", "दोन मिली प्रति लिटर पाण्यात मिसळून फवारणी करा." Fixed by:
+- the requested actives (cartap, dichlorvos, methomyl, chlorfenapyr, dicofol, 2,4-D, pendimethalin, atrazine, chlorothalonil, streptocycline, validamycin) and brands (Rogor, Karate, Regent, Lannate) in Latin, Devanagari and Telugu;
+- a fallback on pesticide-class name endings (-fos, -thrin, -conazole, -cloprid, -mectin, -achlor, -fop, -uron, -mycin and others) in all three scripts, so an unlisted active is still removed;
+- number words as quantities (one/two/half, एक/दो/दोन/आधा/अर्धा/दीड, ఒక/రెండు/అర);
+- apply/use verbs (apply, use, वापरा, टाका, डालें, वाडండి) as spray context, except in sentences about fertilizer, seed or irrigation;
+- small-unit amounts per acre or hectare.
+
+`tests/test_advice_filter_adversarial.py` keeps the five sentences as regression cases and probes 22 actives that are deliberately not in the explicit lists. Run against every reply stored in `docs/try/replays/`, the new filter removes no sentence the old one kept.
+
+### Known limits
+- The name-ending fallback misses actives whose names have none of those endings; sulfoxaflor, etofenprox and pymetrozine were found this way and added by name. Others will need the same.
+- Brand names that are ordinary English words ("Karate", "Regent") are removed wherever they appear.
+
+---
+
+## 2 October 2026 — knowledge base refusals and source line
+
+### Problem
+Live Marathi refusals came back with "स्त्रोत: FAO/ICAR शेती मार्गदर्शक" and a second KVK referral. The model paraphrased the refusal sentence differently each time ("ज्ञानकोशात", "ज्ञान भांडारात", "माझ्या माहितीमध्ये … उपलब्ध नाही"), so phrase matching kept missing it. Separately, `retrievedReferences` is always empty, so the generic FAO/ICAR line was attached to every answer without naming any retrieved document.
+
+### What changed
+- **Refusal markers.** The knowledge base prompt asks for `NO_KB_ANSWER` when the context does not cover the question and `NOT_FARMING` for off-topic questions. `common/guardrail_reply.py` replaces these, and Bedrock's English "Sorry, I am unable to assist you with this request.", with a fixed refusal in the farmer's language. Refusals carry no source line and no referral footer. Phrase checks remain as a fallback.
+- **No generic source line.** WhatsApp replies, the web chat API and the web demo page show a source only when a retrieved document name is available. Source lines the model writes itself (for example an ICAR institute name in the prose) are removed, because nothing checks them against what was retrieved. ADR 0005 amended; REQ-CONV-004 and AC-002 amended.
+- **Pesticide questions state the policy.** A pesticide or spray question the knowledge base cannot answer no longer gets "I don't have information on this", which implies the system would name a product if it knew. It gets a fixed line in the farmer's language ("I can't give pesticide names or quantities. Send a photo of the affected plant…") followed by the KVK referral and Kisan Call Centre number. When the knowledge base does answer, the prompt asks the model to open with the same sentence.
+- **Marathi larva term.** Photo prompts ask for अळी (गुलाबी बोंडअळी) instead of the Hindi इल्ली or इळी; a photo F replay used गुलाबी बोंडअळी in 4 of 4 runs.
+- **Retrieval hints.** Marathi "कापसावरील" (oblique stem कापस) now maps to cotton; whitefly terms in Hindi, Marathi and Telugu and "फवार" (spray) were added. A "pest management" hint was tried and removed: it pulled in product dose tables and generation declined every time.
+
+### Evidence
+- Against Bedrock: the neem dose question returned `NO_KB_ANSWER` in 3 of 3 runs and became the fixed Marathi refusal; whitefly and pink bollworm questions still answered with traps, thresholds and the KVK referral.
+
+### Known limits
+- **Advice filter not yet seen firing on WhatsApp.** A live hit is confirmed only on `web_text` (log line and `AdviceFilterHit` datapoint). Two WhatsApp text attempts and photo F came back clean from the model, so `whatsapp_text`, `whatsapp_voice` and `whatsapp_photo` are covered by wiring tests but unproven live. The metric will show the first real hit.
+- A Telugu rice blast question retrieved a weeding chunk for direct-seeded rice and answered off-topic. There is no Telugu hint for blast yet.
+- The web demo page change goes live only when `main` is updated (GitHub Pages serves `main:/docs`).
+
+---
+
+## 2 October 2026 — no pesticide recommendations: identify and refer
+
+### Decision
+The product identifies the pest and gives non-chemical steps. It does not name pesticide products or doses on any path. Chemical choice and rate are referred to the farmer's local KVK (Krishi Vigyan Kendra). This applies to photo, text and voice.
+
+### Why
+The photo path has no retrieval and no citations, so every product name and rate it gave came from the model's own knowledge (replays on 1–2 Oct: profenofos, emamectin benzoate, chlorpyrifos, imidacloprid, thiamethoxam, chlorantraniliprole, with rates and brand names such as Confidor and Actara). Naming a chemical carries the highest liability and the least differentiation. Pest identification is both defensible and the useful part.
+
+### What changed
+- **Output filter (the control).** New `common/advice_filter.py` in the common layer. Every farmer-facing advice message passes through it before it is sent and before Polly speaks it: WhatsApp text and voice answers, photo answers (direct, assumed-crop, crop-confirmed, visitor sample, last-image override), web chat text and photo answers, and the optional nudge liner. A sentence or numbered step is dropped if it names an active ingredient or brand (Latin, Devanagari, Telugu), gives a formulation strength (`50% EC`, `१७.८ एसएल`, `1500 ppm`) or a dilution (`2 मिली/लिटर`, `0.3 ml per litre`); Devanagari and Telugu digits are matched. A bare quantity is dropped only when the sentence is about spraying, mixing, a pesticide, neem or a trap, so fertilizer and irrigation amounts survive. Each removal logs a line and emits `AgriNexus/Advice` `AdviceFilterHit` by channel and kind.
+- **Referral line.** Every advice reply ends with, in the farmer's language: "This is an automated reading of your photo and it can be wrong. For the correct pesticide and quantity, contact your nearest KVK." Text and voice say "automated answer" instead. The contact comes from the existing district helpline block when the district is curated, otherwise the national Kisan Call Centre number; the buy-keyword footer is not added a second time. Crop questions and knowledge-base refusals carry no referral.
+- **Prompts (first line of defence).** The WhatsApp photo prompt no longer asks for a product with its label rate; it, both knowledge-base prompts and the web chat photo prompt now forbid product, ingredient, formulation and dose and ask for pest, severity and non-chemical steps.
+- **Permissions.** Neither processor, the web chat nor the nudge sender had `cloudwatch:PutMetricData`; all four now do. The existing `AgriNexus/Visitor` metrics were probably never recorded for the same reason (the namespace is empty).
+
+### Evidence
+- Unit tests feed every recommendation and reply stored in `docs/try/replays/` and the live Marathi replies, including `(५०० ग्रॅम निंबोळी १० लिटर पाण्यात)`, through the filter and assert no product, formulation or dose survives. Wiring tests drive each send path with chemical text from the model.
+- Photo replay against Bedrock, Marathi, profile Cotton (`docs/try/replays/2026-10-02-no-pesticide.json`): 5 first-pass and 2 crop-confirmed runs per photo. Pink bollworm (F) and whitefly (G) were named in 14/14; product 0/14, dose 0/14, non-chemical steps 14/14, referral 14/14. The model followed the new prompt in every run, so the filter had nothing to remove.
+- Text questions against the knowledge base (`docs/try/replays/2026-10-02-text-pesticide-question.json`): an explicit "which pesticide and how much" in English, Marathi and Hindi, plus "How do I control whitefly on cotton?", all returned no product and the referral. The filter removed two sentences: a Marathi "Azadirachtin 1500 ppm … 2.5 लिटर/हेक्टर" neem-product rate and a Hindi neem-leaf dilution.
+
+### Known limits
+- The filter drops the whole sentence, so a sentence that combines a trap and a neem dose loses the trap advice too (seen once in the Hindi text answer).
+- The ingredient list is finite. A product the list does not know, written without a dose or formulation, would pass; the metric and the stored replies are how new names get found.
+- Nudge copy still says "please spray" without naming a product; unchanged by decision.
+- The referral names the nearest KVK but gives no KVK phone number; no per-district KVK directory is loaded yet.
+
+### Requirements
+REQ-GUARD-008 to REQ-GUARD-014 added; REQ-GUARD-002 (dosage disclaimers) retired; REQ-GUARD-004 folded into 008; REQ-VIS-002 amended.
+
+---
+
 ## 1 October 2026 — crop identity asked only when it is in doubt (code; not deployed)
 
 ### What was wrong

@@ -12,6 +12,7 @@ from typing import Dict, Any
 from common.whatsapp import send_whatsapp_message, send_whatsapp_template, send_whatsapp_buttons
 from common.redact import redact_phone
 from common.allowlist import is_approved_user
+from common.advice_filter import filter_advice
 
 # Lambda uses Handler sender.lambda_handler (flat zip); tests use src.nudge.sender
 _nudge_dir = os.path.dirname(os.path.abspath(__file__))
@@ -19,6 +20,7 @@ if _nudge_dir not in sys.path:
     sys.path.insert(0, _nudge_dir)
 from nudge_copy import build_nudge_message
 from bedrock_liner import invoke_nudge_focus_line
+from schedules import reminder_schedule_name, expiry_schedule_name
 
 dynamodb = boto3.resource('dynamodb')
 scheduler = boto3.client('scheduler')
@@ -53,9 +55,7 @@ def create_reminder_schedule(phone_number: str, nudge_id: str, hours_offset: int
     """Create EventBridge Scheduler for reminder"""
     schedule_time = datetime.utcnow() + timedelta(hours=hours_offset)
     
-    # Create valid schedule name (alphanumeric, hyphens, underscores only)
-    safe_nudge_id = nudge_id.replace(':', '-').replace('#', '-')
-    schedule_name = f'reminder-{safe_nudge_id}-{hours_offset}h'
+    schedule_name = reminder_schedule_name(nudge_id, hours_offset)
     
     try:
         scheduler.create_schedule(
@@ -71,7 +71,8 @@ def create_reminder_schedule(phone_number: str, nudge_id: str, hours_offset: int
                     'dialect': dialect
                 })
             },
-            FlexibleTimeWindow={'Mode': 'OFF'}
+            FlexibleTimeWindow={'Mode': 'OFF'},
+            ActionAfterCompletion='DELETE',
         )
         print(f"Created reminder schedule: {schedule_name}")
     except Exception as e:
@@ -91,9 +92,7 @@ def create_expiry_schedule(phone_number: str, nudge_id: str, hours_offset: int):
     """Create EventBridge Scheduler to auto-expire nudge if no response"""
     schedule_time = datetime.utcnow() + timedelta(hours=hours_offset)
     
-    # Create valid schedule name
-    safe_nudge_id = nudge_id.replace(':', '-').replace('#', '-')
-    schedule_name = f'expiry-{safe_nudge_id}'
+    schedule_name = expiry_schedule_name(nudge_id)
     
     # Use the same reminder Lambda but with a special 'EXPIRY' type
     try:
@@ -110,7 +109,8 @@ def create_expiry_schedule(phone_number: str, nudge_id: str, hours_offset: int):
                     'activity': 'auto-expire'
                 })
             },
-            FlexibleTimeWindow={'Mode': 'OFF'}
+            FlexibleTimeWindow={'Mode': 'OFF'},
+            ActionAfterCompletion='DELETE',
         )
         print(f"Created expiry schedule: {schedule_name}")
     except Exception as e:
@@ -142,6 +142,75 @@ def emit_metric(name: str, value: float = 1.0):
         print(f"Failed to emit metric {name}: {e}")
 
 
+IST_OFFSET = timedelta(hours=5, minutes=30)  # Asia/Kolkata has no DST
+EXPIRY_HOURS = 72
+
+
+def _utcnow() -> datetime:
+    return datetime.utcnow()
+
+
+def _parse_utc(value) -> datetime:
+    parsed = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+    if parsed.tzinfo is not None:
+        parsed = (parsed - parsed.utcoffset()).replace(tzinfo=None)
+    return parsed
+
+
+def in_send_window(now_utc: datetime) -> bool:
+    """True when Asia/Kolkata local time is within [start, end). Bad config sends nothing."""
+    try:
+        start = int(os.environ.get('NUDGE_WINDOW_START_HOUR', '6'))
+        end = int(os.environ.get('NUDGE_WINDOW_END_HOUR', '19'))
+    except ValueError:
+        print("Nudge send window unreadable - deferring all nudges")
+        return False
+    if not 0 <= start < end <= 24:
+        print(f"Nudge send window invalid ({start}-{end}) - deferring all nudges")
+        return False
+    local = now_utc + IST_OFFSET
+    return start <= local.hour < end
+
+
+def in_cooldown(phone_number: str, activity: str, now_utc: datetime) -> bool:
+    """
+    True when the farmer's last closed (DONE/EXPIRED) nudge for this activity closed
+    within NUDGE_COOLDOWN_DAYS. Close time is completedAt/expiredAt, else creation + 72h.
+    Unreadable config or close time blocks the send.
+    """
+    try:
+        cooldown = timedelta(days=int(os.environ.get('NUDGE_COOLDOWN_DAYS', '7')))
+    except ValueError:
+        cooldown = None
+
+    response = table.query(
+        KeyConditionExpression='PK = :pk AND begins_with(SK, :sk)',
+        ExpressionAttributeValues={
+            ':pk': f'USER#{phone_number}',
+            ':sk': 'NUDGE#'
+        }
+    )
+    for item in response.get('Items', []):
+        nudge_id = item.get('SK', '').replace('NUDGE#', '')
+        created, _, nudge_activity = nudge_id.rpartition('#')
+        status = item.get('status')
+        if nudge_activity != activity or status not in ('DONE', 'EXPIRED'):
+            continue
+        if cooldown is None:
+            print("NUDGE_COOLDOWN_DAYS unreadable - treating closed nudges as cooling down")
+            return True
+        closed = item.get('completedAt') if status == 'DONE' else item.get('expiredAt')
+        try:
+            closed_at = _parse_utc(closed) if closed else _parse_utc(created) + timedelta(hours=EXPIRY_HOURS)
+        except (TypeError, ValueError):
+            print(f"Unreadable close time on {nudge_id} - treating as cooling down")
+            return True
+        if now_utc - closed_at < cooldown:
+            print(f"{activity} nudge for {redact_phone(phone_number)} closed {closed_at.isoformat()} - in cooldown")
+            return True
+    return False
+
+
 def has_open_nudge(phone_number: str, activity: str, max_age_hours: int = 96) -> bool:
     """
     Check if user already has an OPEN nudge for this activity (SENT/REMINDED).
@@ -160,7 +229,7 @@ def has_open_nudge(phone_number: str, activity: str, max_age_hours: int = 96) ->
         }
     )
 
-    now = datetime.utcnow()
+    now = _utcnow()
     max_age = timedelta(hours=max_age_hours)
 
     for item in response.get('Items', []):
@@ -195,7 +264,13 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     location = event.get('location')
     weather = convert_floats_to_decimal(event.get('weather', {}))
     activity = event.get('activity', 'spray')
-    
+    # Demo path only: bypasses the send window and cooldown, never the consent gates.
+    force = event.get('force') is True
+    now = _utcnow()
+    window_open = force or in_send_window(now)
+    if force:
+        print("force=true - send window and cooldown bypassed")
+
     # Query farmers in this location
     response = table.query(
         IndexName='GSI1',
@@ -210,7 +285,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     
     nudges_sent = 0
     nudges_skipped = 0
-    
+    nudges_deferred = 0
+
     for farmer in farmers:
         phone_number = farmer.get('phone_number')
         dialect = farmer.get('dialect', 'hi')
@@ -248,6 +324,16 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             nudges_skipped += 1
             continue
 
+        if not force and in_cooldown(phone_number, activity, now):
+            nudges_skipped += 1
+            continue
+
+        if not window_open:
+            print(f"Deferring {redact_phone(phone_number)} - outside nudge send window")
+            emit_metric('NudgesDeferred', 1)
+            nudges_deferred += 1
+            continue
+
         crop = profile.get('crop', 'Cotton')
         district_key = profile.get('location') or location
 
@@ -255,8 +341,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         hint_override = None
         if os.environ.get("NUDGE_BEDROCK_LINER", "").lower() in ("1", "true", "yes"):
             try:
-                hint_override = invoke_nudge_focus_line(
-                    dialect, crop, str(district_key), wind_speed
+                hint_override = filter_advice(
+                    invoke_nudge_focus_line(dialect, crop, str(district_key), wind_speed),
+                    dialect, "nudge_liner", add_referral=False,
                 )
             except Exception as e:
                 print(f"Nudge Bedrock liner skipped: {e}")
@@ -265,9 +352,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         )
 
         # Create nudge record in DynamoDB
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = now.isoformat()
         nudge_id = f"{timestamp}#{activity}"
-        ttl = int(datetime.utcnow().timestamp()) + (180 * 24 * 60 * 60)  # 180 days
+        ttl = int(now.timestamp()) + (180 * 24 * 60 * 60)  # 180 days
 
         table.put_item(
             Item={
@@ -325,5 +412,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         'statusCode': 200,
         'nudges_sent': nudges_sent,
         'nudges_skipped': nudges_skipped,
+        'nudges_deferred': nudges_deferred,
         'location': location
     }

@@ -8,7 +8,7 @@ import os
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.vision.analyzer import analyze_crop_image
+from src.processor.analyzer import analyze_crop_image
 
 
 def run_vision_analysis(image_path, dialect, crop, description):

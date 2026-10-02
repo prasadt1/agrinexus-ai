@@ -80,8 +80,8 @@ Use a **golden-style** question so the KB is likely to return grounded text (sam
 
 - [ ] ⏳ Send: `Cotton mein aphids ka control kaise karein?` (or Hindi: `कपास में माहू कीट कैसे नियंत्रित करें?`)
 - [ ] ⏳ Receive response in expected language within 10 seconds
-- [ ] ⏳ Verify response has source citation (or proper KVK-style refusal without fake source line)
-- [ ] ⏳ Check no fake "स्रोत: FAO/ICAR" on refusal responses
+- [ ] ⏳ Verify answers carry no generic "स्रोत: FAO/ICAR" line (ADR 0005 amendment)
+- [ ] ⏳ Verify refusals are the fixed localized text with no source line or referral footer
 - [ ] ⏳ Verify message saved in DynamoDB
 
 **Expected Time:** 5-10 seconds  

@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import boto3
+from datetime import datetime
 from typing import Dict, Any
 from common.whatsapp import send_whatsapp_message, send_whatsapp_buttons
 
@@ -13,8 +14,10 @@ _nudge_dir = os.path.dirname(os.path.abspath(__file__))
 if _nudge_dir not in sys.path:
     sys.path.insert(0, _nudge_dir)
 from nudge_copy import build_reminder_message
+from schedules import delete_nudge_schedules
 
 dynamodb = boto3.resource('dynamodb')
+scheduler = boto3.client('scheduler')
 
 TABLE_NAME = os.environ['TABLE_NAME']
 table = dynamodb.Table(TABLE_NAME)
@@ -43,6 +46,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     
     nudge = response.get('Item')
     if not nudge:
+        delete_nudge_schedules(scheduler, nudge_id)
         return {'statusCode': 404, 'message': 'Nudge not found'}
     
     status = nudge.get('status')
@@ -56,13 +60,15 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'PK': f'USER#{phone_number}',
                     'SK': f'NUDGE#{nudge_id}'
                 },
-                UpdateExpression='SET #status = :status',
+                UpdateExpression='SET #status = :status, expiredAt = :expired',
                 ExpressionAttributeNames={'#status': 'status'},
                 ExpressionAttributeValues={
-                    ':status': 'EXPIRED'
+                    ':status': 'EXPIRED',
+                    ':expired': datetime.utcnow().isoformat()
                 }
             )
             print(f"Auto-expired nudge {nudge_id} (no response after T+48h)")
+        delete_nudge_schedules(scheduler, nudge_id)
         return {'statusCode': 200, 'message': 'Nudge expired'}
     
     # Get user profile to determine dialect + district
@@ -109,6 +115,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         return {'statusCode': 200, 'message': 'Reminder sent'}
     else:
+        delete_nudge_schedules(scheduler, nudge_id)
         if status == 'DONE':
             return {'statusCode': 200, 'message': 'Task already completed'}
         return {'statusCode': 200, 'message': 'Task already closed'}

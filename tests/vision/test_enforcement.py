@@ -1,9 +1,9 @@
 import pytest
-from src.vision.enforcement import enforce_message_safety
+from src.processor.enforcement import enforce_message_safety
 
 
 def test_high_confidence_allows_model_message():
-    """High confidence → allow model's message"""
+    """High confidence → the model's recommendation is kept in the four-section message"""
     vision = {
         'is_real_crop_photo': True,
         'crop_confidence': 'high',
@@ -12,7 +12,8 @@ def test_high_confidence_allows_model_message():
 
     result = enforce_message_safety(vision, 'cotton', 'en')
 
-    assert result == 'Cotton bollworm detected on leaves.'
+    assert '*Recommendations:* Cotton bollworm detected on leaves.' in result
+    assert '*Diagnosis:*' in result and '*Severity:*' in result
 
 
 def test_low_confidence_blocks_crop_name():

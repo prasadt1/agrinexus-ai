@@ -14,7 +14,16 @@ from datetime import datetime
 from decimal import Decimal
 import hashlib
 from botocore.exceptions import ClientError
-from common.guardrail_reply import apply_localized_guardrail_reply
+from common.guardrail_reply import (
+    KB_NO_ANSWER_MARKER,
+    KB_NOT_FARMING_MARKER,
+    LOCALIZED_NO_ANSWER,
+    LOCALIZED_REFUSAL,
+    apply_kb_no_answer,
+    apply_localized_guardrail_reply,
+)
+from common.advice_filter import filter_advice, is_pesticide_question, pesticide_policy
+from common.source_line import strip_source_lines
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -58,6 +67,10 @@ def is_rag_refusal_response(text: str) -> bool:
     t = (text or "").strip()
     if not t:
         return True
+    if t in (*LOCALIZED_NO_ANSWER.values(), *LOCALIZED_REFUSAL.values()):
+        return True
+    if KB_NO_ANSWER_MARKER in t or KB_NOT_FARMING_MARKER in t:
+        return True
     low = t.lower()
     # English refusals from prompt rules
     if "i don't have information about this in my knowledge base" in low:
@@ -68,6 +81,11 @@ def is_rag_refusal_response(text: str) -> bool:
     if "मेरे पास" in t and ("जानकारी नहीं" in t or "जानकारी नही" in t):
         return True
     if "कृषि" in t and ("सिर्फ" in t and "सवाल" in t):
+        return True
+    # Marathi (both spellings of ज्ञानकोश appear in model output)
+    if ("ज्ञानकोषात" in t or "ज्ञानकोशात" in t) and "नाही" in t:
+        return True
+    if "माझ्याकडे" in t and "माहिती नाही" in t:
         return True
     return False
 
@@ -379,14 +397,15 @@ def query_bedrock(query: str, dialect: str = 'en') -> Dict[str, Any]:
     if dialect != 'en':
         # Common farming keyword mappings for better retrieval
         _keyword_hints = {
-            'कपास': 'cotton', 'कापूस': 'cotton', 'పత్తి': 'cotton',
+            'कपास': 'cotton', 'कापूस': 'cotton', 'कापस': 'cotton', 'పత్తి': 'cotton',
             'गेहूं': 'wheat', 'गहू': 'wheat', 'గోధుమ': 'wheat',
             'सोयाबीन': 'soybean', 'సోయాబీన్': 'soybean',
             'मक्का': 'maize', 'मका': 'maize', 'మొక్కజొన్న': 'maize',
             'धान': 'rice', 'भात': 'rice', 'వరి': 'rice',
             'कीट': 'pest', 'कीड': 'pest', 'పురుగు': 'pest',
             'रोग': 'disease', 'रोग': 'disease', 'వ్యాధి': 'disease',
-            'स्प्रे': 'spray', 'फवारणी': 'spray', 'స్ప్రే': 'spray',
+            'सफेद मक्खी': 'whitefly', 'पांढरी माशी': 'whitefly', 'पांढऱ्या माशी': 'whitefly', 'తెల్ల దోమ': 'whitefly',
+            'स्प्रे': 'spray', 'फवार': 'spray', 'స్ప్రే': 'spray',
             'खाद': 'fertilizer', 'खत': 'fertilizer', 'ఎరువు': 'fertilizer',
             'पाने': 'leaves', 'पान': 'leaves', 'ఆకులు': 'leaves',
             'पीले': 'yellow', 'पिवळी': 'yellow', 'పసుపు': 'yellow',
@@ -410,9 +429,9 @@ def query_bedrock(query: str, dialect: str = 'en') -> Dict[str, Any]:
 
 CRITICAL RULES - READ CAREFULLY:
 1. ONLY use information from the Context provided below. DO NOT use any external knowledge.
-2. If the Context does not contain relevant information to answer the question, you MUST respond: "I don't have information about this in my knowledge base. Please contact your local KVK (Krishi Vigyan Kendra) or agricultural extension officer."
+2. If the Context does not contain relevant information to answer the question, you MUST respond with exactly NO_KB_ANSWER and nothing else. Do not translate it or add any other words.
 3. NEVER make up or invent information. NEVER hallucinate.
-4. If the question is about people, places, or things not related to farming, respond: "I can only help with farming questions. Please ask about crops, pests, fertilizers, or farm management."
+4. If the question is about people, places, or things not related to farming, respond with exactly NOT_FARMING and nothing else.
 
 RESPONSE STYLE (when you DO have relevant context):
 - Sound like a calm, practical TV or radio farm advisory (DD Kisan / extension bulletin style): direct and trustworthy, not a research paper.
@@ -423,20 +442,22 @@ RESPONSE STYLE (when you DO have relevant context):
 - Avoid long paragraphs, dense lists, and copying long passages from the context.
 - ONLY if you answered the question using the Context: End with exactly ONE final line for traceability: Look at the search_results metadata and extract the actual document name or source title. Write a single compact line starting with "Source:" (or "स्रोत:" in Hindi, "स्त्रोत:" in Marathi, "మూలం:" in Telugu) followed by the actual document name from the metadata (e.g., "Source: FAO Cotton IPM Guide" or "स्रोत: ICAR कीट प्रबंधन सलाह"). Do NOT just write "Source: 1" or "स्रोत: 1".
 
-CRITICAL: If you said "I don't have information" OR "I can only help with farming questions", DO NOT ADD ANY SOURCE CITATION. NO "स्रोत:", NO "Source:", NOTHING. Just end your response immediately after the refusal message.
+CRITICAL: If you respond NO_KB_ANSWER OR NOT_FARMING, DO NOT ADD ANY SOURCE CITATION. NO "स्रोत:", NO "Source:", NOTHING.
 
 IMPORTANT RESTRICTIONS:
 - ONLY answer questions about agriculture, farming, crops, pests, diseases, fertilizers, weather, and farm management
-- If the question is about human health, medical issues, personal problems, or non-farming topics, respond: "I can only help with farming questions. Please ask about crops, pests, fertilizers, or farm management."
+- If the question is about human health, medical issues, personal problems, or non-farming topics, respond with exactly NOT_FARMING.
 - Do NOT provide medical advice, health recommendations, or personal counseling
 - Stay strictly within agricultural domain
+- Never name a pesticide, insecticide, fungicide or herbicide product, brand, active ingredient, formulation or dose, even if the Context contains one. Give the pest or disease and the non-chemical steps the farmer can take today; for chemical control, tell the farmer to contact their local KVK (Krishi Vigyan Kendra) for the right product and quantity.
+- If the question asks which pesticide or spray to use, or how much, begin your answer with one short sentence saying you cannot give pesticide names or quantities, then give the non-chemical steps.
 - NEVER invent or make up information not in the Context
 
 Question: $query$
 
 Context: $search_results$
 
-REMEMBER: If the Context above does not contain information to answer the Question, you MUST say "I don't have information about this in my knowledge base." DO NOT make up answers.'''
+REMEMBER: If the Context above does not contain information to answer the Question, you MUST respond with exactly NO_KB_ANSWER. DO NOT make up answers.'''
         }
     }
     
@@ -470,7 +491,7 @@ REMEMBER: If the Context above does not contain information to answer the Questi
         'citations': response.get('citations', []),
         'guardrailAction': response.get('guardrailAction'),
     }
-    return apply_localized_guardrail_reply(result, dialect)
+    return apply_kb_no_answer(apply_localized_guardrail_reply(result, dialect), dialect)
 
 
 def analyze_image(image_base64: str, dialect: str = 'en') -> str:
@@ -517,7 +538,11 @@ def analyze_image(image_base64: str, dialect: str = 'en') -> str:
 Provide a brief and practical answer. If the image doesn't show a crop, describe what you see.'''
     }
 
-    prompt = prompts.get(dialect, prompts['en'])
+    prompt = prompts.get(dialect, prompts['en']) + (
+        "\n\nNever name a pesticide, insecticide, fungicide or herbicide product, brand, active ingredient, "
+        "formulation or dose. Give non-chemical steps the farmer can take today; for chemical control, "
+        "refer the farmer to the local KVK (Krishi Vigyan Kendra) for the right product and quantity."
+    )
 
     request_body = {
         "anthropic_version": "bedrock-2023-05-31",
@@ -682,7 +707,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'headers': headers,
                     'body': json.dumps({'error': str(ve)})
                 }
-            analysis = analyze_image(images[0], dialect)
+            analysis = filter_advice(analyze_image(images[0], dialect), dialect, "web_photo", kind="photo")
 
             return {
                 'statusCode': 200,
@@ -698,14 +723,26 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Query Bedrock for text
         result = query_bedrock(message, dialect)
 
-        # Clean model output: remove placeholder "Source: 3" style leaks.
         reply_text = result.get('text') or ''
+        policy_reply = (
+            is_pesticide_question(message)
+            and is_rag_refusal_response(reply_text)
+            and not result.get('kb_not_farming')
+            and not result.get('guardrail_localized')
+        )
+        if policy_reply:
+            # Replaces a refused answer, so that answer's retrievals are not its source.
+            reply_text = pesticide_policy(dialect)
         reply_text = strip_llm_xml_citation_tags(reply_text)
-        reply_text = strip_all_numeric_source_footers(reply_text)
+        reply_text = strip_source_lines(reply_text)
+        reply_text = filter_advice(
+            reply_text, dialect, "web_text", kind="answer",
+            add_referral=not is_rag_refusal_response(reply_text),
+        )
 
         # Format citations
         citations = []
-        for citation in result.get('citations', []):
+        for citation in ([] if policy_reply else result.get('citations', [])):
             retrieved_refs = citation.get('retrievedReferences', [])
             for ref in retrieved_refs:
                 location = ref.get('location', {})
@@ -715,18 +752,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     # Extract filename from S3 URI
                     filename = uri.split('/')[-1]
                     citations.append(filename)
-
-        # If Bedrock doesn't return usable retrievedReferences (ADR 0005),
-        # provide an explicit, truthful generic attribution so demo users
-        # still see grounding.
-        if not citations and not is_rag_refusal_response(reply_text):
-            generic = {
-                'hi': 'FAO/ICAR कृषि मार्गदर्शिका (Knowledge Base)',
-                'mr': 'FAO/ICAR शेती मार्गदर्शक (Knowledge Base)',
-                'te': 'FAO/ICAR వ్యవసాయ మార్గదర్శకం (Knowledge Base)',
-                'en': 'FAO/ICAR Agricultural Guidelines (Knowledge Base)',
-            }.get(dialect, 'FAO/ICAR Agricultural Guidelines (Knowledge Base)')
-            citations = [generic]
 
         # Return response
         return {

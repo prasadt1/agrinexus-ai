@@ -44,8 +44,12 @@ Use **Claude 3 Haiku** for the relevance gate because it is:
 - Well-suited for short, strict-JSON classification tasks
 
 Model ID (configurable):
-- Default: `anthropic.claude-3-haiku-20240307-v1:0`
+- Default: `us.anthropic.claude-haiku-4-5-20251001-v1:0` (stack parameter `RelevanceModelId`, passed as `VISION_RELEVANCE_MODEL_ID`)
 - Override via `VISION_RELEVANCE_MODEL_ID`
+
+**Update (2026-10-02).** Claude 3 Haiku reached end of life, so every check failed and returned `unclear`; the gate had silently stopped working. It now uses the Claude Haiku 4.5 inference profile. With the original prompt, Haiku 4.5 labelled the pink bollworm sample photo `not_agri`/`animal` with high confidence in 3 of 3 runs, which would hard-block a real crop-pest photo. The prompt now names insects, larvae, caterpillars and mites on crops as `agri_photo`, and excludes crop pests from "animals". Probed live on 8 crop and pest photos and 4 non-photos, 3 runs each: every crop and pest photo `agri_photo`/high; the logo, diagram and app screenshot `not_agri`/high; a WhatsApp screenshot containing a leaf photo `agri_photo` (the diagnosis model's own non-photo check still applies).
+
+The relevance call carries the content guardrail. When the model answers `not_agri`, the guardrail's non-farming topic often intervenes on that output, and an intervention is read as `unclear`. In practice the gate therefore confirms farm photos and rarely hard-blocks; the diagnosis model remains the check for non-farm images.
 
 ### Architecture (relevant slice)
 
@@ -81,6 +85,7 @@ WhatsApp → Webhook → SQS → MessageProcessor
   - `src/processor/messages.py`
 - Tests:
   - `tests/test_image_relevance_gate.py`
+  - `tests/test_photo_relevance_model.py` (model ID, prompt wording, template IAM)
 
 ### Alternatives considered
 1. **Add more deterministic heuristic rules** (rejected)  

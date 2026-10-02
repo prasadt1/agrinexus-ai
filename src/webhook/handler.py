@@ -65,6 +65,14 @@ def _select_queue_url(from_number: str) -> str:
     return QUEUE_URL
 
 
+def _release_dedup(wamid: str) -> None:
+    """Drop the WAMID claim so Meta's retry of a message that never reached SQS is processed."""
+    try:
+        table.delete_item(Key={'PK': f'WAMID#{wamid}', 'SK': 'DEDUP'})
+    except Exception as e:
+        logger.error(f"Error releasing deduplication record for {wamid}: {e}")
+
+
 def check_rate_limit(phone_number: str) -> bool:
     """Count inbound user messages only in the time window.
 
@@ -253,9 +261,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # Parse webhook payload
         try:
             payload = json.loads(body)
-            # Only log message count, not full payload (saves CloudWatch costs)
-            msg_count = len(payload.get('entry', [{}])[0].get('changes', [{}])[0].get('value', {}).get('messages', []))
-            logger.info(f"Parsed payload: {msg_count} message(s)")
         except json.JSONDecodeError as e:
             logger.error(f"JSON decode error: {e}")
             return {
@@ -263,16 +268,18 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'body': json.dumps({'error': 'Invalid JSON'})
             }
         
-        # Extract message data
-        entry = payload.get('entry', [{}])[0]
-        changes = entry.get('changes', [{}])[0]
-        value = changes.get('value', {})
-        messages = value.get('messages', [])
+        # Meta may batch several entries and changes into one delivery.
+        batch = []
+        for entry in (payload.get('entry') if isinstance(payload, dict) else None) or []:
+            for change in (entry.get('changes') if isinstance(entry, dict) else None) or []:
+                value = (change.get('value') if isinstance(change, dict) else None) or {}
+                for message in value.get('messages') or []:
+                    batch.append((message, value))
         
-        logger.info(f"Processing {len(messages)} message(s)")
+        logger.info(f"Processing {len(batch)} message(s)")
         
         # Queue each message for async processing
-        for message in messages:
+        for message, value in batch:
             wamid = message.get('id')
             from_number = message.get('from')
             message_type = message.get('type')
@@ -376,7 +383,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         continue
                 except Exception as e:
                     logger.error(f"Error queuing audio message: {e}")
-                    continue
+                    _release_dedup(wamid)
+                    raise
             
             # Check if message should skip RAG processing (DONE/NOT YET keywords)
             message_text = ''
@@ -406,6 +414,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 logger.info(f"Message queued successfully - wamid: {wamid}, beta={target_queue_url == QUEUE_URL_BETA}")
             except Exception as e:
                 logger.error(f"Error queuing message: {e}")
+                _release_dedup(wamid)
                 raise
         
         # Always return 200 OK within 2 seconds

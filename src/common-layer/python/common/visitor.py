@@ -203,14 +203,14 @@ def delete_user_conversation_data(table, phone_number: str) -> int:
 
 def delete_user_media_objects(s3_client, bucket: str, phone_number: str) -> int:
     """
-    Delete S3 objects under images/{phone}/ and voice/{phone}/ prefixes.
+    Delete S3 objects under images/{phone}/, voice/{phone}/ and voice-output/{phone}/.
     Returns number of objects deleted. No-op if bucket or phone is empty.
     """
     if not bucket or not phone_number:
         return 0
     phone = str(phone_number).lstrip("+")
     deleted = 0
-    for prefix in (f"images/{phone}/", f"voice/{phone}/"):
+    for prefix in (f"images/{phone}/", f"voice/{phone}/", f"voice-output/{phone}/"):
         continuation = None
         while True:
             kwargs: Dict[str, Any] = {"Bucket": bucket, "Prefix": prefix}

@@ -73,7 +73,7 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **REQ-CONV-003**: The system shall respond to farmer queries in Hindi, Marathi, or Telugu based on the user's profile dialect preference.
 
-**REQ-CONV-004**: Every advisory response shall include a simplified source citation (e.g., "Source: FAO Cotton Guide, Section 3").
+**REQ-CONV-004** (amended 2 Oct 2026): When a retrieved document name is available, the advisory response shall name it as the source. When none is available, the system shall not add a generic source line. Source lines written by the model shall be removed. Knowledge base refusals shall carry no source line.
 
 **REQ-CONV-005**: The system shall log the full source attribution (document name, chunk, confidence score) to CloudWatch for auditability.
 
@@ -97,13 +97,13 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 ### 2.4 Safety Guardrails (Tier 1 - Full Depth)
 
-**REQ-GUARD-001**: The guardrails shall block 100% of requests for banned pesticides including Paraquat, Endosulfan, and other substances on India's banned list.
+**REQ-GUARD-001** (rewritten 2 Oct 2026): The system shall not name a pesticide on India's banned list (CIB&RC "banned for manufacture, import and use", plus endosulfan) in any farmer-facing advice. The output filter (REQ-GUARD-008 to 010) enforces this: it lists those actives by name in Latin script, and the commonest in Devanagari and Telugu. A question asking for a banned pesticide receives the pesticide policy reply (REQ-GUARD-013). Questions are not blocked on input; the earlier wording promised input-side blocking that was never built.
 
-**REQ-GUARD-002**: The system shall include explicit disclaimers when providing pesticide dosage information, directing farmers to read product labels.
+**REQ-GUARD-002** (retired 2 Oct 2026, superseded by REQ-GUARD-008): ~~The system shall include explicit disclaimers when providing pesticide dosage information, directing farmers to read product labels.~~
 
 **REQ-GUARD-003**: The system shall escalate to "contact your local Krishi Vigyan Kendra (KVK)" for severe infestations, unknown diseases, livestock health, and human health concerns.
 
-**REQ-GUARD-004**: The system shall not recommend specific pesticide brands or commercial products.
+**REQ-GUARD-004** (folded into REQ-GUARD-008, 2 Oct 2026): The system shall not recommend specific pesticide brands or commercial products.
 
 **REQ-GUARD-005**: The system shall include a disclaimer that advice is supplementary and does not replace professional agricultural extension services.
 
@@ -111,11 +111,31 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **REQ-GUARD-007**: The guardrail test suite shall include at minimum: 5 banned pesticide scenarios, 5 medical/veterinary advice attempts, 5 dosage-specific queries, 5 edge cases (e.g., mixing chemicals, organic certification claims).
 
+#### Identify and refer (added 2 Oct 2026)
+
+The product identifies the pest or problem and gives non-chemical steps. It does not name pesticide products or doses on any channel; chemical choice and rate are referred to the farmer's local KVK. The photo path has no retrieval and no citations, so any product name or rate it produced came from the model's own knowledge.
+
+**REQ-GUARD-008**: The system shall not include a pesticide product name, brand, active ingredient, formulation strength or application dose in any farmer-facing advice message on WhatsApp text, WhatsApp voice, WhatsApp photo, or web chat.
+
+**REQ-GUARD-009**: When a farmer-facing advice message is ready to send, the system shall pass it through the advice output filter before sending it and before converting it to speech.
+
+**REQ-GUARD-010** (amended 2 Oct 2026): If the output filter detects an active ingredient name, a brand, a name ending typical of a pesticide class (for example -fos, -thrin, -conazole, -cloprid, -mectin), a formulation strength, a dilution, or a small-unit amount per acre or hectare in a sentence, then the system shall remove that sentence and keep the rest of the message. Quantities written as digits or as number words (English, Hindi, Marathi, Telugu) count. A bare quantity shall be removed only when the same sentence concerns spraying, mixing, a pesticide, neem or a trap, or uses an apply/use verb and is not about fertilizer, seed or irrigation. A step directly after a removed one that only says to repeat or reapply it shall be removed too (a step that says to check or inspect again stays), and the remaining numbered steps shall be renumbered without gaps across the whole message.
+
+**REQ-GUARD-011**: When the output filter removes content, the system shall emit the CloudWatch metric `AgriNexus/Advice` `AdviceFilterHit` with the channel and the kind of match.
+
+**REQ-GUARD-012**: The system shall end every advice message with a line in the farmer's language stating that the answer is automated and can be wrong and directing the farmer to the nearest KVK for the pesticide and quantity, and shall carry any contact details in that same footer rather than adding a second one.
+
+**REQ-GUARD-013**: When a farmer asks which pesticide to use or how much, the system shall reply with the identification and non-chemical steps it can give plus the KVK referral, and shall not name a product.
+
+**REQ-GUARD-014**: The system may name neem, yellow sticky traps and pheromone traps as practices, and shall not state a quantity or dilution for them.
+
+**REQ-GUARD-015**: Every Bedrock model call on the WhatsApp photo path shall carry the content guardrail. If the guardrail intervenes on a diagnosis call, the system shall send only the localized farming-only refusal for that photo and no diagnosis.
+
 ### 2.5 Visual Verification (Tier 2 - Working Implementation)
 
 **REQ-VIS-001**: When a farmer sends an image via WhatsApp, the system shall process it using Claude 3 Vision via direct invoke_model API (separate from the Bedrock Agent conversation flow).
 
-**REQ-VIS-002**: The system shall respond with diagnosis, confidence level, and recommended actions in the user's dialect.
+**REQ-VIS-002** (amended 2 Oct 2026): The system shall respond with diagnosis, severity, non-chemical steps, confidence and the KVK referral, in the user's dialect.
 
 **REQ-VIS-003**: When confidence is below 70%, the system shall request a clearer image with specific guidance in the user's dialect (e.g., Hindi: "Photo thoda paas se lein" / "Take a closer photo").
 
@@ -124,6 +144,8 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 **REQ-VIS-005**: When visual analysis is complete, the system shall delete the temporary image from S3 to minimize storage costs.
 
 **REQ-VIS-006**: One working happy path (cotton pest image → diagnosis in user's dialect) is sufficient for MVP demo.
+
+**REQ-VIS-007** (added 2 Oct 2026): Before diagnosis, the system shall classify each photo as farm photo, not a farm photo, or unclear, using a model that is in service on Bedrock. Photos of crop pests (insects, larvae, caterpillars, mites) shall count as farm photos. When the check errors or is blocked by the guardrail, the photo shall be treated as unclear and still pass through the diagnosis model's own non-photo check.
 
 ### 2.6 Behavioral Nudge Engine (Tier 1 - Full Depth)
 
@@ -147,7 +169,7 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **REQ-NUDGE-010**: If no response is received within 72 hours, then the system shall mark the nudge as "no_response" and log for analytics.
 
-**REQ-NUDGE-011**: The system shall limit nudges to a maximum of 2 per farmer per day to avoid notification fatigue.
+**REQ-NUDGE-011**: When a weather nudge is due outside the send window of 06:00 to 19:00 Asia/Kolkata (stack parameters `NudgeSendWindowStartHour` and `NudgeSendWindowEndHour`; an unreadable or invalid window sends nothing), the system shall skip that farmer and emit a `NudgesDeferred` metric; the next 6-hourly poll inside the window sends it. If the farmer's last DONE or EXPIRED nudge for the same activity closed within `NUDGE_COOLDOWN_DAYS` (default 7 days; close time is `completedAt` or `expiredAt`, else creation + 72 hours; an unreadable close time blocks), then the system shall not send a new nudge for that activity. Only an invocation with `"force": true` (the demo script) bypasses the window and the cooldown; consent, allowlist and open-nudge gates still apply. Reminders are not affected.
 
 ### 2.7 WhatsApp Integration (Tier 1 - Full Depth)
 
@@ -219,7 +241,7 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **REQ-VISITOR-008**: The system shall enforce a per-visitor daily answer cap and a global daily visitor answer cap (SAM parameters; defaults 10 and 300); on either cap, it shall send one fixed message and shall not call Bedrock.
 
-**REQ-VISITOR-009**: Allowlisted numbers shall be exempt from visitor caps.
+**REQ-VISITOR-009** (amended 2 Oct 2026): Allowlisted numbers shall be exempt from visitor caps. A number counts as allowlisted only while it has an approved allowlist row whose `expires_at`, if set, is in the future; a missing row, a past or unreadable `expires_at`, or a lookup error counts as not allowlisted.
 
 **REQ-VISITOR-010**: Visitor activity shall be counted separately and shall not increment farmer nudge sent/completed metrics.
 
@@ -237,7 +259,7 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **REQ-I18N-001**: Section labels shall use the farmer's own language; Marathi output shall not reuse Hindi labels.
 
-**REQ-PRIV-001**: When any number sends `DELETE` or `DELETE MY DATA`, the system shall erase that number’s profile and conversation rows and confirm in one message.
+**REQ-PRIV-001** (amended 2 Oct 2026): When any number sends `DELETE` or `DELETE MY DATA`, the system shall erase that number’s profile and conversation rows and its stored photos (`images/`), voice notes (`voice/`) and spoken replies (`voice-output/`), and confirm in one message. Media under those prefixes also expires automatically (photos 7 days, voice notes and spoken replies 1 day).
 
 **REQ-SEC-GUARD-001**: WhatsApp RAG and web-chat RAG shall invoke the configured Bedrock Guardrail (content filters, prompt-attack filter, and a polite redirect for non-farming questions).
 
@@ -277,7 +299,7 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **REQ-ERROR-007**: If Claude Vision cannot analyze an image, then the system shall explain the issue in the user's dialect and provide guidance for better photos.
 
-**REQ-ERROR-008**: When the weather API is unavailable, the system shall use cached weather data and inform farmers that data may be outdated.
+**REQ-ERROR-008** (amended 2 Oct 2026): When the weather API key is missing, the request fails, or the response has no usable wind reading, the system shall treat that district as unfavorable (reason `weather_unavailable`), send no spray nudge for it in that cycle, and emit the `AgriNexus/Weather` `WeatherFetchFailed` metric. Demo weather shall be used only when `MOCK_WEATHER=true` is set explicitly, never as an error fallback.
 
 **REQ-ERROR-009**: The system shall gracefully handle unsupported message types (e.g., videos, documents) by informing the farmer of supported formats.
 
@@ -427,7 +449,7 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **AC-001**: A new farmer can complete onboarding in under 3 minutes by providing dialect, location, and crop information via WhatsApp Interactive Buttons.
 
-**AC-002**: A farmer can send a message in Hindi, Marathi, or Telugu and receive a relevant agronomic response with FAO citation within 5 seconds.
+**AC-002**: A farmer can send a message in Hindi, Marathi, or Telugu and receive a relevant agronomic response within 5 seconds.
 
 **AC-003**: A farmer can send a crop image and receive a pest diagnosis with recommended actions within 15 seconds.
 

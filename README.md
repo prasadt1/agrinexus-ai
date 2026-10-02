@@ -10,6 +10,8 @@
 
 **What I built.** An advisor that runs on the WhatsApp a farmer already has, no app install, grounded in [ICAR](https://icar.org.in/) + [FAO](https://www.fao.org/) research, responsive in Hindi / Marathi / Telugu / English, and most importantly — a closed accountability loop that follows up until the farmer confirms "हो गया" (done) or opts out.
 
+**What it refuses to do.** It does not recommend pesticides. It identifies the pest or problem and gives non-chemical steps the farmer can take today; for which chemical to use and how much, every reply sends the farmer to their nearest [KVK (Krishi Vigyan Kendra)](https://en.wikipedia.org/wiki/Krishi_Vigyan_Kendra), the district farm science centre run under ICAR. An output filter in code removes product names, active ingredients, formulation strengths and doses from every reply before it is sent or spoken, whatever the model writes.
+
 **Designed for scale.** Modeled at **[~$0.54 per farmer per year at 10,000 active farmers](#cost-breakdown)** on fully serverless AWS. Measured running cost in April 2026: about $1.70 a day. No app to install; onboarding is a few button taps in the farmer's language.
 
 **The differentiator.** The closed-loop nudge engine. Most agri-AI tools stop at delivering advice. AgriNexus tracks whether the advice was acted on — advice plus accountability, not just information.
@@ -35,7 +37,7 @@
 [![AWS Serverless](https://img.shields.io/badge/AWS-Serverless-232F3E?logo=amazonaws&logoColor=white)](https://aws.amazon.com/serverless/)
 [![Amazon Bedrock](https://img.shields.io/badge/Amazon%20Bedrock-Claude%20(BedrockModelId)-FF9900?logo=amazonaws&logoColor=white)](https://aws.amazon.com/bedrock/)
 [![WhatsApp Business Platform](https://img.shields.io/badge/WhatsApp-Business%20Platform-25D366?logo=whatsapp&logoColor=white)](https://www.whatsapp.com/business/platform/)
-[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![AWS SQS](https://img.shields.io/badge/AWS-SQS-232F3E?logo=amazonaws&logoColor=white)](https://aws.amazon.com/sqs/)
 [![AWS DynamoDB](https://img.shields.io/badge/AWS-DynamoDB-4053D6?logo=amazondynamodb&logoColor=white)](https://aws.amazon.com/dynamodb/)
 [![Kiro](https://img.shields.io/badge/Kiro-Requirements%20to%20Code-6E56CF)](https://kiro.ai/)
@@ -79,7 +81,7 @@ AgriNexus is a deployed, functional prototype with production-grade observabilit
 | Web demo (public) | ✅ Reachable | [demo.agrinexus-ai.farm](https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html) |
 | Product site (owned landing page) | ✅ Reachable | [agrinexus-ai.farm](https://agrinexus-ai.farm/) |
 | re:Invent visitor landing | ⏳ After site publish | [agrinexus-ai.farm/try](https://agrinexus-ai.farm/try) (`docs/try/` + site twin) |
-| Webhook API (Meta verified) | ✅ Reachable | API Gateway + WAF |
+| Webhook API (Meta verified) | ✅ Reachable | API Gateway with Meta HMAC signature check and per-user rate limit (no WAF; WAF covers web chat `/chat` only) |
 | Health endpoint (liveness) | ✅ Reachable | [health](https://h4bt24ycdl.execute-api.us-east-1.amazonaws.com/dev/health) |
 | Weather API integration | ✅ Reachable | OpenWeatherMap via Secrets Manager |
 
@@ -90,7 +92,7 @@ AgriNexus is a deployed, functional prototype with production-grade observabilit
 | Line coverage (pytest-cov) | **53%** — re-measured 26 Sept 2026 after model-ID test edits (`pytest --cov=src`); the previous "80%" figure measured lines-of-test-code ÷ lines-of-source, not executed-line coverage. See [metrics](docs/IMPLEMENTATION-QUALITY-METRICS.md). |
 | Infrastructure-as-Code resources (SAM) | **34** ([template.yaml](template.yaml)) |
 | Architecture Decision Records (ADRs) | **10** ([docs/adr/](docs/adr/)) |
-| EARS requirements traced to code | **144** ([docs/requirements.md](docs/requirements.md)) |
+| Active EARS requirements | **168** ([docs/requirements.md](docs/requirements.md); `python3 scripts/count_requirements.py`) |
 | Lambda functions deployed | **11** |
 | CI/CD workflows | **2** ([ci.yml](.github/workflows/ci.yml) + [aws-smoke.yml](.github/workflows/aws-smoke.yml)) |
 | Lines of Python | **~6,000** across 11 services |
@@ -176,6 +178,7 @@ AgriNexus is a deployed, functional prototype with production-grade observabilit
 | Encryption at rest | ✅ Active | DynamoDB default encryption |
 | Encryption in transit | ✅ Active | HTTPS only |
 | Data retention TTL | ✅ Active | Farmer conversations 90d / webhook MSG copies 7d / Nudges 180d / WAMID dedup 24h / **re:Invent visitor profile+MSG: 7d** (`VisitorTtlDays`) |
+| No pesticide recommendations | ⏳ Code ready 2 Oct 2026; not deployed | Every advice reply (WhatsApp text, voice, photo; web chat) passes through `common/advice_filter.py`, which drops sentences naming an active ingredient, brand, formulation or dose (Latin, Devanagari and Telugu) and ends the reply with a KVK referral. Each removal emits `AgriNexus/Advice` `AdviceFilterHit`. Requirements REQ-GUARD-008 to 014. |
 | Log retention | ✅ Active (set 27 Sept 2026) | CloudWatch Logs kept 90 days on all Lambda and canary log groups ([`scripts/set-log-retention.sh`](scripts/set-log-retention.sh)); previously never expired |
 
 ### Verification Note
@@ -235,7 +238,7 @@ Bot: कपास में कीटों को नियंत्रित �
 Send a voice note asking your question - it will be transcribed and answered.
 
 ### Image Analysis
-Send a photo of your crop - the bot will identify pests/diseases and provide recommendations.
+Send a photo of your crop - the bot identifies the pest or disease, says how severe it looks, and gives non-chemical steps. It does not name pesticides or doses; the reply ends with a referral to the nearest KVK for chemical control.
 
 ### Behavioral Nudges
 If you consent during onboarding, you'll receive weather-based spray reminders:
@@ -499,7 +502,7 @@ The production build made deliberate tradeoffs to keep running costs low. Callin
 
 3. **Single-region deployment**: Multi-region is architected but deployed single-region (us-east-1) for cost efficiency while it is a prototype. Failover and multi-region deployment patterns are documented in [docs/architecture.md](docs/architecture.md).
 
-4. **Weather API with demo fallback**: Production uses OpenWeatherMap via Secrets Manager. The `MOCK_WEATHER=true` flag exists for demo reliability and is explicitly logged so test traffic is never confused with production readings.
+4. **Weather API, fail closed**: Production uses OpenWeatherMap via Secrets Manager. If the key is missing, the request fails or the response has no wind reading, the district is treated as unfavorable, no spray nudge is sent, and `AgriNexus/Weather` `WeatherFetchFailed` is emitted. The `MOCK_WEATHER=true` flag exists for demo reliability, is set explicitly, and is logged so test traffic is never confused with production readings; it is never used as an error fallback.
    - **Setup**: Store the OpenWeatherMap API key in Secrets Manager (`WEATHER_API_KEY_SECRET`, e.g. `agrinexus/weather/api-key`) — never in `samconfig` or git. Set `MOCK_WEATHER=true` on the Weather Lambda only for deterministic demo weather. See [docs/guides/WEATHER-API-SETUP.md](docs/guides/WEATHER-API-SETUP.md).
 
 5. **WhatsApp test numbers limited**: Meta's WhatsApp Business test numbers don't support media (voice/images). End-to-end voice and vision testing requires a real WhatsApp Business number — which AgriNexus has provisioned for production.
@@ -574,14 +577,14 @@ def test_done_response_marks_complete():
     assert get_scheduled_reminders() == []
 ```
 
-See [docs/requirements.md](docs/requirements.md) for the complete EARS specification (144 requirements covering all features).
+See [docs/requirements.md](docs/requirements.md) for the complete EARS specification (168 active requirements covering all features; 2 more are kept as retired or folded).
 
 ## Development Workflow: Kiro AI
 
 This project was developed using **Kiro AI**, which enabled requirements-driven development from EARS specs through to deployed Lambda functions. Kiro's steering documents (`.kiro/specs/`) defined feature specs, implementation plans, and acceptance criteria—keeping requirements, code, and tests traceable throughout the 4-week build.
 
 **Key metrics:**
-- 144 EARS requirements in [docs/requirements.md](docs/requirements.md)
+- 168 active EARS requirements in [docs/requirements.md](docs/requirements.md)
 - ~6,000 lines of Python across 11 Lambda functions
 - Full test coverage: voice, vision, RAG, nudges
 
@@ -652,7 +655,7 @@ The timing and follow-through problems smallholder farmers face inspired this wo
 
 ### For evaluators
 - [Architecture](docs/architecture.md) — full system design
-- [Requirements (EARS)](docs/requirements.md) — 144 requirements specification
+- [Requirements (EARS)](docs/requirements.md) — 168 active requirements specification
 - [Implementation Quality Metrics](docs/IMPLEMENTATION-QUALITY-METRICS.md) — test coverage, code quality, traceability
 - [Cost & FinOps](docs/finops-public.md) — cost modeling and FinOps breakdown
 - [Competitive Evidence Notes](docs/competitive-evidence-notes.md) — competitive landscape analysis

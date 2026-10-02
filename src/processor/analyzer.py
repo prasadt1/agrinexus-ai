@@ -17,6 +17,7 @@ from messages import get_block_message, get_not_agri_message, get_safe_retake_me
 from messages import get_crop_question, get_crop_mismatch_question
 from enforcement import enforce_message_safety
 from enforcement import format_crop_message
+from common.guardrail_reply import localized_guardrail_refusal
 
 bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
 s3 = boto3.client('s3', region_name='us-east-1')
@@ -28,7 +29,31 @@ BEDROCK_MODEL_ID = os.environ.get(
     "BEDROCK_MODEL_ID",
     "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
 )
-RELEVANCE_MODEL_ID = os.environ.get("VISION_RELEVANCE_MODEL_ID") or "anthropic.claude-3-haiku-20240307-v1:0"
+RELEVANCE_MODEL_ID = os.environ.get("VISION_RELEVANCE_MODEL_ID") or "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+
+
+def _guardrail_kwargs() -> Dict[str, str]:
+    gid = (os.environ.get("GUARDRAIL_ID") or "").strip()
+    if not gid:
+        return {}
+    return {"guardrailIdentifier": gid, "guardrailVersion": (os.environ.get("GUARDRAIL_VERSION") or "DRAFT").strip()}
+
+
+def _guardrail_intervened(response_body: Dict[str, Any]) -> bool:
+    return str(response_body.get("amazon-bedrock-guardrailAction") or "").upper() == "INTERVENED"
+
+
+def _guardrail_blocked_result(dialect: str) -> Dict[str, Any]:
+    return {
+        "is_real_crop_photo": False,
+        "non_photo_reason": None,
+        "inferred_crop": "unknown",
+        "crop_confidence": "low",
+        "visible_problem": False,
+        "severity": "unknown",
+        "guardrail_blocked": True,
+        "recommendations": localized_guardrail_refusal(dialect),
+    }
 
 
 def _relevance_gate_enabled() -> bool:
@@ -65,8 +90,10 @@ def classify_image_relevance(image_bytes: bytes, dialect: str) -> Dict[str, Any]
             '  "confidence": "high" | "medium" | "low"\n'
             "}\n\n"
             "Guidelines:\n"
-            "- agri_photo: real photo of plant/leaf/crop/field/plant damage/pest on plant.\n"
-            "- not_agri: UI/screenshot, logo/graphic, document, selfie/person, animals, food, underwater, random objects.\n"
+            "- agri_photo: real photo of a plant, leaf, crop, fruit, boll, pod, grain, field or plant damage, or of an insect, "
+            "larva, caterpillar, mite or other crop pest, including close-ups where the pest fills the frame.\n"
+            "- not_agri: UI/screenshot, logo/graphic/diagram, document, selfie/person, livestock, pets or other animals that "
+            "are not crop pests, cooked food, underwater, random objects.\n"
             "- unclear: too blurry/dark/cropped to be sure.\n"
         )
 
@@ -88,9 +115,13 @@ def classify_image_relevance(image_bytes: bytes, dialect: str) -> Dict[str, Any]
                     ],
                 }
             ),
+            **_guardrail_kwargs(),
         )
 
         response_body = json.loads(resp["body"].read())
+        if _guardrail_intervened(response_body):
+            print("Guardrail intervened on relevance check")
+            return {"relevance": "unclear", "confidence": "low", "reason": "other"}
         raw_text = response_body["content"][0]["text"].strip()
         if raw_text.startswith("```"):
             raw_text = "\n".join(raw_text.split("\n")[1:-1])
@@ -601,7 +632,7 @@ JSON OUTPUT (all fields required):
 {{
     "is_real_crop_photo": true | false,
     "non_photo_reason": "screenshot" | "logo" | "document" | "too_blurry" | null,
-    "insects_visible": ["beetle", "grasshopper", "caterpillar", "aphid", "moth"] | [],
+    "insects_visible": ["beetle", "grasshopper", "caterpillar", "aphid", "whitefly", "moth"] | [],
     "inferred_crop": "Cotton" | "Wheat" | "Soybean" | "Rice" | "Sugarcane" | "Maize" | "unknown",
     "crop_confidence": "high" | "medium" | "low",
     "diagnosis": "<1-2 sentences describing what you see in {language}>",
@@ -614,10 +645,16 @@ JSON OUTPUT (all fields required):
 **STRUCTURED OUTPUT RULES:**
 - "diagnosis": What's wrong OR what you see (e.g., "कपास की फली पर इल्ली दिखाई दे रही है" or "पौधे की पहचान स्पष्ट नहीं")
 - "severity": How serious the problem is (or "none" if healthy, "unknown" if can't tell)
-- "recommendations": Specific actions (spray neem, use pesticide, send better photo, etc.)
+- "recommendations": Non-chemical steps the farmer can take today for the visible problem (remove and destroy affected parts, hand-pick larvae, yellow sticky traps, pheromone traps, field sanitation, regular checks).
 - "confidence_text": Explain your confidence level (e.g., "उच्च - कपास की फली स्पष्ट दिखाई दे रही है" or "कम - फोटो धुंधली है")
 - NO VISIBLE PROBLEM IS A VALID DIAGNOSIS (healthy photos are allowed): use severity="none", visible_problem=false, and give preventive monitoring guidance.
-- Do not recommend pesticides unless there is clear visible pest/disease evidence.
+
+NO PESTICIDES (applies to every field):
+- Never name a pesticide, insecticide, fungicide or herbicide product, brand, active ingredient, formulation (EC, SL, WG, SC, WP, SG) or any dose, quantity or dilution.
+- Give the pest or disease, the severity, and non-chemical steps the farmer can take today. The app ends every reply with a referral to the local KVK for chemical control, so do not write that referral yourself.
+- Neem, yellow sticky traps and pheromone traps may be named as practices, without any quantity or dilution.
+
+MARATHI TERMS: when writing Marathi, call a larva or caterpillar अळी (pink bollworm: गुलाबी बोंडअळी; bollworm: बोंडअळी), never इल्ली or इळी.
 
 **insects_visible RULES:**
 - List EVERY insect/creature you see (beetles, grasshoppers, caterpillars, moths, aphids, worms, etc.)
@@ -639,7 +676,8 @@ VISUAL CROP EVIDENCE WINS (DO NOT ANCHOR ON PROFILE):
    - inferred_crop="unknown"
    - crop_confidence="low"
    - In recommendations: use "this plant"/"this leaf" (NO crop name)
-   - Suggest clearer/closer photo
+   - Do NOT ask for another photo to identify the crop; the app confirms the crop with the farmer separately.
+   - Only suggest a clearer photo when the pest or symptom itself cannot be made out.
 
 3. **Never anchor on profile**: Do NOT use {crop.title()} as evidence. Only name crops when visual features confirm it.
 
@@ -669,8 +707,14 @@ If is_real_crop_photo=false:
 Look for:
 - Beetles, grasshoppers, locusts, moths, butterflies ON the plant
 - Caterpillars, worms, larvae ON leaves/stems/grain
-- Aphids (tiny white/green bugs in clusters)
+- Whiteflies: tiny insects with powdery WHITE WINGS held flat like a tent, usually on the leaf underside, adults often fly up when disturbed
+- Aphids: soft, pear-shaped, mostly WINGLESS bodies, usually green, black, yellow or brown, clustered on young shoots and leaf undersides
 - ANY creature sitting on or near plant parts
+
+PEST NAMING (the pest name is what the farmer takes to the KVK, so do not guess):
+- Whiteflies and aphids are different pests. Look for wings before choosing between them.
+- When you can identify the pest confidently, name it. Uncertainty about the crop alone is not a reason to hold the pest name back.
+- Only when two or more similar pests are genuinely possible: name both as possible in "diagnosis" and say the pest identity is uncertain in "confidence_text".
 
 **If you see ANY insect/creature → IMMEDIATELY set:**
 - visible_problem=true
@@ -705,6 +749,8 @@ REMEMBER:
 - Title Case crops: "Cotton", "Wheat"
 - Never name crop unless visual evidence strongly supports it (95%+ certainty for "high")
 - ALWAYS check for insects/pests - they are often the main issue farmers send photos about
+- Never ask in "recommendations" for a photo of the whole plant or another photo to identify the crop. Uncertainty about the crop goes in "inferred_crop", "crop_confidence" and "confidence_text" only.
+- Never name a pesticide product, active ingredient, formulation or dose. Chemical control goes to the local KVK.
 """
 
     if confirmed_crop:
@@ -747,11 +793,15 @@ CONFIRMED CROP OVERRIDE (highest priority, replaces the 3-tier crop rules above)
                         ]
                     }
                 ]
-            })
+            }),
+            **_guardrail_kwargs(),
         )
         
         # Parse response
         response_body = json.loads(response['body'].read())
+        if _guardrail_intervened(response_body):
+            print("Guardrail intervened on vision diagnosis")
+            return _guardrail_blocked_result(dialect)
         raw_text = response_body['content'][0]['text'].strip()
 
         # Defensive fallback: strip fences if present (should be rare with temp=0)
@@ -822,6 +872,8 @@ def diagnose_with_confirmed_crop(
     produce identical text for the same image + crop + dialect + district.
     """
     vision = analyze_crop_image(image_bytes, dialect, crop, district=district, confirmed_crop=True)
+    if vision.get("guardrail_blocked"):
+        return vision["recommendations"]
     return format_crop_message(vision, crop, dialect, assumed=False)
 
 
@@ -948,6 +1000,9 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
             from messages import get_error_message
             return {"text": get_error_message('model_error', dialect)}
 
+        if vision.get("guardrail_blocked"):
+            return {"text": vision["recommendations"], "guardrail_blocked": True}
+
         # Schema already validated inside analyze_crop_image()
 
         # EXISTING: _normalize_vision_metadata() already enforces metadata-level safety
@@ -990,8 +1045,27 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
         # they can check.
         if is_real and visible and cc != "high" and profile_title and not contradicts:
             print(f"Assumed profile crop {profile_title} (crop_confidence={cc}, model_crop={model_crop})")
+            # The first pass must not be told the crop, or it could never name a
+            # different one. Without the crop it often cannot name the pest either
+            # (pink bollworm on a boll it calls "unknown"), and then names no product.
+            # Diagnose again with the assumed crop as given, as after a crop tap.
+            diagnosis_vision = vision
+            try:
+                second = analyze_crop_image(
+                    image_bytes, dialect, profile_title, district=district, confirmed_crop=True
+                )
+                # Routing used the first pass's verdict; a second call that disagrees
+                # would turn an answer into a "not a crop photo" block.
+                if second.get("guardrail_blocked"):
+                    return {"text": second["recommendations"], "guardrail_blocked": True}
+                if second.get("is_real_crop_photo", True) and second.get("visible_problem", False):
+                    diagnosis_vision = second
+                else:
+                    print("Assumed-crop diagnosis disagreed with first pass, using first pass")
+            except Exception as e:
+                print(f"Assumed-crop diagnosis failed, using first pass: {type(e).__name__}: {e}")
             return {
-                "text": format_crop_message(vision, profile_title, dialect, assumed=True),
+                "text": format_crop_message(diagnosis_vision, profile_title, dialect, assumed=True),
                 "pending_crop_confirm": {
                     "bucket": TEMP_BUCKET,
                     "key": s3_key,

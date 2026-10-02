@@ -43,7 +43,7 @@
     },
     "NoNudgesSent": {
       "Type": "Succeed",
-      "Comment": "No nudges sent (no farmers in location or all had pending nudges)"
+      "Comment": "No nudges sent (no eligible farmers, open nudge, cooldown, or deferred outside the send window)"
     },
     "HandleFailure": {
       "Type": "Pass",

@@ -4,6 +4,7 @@ Detects DONE/NOT YET keywords in messages via DynamoDB Streams
 """
 import json
 import os
+import sys
 import boto3
 from typing import Dict, Any, List
 from common.whatsapp import send_whatsapp_message
@@ -14,6 +15,11 @@ from common.nudge_keywords import (
     is_done_reply,
     is_not_yet_reply,
 )
+
+_nudge_dir = os.path.dirname(os.path.abspath(__file__))
+if _nudge_dir not in sys.path:
+    sys.path.insert(0, _nudge_dir)
+from schedules import delete_nudge_schedules
 
 dynamodb = boto3.resource('dynamodb')
 scheduler = boto3.client('scheduler')
@@ -108,171 +114,173 @@ def get_user_dialect(phone_number: str) -> str:
 
 def delete_scheduled_reminders(nudge_id: str):
     """Delete EventBridge Scheduler reminders and expiry"""
-    # Apply same transformation as sender: replace : and # with -
-    safe_nudge_id = nudge_id.replace(':', '-').replace('#', '-')
-    
-    try:
-        schedule_name = f'reminder-{safe_nudge_id}-24h'
-        scheduler.delete_schedule(Name=schedule_name)
-        print(f"Deleted schedule: {schedule_name}")
-    except Exception as e:
-        print(f"Failed to delete 24h schedule: {e}")
-    
-    try:
-        schedule_name = f'reminder-{safe_nudge_id}-48h'
-        scheduler.delete_schedule(Name=schedule_name)
-        print(f"Deleted schedule: {schedule_name}")
-    except Exception as e:
-        print(f"Failed to delete 48h schedule: {e}")
-    
-    try:
-        schedule_name = f'expiry-{safe_nudge_id}'
-        scheduler.delete_schedule(Name=schedule_name)
-        print(f"Deleted expiry schedule: {schedule_name}")
-    except Exception as e:
-        print(f"Failed to delete expiry schedule: {e}")
+    delete_nudge_schedules(scheduler, nudge_id)
 
 
-def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    """Process DynamoDB Stream events"""
-    print(f"Received {len(event['Records'])} records")
+def _parse_record(record: Dict[str, Any]):
+    """Return (pk, phone_number, sk, text), or None for records this detector ignores.
+
+    Raises KeyError/TypeError/AttributeError on a malformed record."""
+    if record['eventName'] != 'INSERT':
+        print(f"Skipping non-INSERT event: {record['eventName']}")
+        return None
+
+    new_image = record['dynamodb']['NewImage']
+
+    # Only process message records
+    sk = new_image.get('SK', {}).get('S', '')
+    if not sk.startswith('MSG#'):
+        print(f"Skipping non-message record: {sk}")
+        return None
+
+    pk = new_image.get('PK', {}).get('S', '')
+    phone_number = pk.replace('USER#', '')
+
+    # The 'message' field is a Map (M) in DynamoDB Streams, not a String (S)
+    message_map = new_image.get('message', {}).get('M', {})
+
+    # Try text message first
+    text_map = message_map.get('text', {}).get('M', {})
+    text = text_map.get('body', {}).get('S', '')
+
+    # If no text, try interactive button reply (onboarding buttons)
+    if not text:
+        interactive_map = message_map.get('interactive', {}).get('M', {})
+        button_reply_map = interactive_map.get('button_reply', {}).get('M', {})
+        text = button_reply_map.get('title', {}).get('S', '')
+
+    # If still no text, try template button (nudge response buttons)
+    if not text:
+        button_map = message_map.get('button', {}).get('M', {})
+        text = button_map.get('text', {}).get('S', '')
+
+    if not isinstance(text, str):
+        raise TypeError(f"message text is {type(text).__name__}")
+    if not text:
+        print("No text found in message")
+        return None
+    return pk, phone_number, sk, text
+
+
+def _handle_reply(pk: str, phone_number: str, sk: str, text: str) -> None:
+    print(f"Processing message for user: {redact_phone(phone_number)}")
+    print(f"Checking keywords in: {text}")
     
-    for record in event['Records']:
-        print(f"Processing record: eventName={record['eventName']}")
+    # Exact short-message match only — otherwise fall through (no ack / no status change)
+    if is_not_yet_reply(text):
+        print("NOT YET keyword detected!")
         
-        if record['eventName'] != 'INSERT':
-            print(f"Skipping non-INSERT event: {record['eventName']}")
-            continue
+        # Get active nudges to check reminder status
+        active_nudges = get_active_nudges(phone_number)
+        dialect = get_user_dialect(phone_number)
         
-        new_image = record['dynamodb']['NewImage']
-        
-        # Only process message records
-        sk = new_image.get('SK', {}).get('S', '')
-        print(f"Record SK: {sk}")
-        
-        if not sk.startswith('MSG#'):
-            print(f"Skipping non-message record: {sk}")
-            continue
-        
-        pk = new_image.get('PK', {}).get('S', '')
-        phone_number = pk.replace('USER#', '')
-        print(f"Processing message for user: {redact_phone(phone_number)}")
-        
-        # Extract message text from DynamoDB Stream format
-        # The 'message' field is a Map (M) in DynamoDB Streams, not a String (S)
-        message_map = new_image.get('message', {}).get('M', {})
-        
-        # Try text message first
-        text_map = message_map.get('text', {}).get('M', {})
-        text = text_map.get('body', {}).get('S', '')
-        
-        # If no text, try interactive button reply (onboarding buttons)
-        if not text:
-            interactive_map = message_map.get('interactive', {}).get('M', {})
-            button_reply_map = interactive_map.get('button_reply', {}).get('M', {})
-            text = button_reply_map.get('title', {}).get('S', '')
-        
-        # If still no text, try template button (nudge response buttons)
-        if not text:
-            button_map = message_map.get('button', {}).get('M', {})
-            text = button_map.get('text', {}).get('S', '')
-        
-        print(f"Message text: {text}")
-        
-        if not text:
-            print("No text found in message")
-            continue
-        
-        print(f"Checking keywords in: {text}")
-        
-        # Exact short-message match only — otherwise fall through (no ack / no status change)
-        if is_not_yet_reply(text):
-            print("NOT YET keyword detected!")
+        # Check if this is after the final (T+48h) reminder
+        is_final_reminder = False
+        if active_nudges:
+            # [0] = newest active nudge (ScanIndexForward=False + filter preserves order)
+            latest_nudge = active_nudges[0]
+            last_reminder = latest_nudge.get('lastReminder')
+            print(f"Using nudge SK={latest_nudge.get('SK')} lastReminder={last_reminder}")
             
-            # Get active nudges to check reminder status
-            active_nudges = get_active_nudges(phone_number)
-            dialect = get_user_dialect(phone_number)
-            
-            # Check if this is after the final (T+48h) reminder
-            is_final_reminder = False
-            if active_nudges:
-                # [0] = newest active nudge (ScanIndexForward=False + filter preserves order)
-                latest_nudge = active_nudges[0]
-                last_reminder = latest_nudge.get('lastReminder')
-                print(f"Using nudge SK={latest_nudge.get('SK')} lastReminder={last_reminder}")
+            # If last reminder was T+48h, this is the final response
+            if last_reminder == 'T+48h':
+                is_final_reminder = True
                 
-                # If last reminder was T+48h, this is the final response
-                if last_reminder == 'T+48h':
-                    is_final_reminder = True
-                    
-                    # Mark nudge as EXPIRED (no more reminders)
-                    nudge_sk = latest_nudge['SK']
-                    nudge_id = nudge_sk.replace('NUDGE#', '')
-                    table.update_item(
-                        Key={
-                            'PK': pk,
-                            'SK': nudge_sk
-                        },
-                        UpdateExpression='SET #status = :status',
-                        ExpressionAttributeNames={'#status': 'status'},
-                        ExpressionAttributeValues={
-                            ':status': 'EXPIRED'
-                        }
-                    )
-                    print(f"Marked nudge as EXPIRED (farmer declined after T+48h)")
-
-                    # Delete scheduled reminders/expiry (avoid orphaned expiry invocation)
-                    delete_scheduled_reminders(nudge_id)
-            
-            # Send appropriate acknowledgment
-            if is_final_reminder:
-                acknowledgment = NOT_YET_FINAL_MESSAGES.get(dialect, NOT_YET_FINAL_MESSAGES['hi'])
-                print("Sending final NOT YET acknowledgment (no more reminders)")
-            else:
-                acknowledgment = NOT_YET_MESSAGES.get(dialect, NOT_YET_MESSAGES['hi'])
-                print("Sending NOT YET acknowledgment (reminders will continue)")
-            
-            send_whatsapp_message(phone_number, acknowledgment)
-        
-        elif is_done_reply(text):
-            print("DONE keyword detected!")
-            
-            # Get active nudges
-            active_nudges = get_active_nudges(phone_number)
-            print(f"Found {len(active_nudges)} active nudges")
-            
-            # Mark most recent nudge as DONE
-            if active_nudges:
-                latest_nudge = active_nudges[0]
+                # Mark nudge as EXPIRED (no more reminders)
                 nudge_sk = latest_nudge['SK']
                 nudge_id = nudge_sk.replace('NUDGE#', '')
-                
-                # Update status to DONE
                 table.update_item(
                     Key={
                         'PK': pk,
                         'SK': nudge_sk
                     },
-                    UpdateExpression='SET #status = :status, completedAt = :completed',
+                    UpdateExpression='SET #status = :status, expiredAt = :expired',
                     ExpressionAttributeNames={'#status': 'status'},
                     ExpressionAttributeValues={
-                        ':status': 'DONE',
-                        ':completed': new_image.get('SK', {}).get('S', '').replace('MSG#', '')
+                        ':status': 'EXPIRED',
+                        ':expired': sk.replace('MSG#', '')
                     }
                 )
-                
-                # Delete scheduled reminders
+                print(f"Marked nudge as EXPIRED (farmer declined after T+48h)")
+
+                # Delete scheduled reminders/expiry (avoid orphaned expiry invocation)
                 delete_scheduled_reminders(nudge_id)
-                
-                print(f"Marked nudge {nudge_id} as DONE for {redact_phone(phone_number)}")
-                
-                # Send confirmation message
-                dialect = get_user_dialect(phone_number)
-                confirmation = CONFIRMATION_MESSAGES.get(dialect, CONFIRMATION_MESSAGES['hi'])
-                send_whatsapp_message(phone_number, confirmation)
-                emit_metric('NudgesCompleted', 1)
+        
+        # Send appropriate acknowledgment
+        if is_final_reminder:
+            acknowledgment = NOT_YET_FINAL_MESSAGES.get(dialect, NOT_YET_FINAL_MESSAGES['hi'])
+            print("Sending final NOT YET acknowledgment (no more reminders)")
         else:
-            # Not an exact short DONE/NOT YET reply — leave for normal RAG / other handlers
-            print("No exact DONE/NOT YET match — falling through")
+            acknowledgment = NOT_YET_MESSAGES.get(dialect, NOT_YET_MESSAGES['hi'])
+            print("Sending NOT YET acknowledgment (reminders will continue)")
+        
+        send_whatsapp_message(phone_number, acknowledgment)
     
-    return {'statusCode': 200}
+    elif is_done_reply(text):
+        print("DONE keyword detected!")
+        
+        # Get active nudges
+        active_nudges = get_active_nudges(phone_number)
+        print(f"Found {len(active_nudges)} active nudges")
+        
+        # Mark most recent nudge as DONE
+        if active_nudges:
+            latest_nudge = active_nudges[0]
+            nudge_sk = latest_nudge['SK']
+            nudge_id = nudge_sk.replace('NUDGE#', '')
+            
+            # Update status to DONE
+            table.update_item(
+                Key={
+                    'PK': pk,
+                    'SK': nudge_sk
+                },
+                UpdateExpression='SET #status = :status, completedAt = :completed',
+                ExpressionAttributeNames={'#status': 'status'},
+                ExpressionAttributeValues={
+                    ':status': 'DONE',
+                    ':completed': sk.replace('MSG#', '')
+                }
+            )
+            
+            # Delete scheduled reminders
+            delete_scheduled_reminders(nudge_id)
+            
+            print(f"Marked nudge {nudge_id} as DONE for {redact_phone(phone_number)}")
+            
+            # Send confirmation message
+            dialect = get_user_dialect(phone_number)
+            confirmation = CONFIRMATION_MESSAGES.get(dialect, CONFIRMATION_MESSAGES['hi'])
+            send_whatsapp_message(phone_number, confirmation)
+            emit_metric('NudgesCompleted', 1)
+    else:
+        # Not an exact short DONE/NOT YET reply — leave for normal RAG / other handlers
+        print("No exact DONE/NOT YET match — falling through")
+
+
+
+def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+    """Process DynamoDB Stream events.
+
+    Malformed records are skipped. On the first record that fails to process, stop and
+    report it: the stream retries from that record onward, so later records are not
+    handled twice."""
+    records = (event or {}).get('Records') or []
+    print(f"Received {len(records)} records")
+
+    for record in records:
+        try:
+            parsed = _parse_record(record)
+        except (KeyError, TypeError, AttributeError) as e:
+            print(f"Skipping malformed stream record: {type(e).__name__}: {e}")
+            emit_metric('MalformedStreamRecord', 1)
+            continue
+        if parsed is None:
+            continue
+        try:
+            _handle_reply(*parsed)
+        except Exception as e:
+            print(f"Failed to process stream record: {type(e).__name__}: {e}")
+            return {'statusCode': 200, 'batchItemFailures': [{'itemIdentifier': record['dynamodb']['SequenceNumber']}]}
+
+    return {'statusCode': 200, 'batchItemFailures': []}

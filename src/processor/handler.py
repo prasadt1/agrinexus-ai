@@ -20,11 +20,20 @@ import analyzer
 from common.whatsapp import send_whatsapp_message, send_whatsapp_list
 from common.whatsapp import send_whatsapp_buttons as _send_whatsapp_buttons
 from common.district_helplines import maybe_append_helpline_footer
+from common.advice_filter import filter_advice, is_pesticide_question, pesticide_policy
+from common.source_line import strip_source_lines
 from common.allowlist import is_approved_user, allowlist_expiry_hint
 from common.redact import redact_phone
 from common.nudge_keywords import is_nudge_reply
 from common import visitor as visitor_mod
-from common.guardrail_reply import apply_localized_guardrail_reply
+from common.guardrail_reply import (
+    KB_NO_ANSWER_MARKER,
+    KB_NOT_FARMING_MARKER,
+    LOCALIZED_NO_ANSWER,
+    LOCALIZED_REFUSAL,
+    apply_kb_no_answer,
+    apply_localized_guardrail_reply,
+)
 
 
 def send_whatsapp_buttons(phone_number: str, body_text: str, buttons: list):
@@ -334,9 +343,16 @@ def update_user_profile(phone_number: str, updates: Dict[str, Any]):
     )
 
 
+def _location_coords(location: str) -> Optional[List[Decimal]]:
+    """[lat, lon] for a known district, as Decimals (DynamoDB rejects floats)."""
+    coords = DISTRICT_COORDS.get(location)
+    if not coords:
+        return None
+    return [Decimal(str(coords['lat'])), Decimal(str(coords['lon']))]
+
+
 def create_user_profile(phone_number: str, dialect: str, location: str, crop: str, consent: bool):
     """Create complete user profile"""
-    coords = DISTRICT_COORDS.get(location)
     table.put_item(
         Item={
             'PK': f'USER#{phone_number}',
@@ -344,7 +360,7 @@ def create_user_profile(phone_number: str, dialect: str, location: str, crop: st
             'phone_number': phone_number,
             'dialect': dialect,
             'location': location,
-            'location_coords': list(coords) if coords else None,
+            'location_coords': _location_coords(location),
             'crop': crop,
             'consent': consent,
             'onboarding_complete': True,
@@ -554,10 +570,9 @@ Please choose your language / कृपया अपनी भाषा चु�
             location = message_text.strip().title()
         
         if location:
-            coords = DISTRICT_COORDS.get(location)
             update_user_profile(phone_number, {
                 'location': location,
-                'location_coords': list(coords) if coords else None,
+                'location_coords': _location_coords(location),
                 'onboarding_state': 'crop'
             })
             # Ask for crop with buttons in user's dialect
@@ -684,10 +699,14 @@ def convert_floats_to_decimal(obj):
 
 def is_rag_refusal_response(text: str) -> bool:
     """
-    Detect KB no-hit / refusal replies. Generic FAO/ICAR footer must not be appended to these
+    Detect KB no-hit / refusal replies. No source line or referral footer is appended to these
     (it implies a grounded answer when there was none).
     """
     if not text or not text.strip():
+        return True
+    if text.strip() in (*LOCALIZED_NO_ANSWER.values(), *LOCALIZED_REFUSAL.values()):
+        return True
+    if KB_NO_ANSWER_MARKER in text or KB_NOT_FARMING_MARKER in text:
         return True
     low = text.lower()
     if "don't have information" in low or "do not have information" in low:
@@ -707,7 +726,7 @@ def is_rag_refusal_response(text: str) -> bool:
         "विशिष्ट जानकारी नहीं" in text or "जानकारी नहीं दी गई" in text
     ):
         return True
-    if "ज्ञानकोषात" in text and ("माहिती नाही" in text or "नाही" in text):
+    if ("ज्ञानकोषात" in text or "ज्ञानकोशात" in text) and "नाही" in text:
         return True
     if "माझ्याकडे" in text and "माहिती नाही" in text:
         return True
@@ -840,7 +859,8 @@ def _diagnose_image_with_confirmed_crop(
     this too, so both produce identical text for the same image bytes + crop +
     dialect + district.
     """
-    return analyzer.diagnose_with_confirmed_crop(image_bytes, dialect, crop, district=district)
+    text = analyzer.diagnose_with_confirmed_crop(image_bytes, dialect, crop, district=district)
+    return filter_advice(text, dialect, "whatsapp_photo", kind="photo", district=district)
 
 
 def _run_visitor_sample_vision(from_number: str, profile: Dict[str, Any], wamid: str) -> None:
@@ -927,14 +947,15 @@ def query_bedrock(query: str, dialect: str = 'hi', session_id: Optional[str] = N
     retrieval_query = query
     if dialect != 'en':
         _keyword_hints = {
-            'कपास': 'cotton', 'कापूस': 'cotton', 'పత్తి': 'cotton',
+            'कपास': 'cotton', 'कापूस': 'cotton', 'कापस': 'cotton', 'పత్తి': 'cotton',
             'गेहूं': 'wheat', 'गहू': 'wheat', 'గోధుమ': 'wheat',
             'सोयाबीन': 'soybean', 'సోయాబీన్': 'soybean',
             'मक्का': 'maize', 'मका': 'maize', 'మొక్కజొన్న': 'maize',
             'धान': 'rice', 'भात': 'rice', 'వరి': 'rice',
             'कीट': 'pest', 'कीड': 'pest', 'పురుగు': 'pest',
             'रोग': 'disease', 'వ్యాధి': 'disease',
-            'स्प्रे': 'spray', 'फवारणी': 'spray', 'స్ప్రే': 'spray',
+            'सफेद मक्खी': 'whitefly', 'पांढरी माशी': 'whitefly', 'पांढऱ्या माशी': 'whitefly', 'తెల్ల దోమ': 'whitefly',
+            'स्प्रे': 'spray', 'फवार': 'spray', 'స్ప్రే': 'spray',
             'खाद': 'fertilizer', 'खत': 'fertilizer', 'ఎరువు': 'fertilizer',
             'पाने': 'leaves', 'पान': 'leaves', 'ఆకులు': 'leaves',
             'पीले': 'yellow', 'पिवळी': 'yellow', 'పసుపు': 'yellow',
@@ -958,9 +979,9 @@ def query_bedrock(query: str, dialect: str = 'hi', session_id: Optional[str] = N
 
 CRITICAL RULES - READ CAREFULLY:
 1. ONLY use information from the Context provided below. DO NOT use any external knowledge.
-2. If the Context does not contain relevant information to answer the question, you MUST respond: "I don't have information about this in my knowledge base. Please contact your local KVK (Krishi Vigyan Kendra) or agricultural extension officer."
+2. If the Context does not contain relevant information to answer the question, you MUST respond with exactly NO_KB_ANSWER and nothing else. Do not translate it or add any other words.
 3. NEVER make up or invent information. NEVER hallucinate.
-4. If the question is about people, places, or things not related to farming, respond: "I can only help with farming questions. Please ask about crops, pests, fertilizers, or farm management."
+4. If the question is about people, places, or things not related to farming, respond with exactly NOT_FARMING and nothing else.
 
 RESPONSE STYLE (when you DO have relevant context):
 - Sound like a calm, practical TV or radio farm advisory (DD Kisan / extension bulletin style): direct and trustworthy, not a research paper.
@@ -972,19 +993,21 @@ RESPONSE STYLE (when you DO have relevant context):
 - DO NOT add any source citation or reference line at the end. The system will add it automatically.
 - NEVER end with a "source" line that lists only numbers or citation indices (e.g. comma-separated digits like 3, 4, 5). No Devanagari or English label before such numbers.
 
-CRITICAL: If you said "I don't have information" OR "I can only help with farming questions", DO NOT ADD ANY SOURCE CITATION. NO "स्रोत:", NO "Source:", NOTHING. Just end your response immediately after the refusal message.
+CRITICAL: If you respond NO_KB_ANSWER OR NOT_FARMING, DO NOT ADD ANY SOURCE CITATION. NO "स्रोत:", NO "Source:", NOTHING.
 
 IMPORTANT RESTRICTIONS:
 - ONLY answer questions about agriculture, farming, crops, pests, diseases, fertilizers, weather, and farm management
-- If the question is about human health, medical issues, personal problems, or non-farming topics, respond: "I can only help with farming questions. Please ask about crops, pests, fertilizers, or farm management."
+- If the question is about human health, medical issues, personal problems, or non-farming topics, respond with exactly NOT_FARMING.
 - Do NOT provide medical advice, health recommendations, or personal counseling
 - Stay strictly within agricultural domain
+- Never name a pesticide, insecticide, fungicide or herbicide product, brand, active ingredient, formulation or dose, even if the Context contains one. Give the pest or disease and the non-chemical steps the farmer can take today; for chemical control, tell the farmer to contact their local KVK (Krishi Vigyan Kendra) for the right product and quantity.
+- If the question asks which pesticide or spray to use, or how much, begin your answer with one short sentence saying you cannot give pesticide names or quantities, then give the non-chemical steps.
 
 Question: $query$
 
 Context: $search_results$
 
-REMEMBER: If the Context above does not contain information to answer the Question, you MUST say "I don't have information about this in my knowledge base." DO NOT make up answers.'''
+REMEMBER: If the Context above does not contain information to answer the Question, you MUST respond with exactly NO_KB_ANSWER. DO NOT make up answers.'''
         }
     }
     
@@ -1026,7 +1049,7 @@ REMEMBER: If the Context above does not contain information to answer the Questi
                 'sessionId': response.get('sessionId'),
                 'guardrailAction': response.get('guardrailAction'),
             }
-            return apply_localized_guardrail_reply(result, dialect)
+            return apply_kb_no_answer(apply_localized_guardrail_reply(result, dialect), dialect)
         except bedrock_agent.exceptions.ValidationException as e:
             # Session doesn't exist yet, create new one by calling without sessionId
             if 'Session with Id' in str(e) and 'is not valid' in str(e):
@@ -1047,7 +1070,7 @@ REMEMBER: If the Context above does not contain information to answer the Questi
         'sessionId': response.get('sessionId'),
         'guardrailAction': response.get('guardrailAction'),
     }
-    return apply_localized_guardrail_reply(result, dialect)
+    return apply_kb_no_answer(apply_localized_guardrail_reply(result, dialect), dialect)
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -1253,6 +1276,11 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
         # Process based on message type
         if message_type in ('text', 'interactive'):
             text = early_text
+            if not text.strip():
+                # Unhandled interactive types (e.g. nfm_reply) and blank text carry nothing
+                # to answer; Bedrock rejects empty input and SQS would retry the ack.
+                print(f"Empty {message_type} payload from {redact_phone(from_number)}; skipping")
+                continue
 
             # Visitor: switch to farmer onboarding
             if is_visitor and visitor_mod.is_farmer_onboard_selection(text):
@@ -1319,9 +1347,10 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                     bucket = pending.get("bucket") or os.environ.get("TEMP_AUDIO_BUCKET")
                     key = pending.get("key")
                     if bucket and key:
+                        # Refuse before the try: its finally would drop the pending photo.
+                        if not _consume_visitor_or_refuse(from_number, profile, approved):
+                            continue
                         try:
-                            if not _consume_visitor_or_refuse(from_number, profile, approved):
-                                continue
                             obj = s3.get_object(Bucket=bucket, Key=key)
                             image_bytes = obj["Body"].read()
                             district = profile.get("district") or profile.get("location")
@@ -1355,7 +1384,10 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                         image_bytes = obj["Body"].read()
                         district = profile.get("district") or profile.get("location")
                         result = analyzer.analyze_crop_image(image_bytes, dialect, chosen, district=district)
-                        reply_text = str(result.get("recommendations") or "")
+                        reply_text = filter_advice(
+                            str(result.get("recommendations") or ""),
+                            dialect, "whatsapp_photo", kind="photo", district=district,
+                        )
                         save_message(from_number, wamid, message, reply_text, "vision_last_image_override")
                         send_whatsapp_message(from_number, reply_text)
                     finally:
@@ -1397,8 +1429,16 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             )
             result = query_bedrock(text, dialect, session_id=rag_session)
             
-            # Extract source citation from response or add generic attribution
             response_text = result["text"]
+            policy_reply = (
+                is_pesticide_question(text)
+                and is_rag_refusal_response(response_text)
+                and not result.get("kb_not_farming")
+                and not result.get("guardrail_localized")
+            )
+            if policy_reply:
+                # Replaces a refused answer, so that answer's retrievals are not its source.
+                response_text = pesticide_policy(dialect)
             source_keywords = {
                 'hi': 'स्रोत:',
                 'mr': 'स्त्रोत:',
@@ -1407,12 +1447,11 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             }
             source_keyword = source_keywords.get(dialect, 'Source:')
             
-            # Strip LLM citation artifacts; append doc names or generic line
+            # Model-written source lines are removed; a source is named only from retrieval metadata
             response_text = strip_llm_xml_citation_tags(response_text)
-            response_text = strip_all_numeric_source_footers(response_text)
-            has_source = source_keyword in response_text
+            response_text = strip_source_lines(response_text)
 
-            if not has_source and not is_rag_refusal_response(response_text):
+            if not policy_reply and not is_rag_refusal_response(response_text):
                 labels = source_labels_from_citations(result.get("citations"))
                 if labels:
                     max_show = 5
@@ -1420,21 +1459,21 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                     if len(labels) > max_show:
                         tail += " …"
                     response_text += f"\n\n{source_keyword} {tail}"
-                else:
-                    source_attributions = {
-                        'hi': 'FAO/ICAR कृषि मार्गदर्शिका',
-                        'mr': 'FAO/ICAR शेती मार्गदर्शक',
-                        'te': 'FAO/ICAR వ్యవసాయ మార్గదర్శకం',
-                        'en': 'FAO/ICAR Agricultural Guidelines'
-                    }
-                    source_text = source_attributions.get(dialect, source_attributions['en'])
-                    response_text += f"\n\n{source_keyword} {source_text}"
 
+            location = (profile.get("district") or profile.get("location")) if profile else None
+            response_text = filter_advice(
+                response_text,
+                dialect,
+                "whatsapp_voice" if voice_source in ("voice", "voice_test") else "whatsapp_text",
+                kind="answer",
+                district=location,
+                add_referral=not is_rag_refusal_response(response_text),
+            )
             reply_text = maybe_append_helpline_footer(
                 response_text,
                 text,
                 dialect,
-                profile.get("location") if profile else None,
+                location,
             )
             
             # Save to DynamoDB
@@ -1508,7 +1547,13 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                 pending.setdefault("dialect", dialect)
                 pending.setdefault("profile_crop", profile.get("crop"))
                 _put_pending_crop_confirm(from_number, pending)
-                text_out = str(analysis.get("text") or "")
+                photo_district = profile.get("district") or profile.get("location")
+                # A crop question is not advice yet; an assumed-crop answer is.
+                text_out = filter_advice(
+                    str(analysis.get("text") or ""),
+                    dialect, "whatsapp_photo", kind="photo", district=photo_district,
+                    add_referral=bool(pending.get("assumed")),
+                )
                 save_message(
                     from_number, wamid, message, text_out, "vision_crop_confirm",
                     ttl_days=_msg_ttl_days(profile),
@@ -1523,6 +1568,10 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             # Backward compatible (string return)
             if isinstance(analysis, dict):
                 analysis = str(analysis.get("text") or analysis.get("recommendations") or "")
+            analysis = filter_advice(
+                analysis, dialect, "whatsapp_photo", kind="photo",
+                district=profile.get("district") or profile.get("location"),
+            )
             
             # Save to DynamoDB
             save_message(

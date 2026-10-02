@@ -132,5 +132,7 @@ def test_visitor_sample_and_farmer_confirm_share_helper(monkeypatch):
     img = b"FAKE_IMAGE_BYTES"
     visitor_reply = mod._diagnose_image_with_confirmed_crop(img, "en", "Cotton", district="Latur")
     farmer_reply = mod._diagnose_image_with_confirmed_crop(img, "en", "Cotton", district="Latur")
-    assert visitor_reply == farmer_reply == "ADVICE|en|Cotton|Latur"
+    assert visitor_reply == farmer_reply
+    assert visitor_reply.startswith("ADVICE|en|Cotton|Latur")
+    assert "contact your nearest KVK" in visitor_reply
     assert calls[0] == calls[1]

@@ -18,7 +18,7 @@ AgriNexus AI demonstrates **production-grade implementation quality** across tes
 | IaC resources | **34** (SAM/CloudFormation) |
 | Lambda functions | **11** |
 | ADRs | **10** |
-| EARS requirements | **144** |
+| Active EARS requirements | **168** |
 | CI/CD workflows | **2** (GitHub Actions) |
 | CloudWatch alarms | **8** |
 
@@ -57,7 +57,7 @@ AgriNexus AI demonstrates **production-grade implementation quality** across tes
 | `common/district_helplines.py` | `test_district_helplines.py`, `test_district_helplines_extended.py` | 34+ | Helpline data, buy-keyword detection, footer append |
 | `src/nudge/` (flow) | `test_nudge_flow.py` | 10+ | Dedup, context-aware messages, template fallback |
 | `src/processor/` | `test_e2e_happy_path_mocked.py` | 1 | Full webhook→processor→response flow |
-| `src/vision/` | `test_vision_quality_gate.py`, `test_non_photo_screenshot_heuristic.py`, `test_pest_macro_crop_prompt.py`, `test_crop_override_confirmation_flow.py` | 15+ | Quality gates, non-photo detection, crop confirmation |
+| `src/processor/analyzer.py` (vision) | `tests/vision/`, `test_vision_quality_gate.py`, `test_non_photo_screenshot_heuristic.py`, `test_pest_macro_crop_prompt.py`, `test_crop_override_confirmation_flow.py` | 15+ | Quality gates, non-photo detection, crop confirmation |
 | RAG quality | `test_golden_questions.py`, `test_golden_questions_realistic.py` | 50+ | 4-language golden questions, hallucination prevention |
 | Voice pipeline | `test_voice_*.py` (4 files) | 4+ | Transcribe, Polly, end-to-end round-trip |
 
@@ -156,7 +156,7 @@ pytest tests/ -v
 - **Least privilege IAM:** DynamoDB/S3/Bedrock resource-scoped, no wildcard `Resource: '*'`
 - **Cost controls:** $5/day cost alarm, SQS long polling, Lambda memory right-sizing
 - **Monitoring:** 8 CloudWatch alarms, X-Ray tracing, SNS alerts
-- **Security:** Meta HMAC-SHA256 verification, per-user rate limiting, WAF
+- **Security:** Meta HMAC-SHA256 verification and per-user rate limiting on the webhook; WAF on the web chat API only
 
 ---
 
@@ -188,7 +188,7 @@ CloudFormation change sets, automatic rollback on failure, parameter validation.
 | Category | Count | Examples |
 |---|---|---|
 | Architecture Decision Records | **9** | EventBridge vs Step Functions, S3 Vectors vs OpenSearch, Vision quality gates |
-| EARS requirements | **144** | Traced to code in `docs/requirements.md` |
+| Active EARS requirements | **168** | `docs/requirements.md`; count with `scripts/count_requirements.py` |
 | Guides | 5+ | E2E test guide, WhatsApp setup, weather API, install prerequisites |
 | Operational docs | 3+ | Runbook alerts, capacity analysis, FinOps |
 | Product docs | 2 | RAG flow explained, nudge behavior guide |
@@ -209,7 +209,7 @@ CloudFormation change sets, automatic rollback on failure, parameter validation.
 | **IaC** | Best practices | ✅ | Parameterized, least privilege, monitoring |
 | **CI/CD** | Workflows | 2 | GitHub Actions |
 | **Documentation** | ADRs | 9 | `docs/adr/` |
-| **Documentation** | EARS requirements | 144 | `docs/requirements.md` |
+| **Documentation** | Active EARS requirements | 168 | `docs/requirements.md` |
 | **Monitoring** | Alarms | 8 | SAM template |
 | **Monitoring** | Dashboard widgets | 9 | CloudWatch |
 | **Monitoring** | Tracing | ✅ | X-Ray enabled |

@@ -210,8 +210,9 @@ function update_profile_to_full_tier() {
 
 function trigger_weather_poll() {
   echo "🌤️  Triggering weather poller..."
-  aws lambda invoke --function-name "$WEATHER_LAMBDA" --payload '{}' /tmp/weather-response.json >/dev/null
-  echo "✅ Weather poller invoked"
+  # force bypasses the 06:00-19:00 IST send window and the per-activity cooldown
+  aws lambda invoke --function-name "$WEATHER_LAMBDA" --cli-binary-format raw-in-base64-out --payload '{"force": true}' /tmp/weather-response.json >/dev/null
+  echo "✅ Weather poller invoked (force)"
 }
 
 function simulate_24h_reminder() {

@@ -11,24 +11,44 @@ Item shape (in the existing single DynamoDB table):
 
 from __future__ import annotations
 
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Any, Optional
 
 
 def allowlist_key(phone_number: str) -> dict:
     return {"PK": "ALLOWLIST", "SK": f"USER#{phone_number}"}
 
 
+def _expired(expires_at: Any) -> bool:
+    """True when expires_at is in the past or cannot be read. Naive timestamps are UTC."""
+    if not isinstance(expires_at, str) or not expires_at.strip():
+        return True
+    try:
+        when = datetime.fromisoformat(expires_at.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return when <= datetime.now(timezone.utc)
+
+
 def is_approved_user(table, phone_number: str) -> bool:
     """
-    Return True if phone_number exists in allowlist.
+    Return True only if phone_number has an allowlist row that is approved and not expired.
 
     - `table` is a boto3 DynamoDB Table instance (dependency-injected to avoid extra clients).
-    - Fails closed on unexpected errors (safer for cost control).
+    - Fails closed: no row, approved=false, a past or unreadable expires_at, or any error.
     """
     try:
         r = table.get_item(Key=allowlist_key(phone_number))
-        item = r.get("Item") or {}
-        return bool(item.get("approved", True))  # presence implies approved unless explicitly false
+        item = r.get("Item")
+        if not item:
+            return False
+        if not bool(item.get("approved", True)):  # a row without the flag counts as approved
+            return False
+        if "expires_at" in item and _expired(item["expires_at"]):
+            return False
+        return True
     except Exception:
         return False
 

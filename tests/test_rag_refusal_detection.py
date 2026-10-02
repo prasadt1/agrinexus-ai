@@ -69,6 +69,11 @@ strip_llm_xml_citation_tags = processor_handler.strip_llm_xml_citation_tags
             True,
         ),
         ("ज्ञानकोषात या विषयाविषयी माहिती नाही.", True),
+        (
+            "मला या विषयाची माहिती माझ्या ज्ञानकोशात नाही. कृपया तुमच्या जवळच्या कृषी विज्ञान केंद्र (KVK) "
+            "किंवा कृषी विस्तार अधिकाऱ्यांशी संपर्क साधा.",
+            True,
+        ),
         ("माझ्याकडे या विषयाविषयी माहिती नाही.", True),
         (
             "सोयाबीन में बुवाई अप्रैल में करें। बीज दर 60–80 किग्रा प्रति हेक्टेयर।",
@@ -101,3 +106,43 @@ def test_strip_llm_xml_citation_tags_case_insensitive():
     out = strip_llm_xml_citation_tags(raw)
     assert "<" not in out
     assert "जवाब" in out and "अंत" in out
+
+
+def _load_web_chat_handler():
+    original_sys_path = list(sys.path)
+    try:
+        sys.path.insert(0, str(_ROOT / "src" / "common-layer" / "python"))
+        spec = importlib.util.spec_from_file_location(
+            "web_chat_handler_refusal_test", _ROOT / "src" / "web-chat" / "handler.py"
+        )
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    finally:
+        sys.path[:] = original_sys_path
+
+
+@pytest.mark.parametrize("dialect", ["en", "hi", "mr", "te"])
+def test_every_localized_no_answer_is_a_refusal_in_both_handlers(dialect):
+    from common.guardrail_reply import LOCALIZED_NO_ANSWER
+
+    text = LOCALIZED_NO_ANSWER[dialect]
+    assert is_rag_refusal_response(text)
+    assert _load_web_chat_handler().is_rag_refusal_response(text)
+
+
+def test_unreplaced_marker_is_a_refusal():
+    assert is_rag_refusal_response("NO_KB_ANSWER")
+
+
+@pytest.mark.parametrize("dialect", ["en", "hi", "mr", "te"])
+def test_every_localized_off_topic_refusal_is_a_refusal_in_both_handlers(dialect):
+    from common.guardrail_reply import LOCALIZED_REFUSAL
+
+    text = LOCALIZED_REFUSAL[dialect]
+    assert is_rag_refusal_response(text)
+    assert _load_web_chat_handler().is_rag_refusal_response(text)
+
+
+def test_unreplaced_not_farming_marker_is_a_refusal():
+    assert is_rag_refusal_response("NOT_FARMING")
