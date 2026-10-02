@@ -146,3 +146,53 @@ class TestReminderHandler:
         assert "sent" in result["message"].lower()
         assert len(sent_messages) == 1
         assert len(updates) == 1
+
+
+class TestReminderScheduleCleanup:
+    NUDGE_ID = "2026-04-25T10:00:00#spray"
+    ALL = {
+        "reminder-2026-04-25T10-00-00-spray-24h",
+        "reminder-2026-04-25T10-00-00-spray-48h",
+        "expiry-2026-04-25T10-00-00-spray",
+    }
+
+    def _run(self, reminder, monkeypatch, item, reminder_type):
+        deleted = []
+        monkeypatch.setattr(
+            reminder, "scheduler",
+            types.SimpleNamespace(delete_schedule=lambda Name, **kw: deleted.append(Name)),
+            raising=False,
+        )
+        monkeypatch.setattr(reminder, "table", types.SimpleNamespace(
+            get_item=lambda **kw: {"Item": item} if kw["Key"]["SK"].startswith("NUDGE#") else {"Item": {"dialect": "hi"}},
+            update_item=lambda **kw: {},
+        ))
+        reminder.lambda_handler(
+            {"phone_number": "491234", "nudge_id": self.NUDGE_ID, "reminder_type": reminder_type}, None
+        )
+        return set(deleted)
+
+    def test_expiry_deletes_remaining_schedules(self, reminder, monkeypatch):
+        assert self._run(reminder, monkeypatch, {"status": "REMINDED"}, "EXPIRY") == self.ALL
+
+    @pytest.mark.parametrize("status", ["DONE", "EXPIRED"])
+    def test_reminder_for_closed_nudge_deletes_schedules(self, reminder, monkeypatch, status):
+        assert self._run(reminder, monkeypatch, {"status": status}, "T+24h") == self.ALL
+
+    def test_reminder_for_missing_nudge_deletes_schedules(self, reminder, monkeypatch):
+        assert self._run(reminder, monkeypatch, None, "T+24h") == self.ALL
+
+    def test_open_nudge_reminder_keeps_later_schedules(self, reminder, monkeypatch):
+        assert self._run(reminder, monkeypatch, {"status": "SENT", "crop": "Cotton"}, "T+24h") == set()
+
+    def test_delete_failure_does_not_break_expiry(self, reminder, monkeypatch):
+        def boom(Name, **kw):
+            raise Exception("ResourceNotFoundException")
+        monkeypatch.setattr(reminder, "scheduler", types.SimpleNamespace(delete_schedule=boom), raising=False)
+        monkeypatch.setattr(reminder, "table", types.SimpleNamespace(
+            get_item=lambda **kw: {"Item": {"status": "SENT"}}, update_item=lambda **kw: {},
+        ))
+        out = reminder.lambda_handler(
+            {"phone_number": "491234", "nudge_id": self.NUDGE_ID, "reminder_type": "EXPIRY"}, None
+        )
+        assert out["statusCode"] == 200

@@ -4,6 +4,7 @@ Detects DONE/NOT YET keywords in messages via DynamoDB Streams
 """
 import json
 import os
+import sys
 import boto3
 from typing import Dict, Any, List
 from common.whatsapp import send_whatsapp_message
@@ -14,6 +15,11 @@ from common.nudge_keywords import (
     is_done_reply,
     is_not_yet_reply,
 )
+
+_nudge_dir = os.path.dirname(os.path.abspath(__file__))
+if _nudge_dir not in sys.path:
+    sys.path.insert(0, _nudge_dir)
+from schedules import delete_nudge_schedules
 
 dynamodb = boto3.resource('dynamodb')
 scheduler = boto3.client('scheduler')
@@ -108,29 +114,7 @@ def get_user_dialect(phone_number: str) -> str:
 
 def delete_scheduled_reminders(nudge_id: str):
     """Delete EventBridge Scheduler reminders and expiry"""
-    # Apply same transformation as sender: replace : and # with -
-    safe_nudge_id = nudge_id.replace(':', '-').replace('#', '-')
-    
-    try:
-        schedule_name = f'reminder-{safe_nudge_id}-24h'
-        scheduler.delete_schedule(Name=schedule_name)
-        print(f"Deleted schedule: {schedule_name}")
-    except Exception as e:
-        print(f"Failed to delete 24h schedule: {e}")
-    
-    try:
-        schedule_name = f'reminder-{safe_nudge_id}-48h'
-        scheduler.delete_schedule(Name=schedule_name)
-        print(f"Deleted schedule: {schedule_name}")
-    except Exception as e:
-        print(f"Failed to delete 48h schedule: {e}")
-    
-    try:
-        schedule_name = f'expiry-{safe_nudge_id}'
-        scheduler.delete_schedule(Name=schedule_name)
-        print(f"Deleted expiry schedule: {schedule_name}")
-    except Exception as e:
-        print(f"Failed to delete expiry schedule: {e}")
+    delete_nudge_schedules(scheduler, nudge_id)
 
 
 def _parse_record(record: Dict[str, Any]):

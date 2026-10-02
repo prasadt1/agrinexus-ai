@@ -231,3 +231,17 @@ class TestScheduleCreation:
         sender.create_expiry_schedule("491234", "2026-04-25T10:00:00#spray", 72)
         out = capsys.readouterr().out
         assert "failed to create expiry schedule" in out.lower()
+
+
+class TestScheduleCleanup:
+    @pytest.mark.parametrize("make", ["reminder", "expiry"])
+    def test_one_shot_schedules_delete_themselves(self, sender, monkeypatch, make):
+        calls = []
+        monkeypatch.setattr(sender.scheduler, "create_schedule", lambda **kw: calls.append(kw) or {})
+        monkeypatch.setenv("REMINDER_LAMBDA_ARN", "arn:lambda")
+        monkeypatch.setenv("SCHEDULER_ROLE_ARN", "arn:role")
+        if make == "reminder":
+            sender.create_reminder_schedule("491234", "2026-04-25T10:00:00#spray", 24, "hi")
+        else:
+            sender.create_expiry_schedule("491234", "2026-04-25T10:00:00#spray", 72)
+        assert calls and calls[0]["ActionAfterCompletion"] == "DELETE"

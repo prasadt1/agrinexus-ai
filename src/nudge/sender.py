@@ -20,6 +20,7 @@ if _nudge_dir not in sys.path:
     sys.path.insert(0, _nudge_dir)
 from nudge_copy import build_nudge_message
 from bedrock_liner import invoke_nudge_focus_line
+from schedules import reminder_schedule_name, expiry_schedule_name
 
 dynamodb = boto3.resource('dynamodb')
 scheduler = boto3.client('scheduler')
@@ -54,9 +55,7 @@ def create_reminder_schedule(phone_number: str, nudge_id: str, hours_offset: int
     """Create EventBridge Scheduler for reminder"""
     schedule_time = datetime.utcnow() + timedelta(hours=hours_offset)
     
-    # Create valid schedule name (alphanumeric, hyphens, underscores only)
-    safe_nudge_id = nudge_id.replace(':', '-').replace('#', '-')
-    schedule_name = f'reminder-{safe_nudge_id}-{hours_offset}h'
+    schedule_name = reminder_schedule_name(nudge_id, hours_offset)
     
     try:
         scheduler.create_schedule(
@@ -72,7 +71,8 @@ def create_reminder_schedule(phone_number: str, nudge_id: str, hours_offset: int
                     'dialect': dialect
                 })
             },
-            FlexibleTimeWindow={'Mode': 'OFF'}
+            FlexibleTimeWindow={'Mode': 'OFF'},
+            ActionAfterCompletion='DELETE',
         )
         print(f"Created reminder schedule: {schedule_name}")
     except Exception as e:
@@ -92,9 +92,7 @@ def create_expiry_schedule(phone_number: str, nudge_id: str, hours_offset: int):
     """Create EventBridge Scheduler to auto-expire nudge if no response"""
     schedule_time = datetime.utcnow() + timedelta(hours=hours_offset)
     
-    # Create valid schedule name
-    safe_nudge_id = nudge_id.replace(':', '-').replace('#', '-')
-    schedule_name = f'expiry-{safe_nudge_id}'
+    schedule_name = expiry_schedule_name(nudge_id)
     
     # Use the same reminder Lambda but with a special 'EXPIRY' type
     try:
@@ -111,7 +109,8 @@ def create_expiry_schedule(phone_number: str, nudge_id: str, hours_offset: int):
                     'activity': 'auto-expire'
                 })
             },
-            FlexibleTimeWindow={'Mode': 'OFF'}
+            FlexibleTimeWindow={'Mode': 'OFF'},
+            ActionAfterCompletion='DELETE',
         )
         print(f"Created expiry schedule: {schedule_name}")
     except Exception as e:

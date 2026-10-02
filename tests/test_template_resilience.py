@@ -60,3 +60,20 @@ def test_response_detector_stream_has_bounded_retries_and_failure_destination():
         and p["SQSSendMessagePolicy"]["QueueName"] == {"GetAtt": f"{dest}.QueueName"}
         for p in policies
     )
+
+
+def _statements(fn):
+    out = []
+    for p in _resources()[fn]["Properties"]["Policies"]:
+        if isinstance(p, dict) and "Statement" in p:
+            out += p["Statement"]
+    return out
+
+
+def test_reminder_can_delete_only_nudge_schedules():
+    stmts = [s for s in _statements("ReminderSender") if "scheduler:DeleteSchedule" in s["Action"]]
+    assert stmts
+    for s in stmts:
+        resources = s["Resource"] if isinstance(s["Resource"], list) else [s["Resource"]]
+        assert resources and all(isinstance(r, dict) and "Sub" in r for r in resources)
+        assert sorted(r["Sub"].rsplit("/", 1)[-1] for r in resources) == ["expiry-*", "reminder-*"]

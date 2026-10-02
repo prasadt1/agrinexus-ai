@@ -833,6 +833,12 @@ Resources:
         - Statement:
             - Effect: Allow
               Action:
+                - scheduler:DeleteSchedule
+              Resource:
+                - !Sub arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/default/reminder-*
+                - !Sub arn:aws:scheduler:${AWS::Region}:${AWS::AccountId}:schedule/default/expiry-*
+            - Effect: Allow
+              Action:
                 - secretsmanager:GetSecretValue
               Resource:
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus/whatsapp/*
