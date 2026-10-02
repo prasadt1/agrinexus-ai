@@ -18,7 +18,7 @@ AgriNexus AI demonstrates **production-grade implementation quality** across tes
 | IaC resources | **34** (SAM/CloudFormation) |
 | Lambda functions | **11** |
 | ADRs | **10** |
-| EARS requirements | **144** |
+| EARS requirements | **169** |
 | CI/CD workflows | **2** (GitHub Actions) |
 | CloudWatch alarms | **8** |
 
@@ -188,7 +188,7 @@ CloudFormation change sets, automatic rollback on failure, parameter validation.
 | Category | Count | Examples |
 |---|---|---|
 | Architecture Decision Records | **9** | EventBridge vs Step Functions, S3 Vectors vs OpenSearch, Vision quality gates |
-| EARS requirements | **144** | Traced to code in `docs/requirements.md` |
+| EARS requirements | **169** | Traced to code in `docs/requirements.md` |
 | Guides | 5+ | E2E test guide, WhatsApp setup, weather API, install prerequisites |
 | Operational docs | 3+ | Runbook alerts, capacity analysis, FinOps |
 | Product docs | 2 | RAG flow explained, nudge behavior guide |
@@ -209,7 +209,7 @@ CloudFormation change sets, automatic rollback on failure, parameter validation.
 | **IaC** | Best practices | ✅ | Parameterized, least privilege, monitoring |
 | **CI/CD** | Workflows | 2 | GitHub Actions |
 | **Documentation** | ADRs | 9 | `docs/adr/` |
-| **Documentation** | EARS requirements | 144 | `docs/requirements.md` |
+| **Documentation** | EARS requirements | 169 | `docs/requirements.md` |
 | **Monitoring** | Alarms | 8 | SAM template |
 | **Monitoring** | Dashboard widgets | 9 | CloudWatch |
 | **Monitoring** | Tracing | ✅ | X-Ray enabled |
