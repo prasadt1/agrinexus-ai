@@ -17,6 +17,7 @@
 | **BUSINESS METRICS** |
 | Nudges | NudgesSent | Custom | CloudWatch | ✅ Active | - | ~4/day |
 | Nudges | NudgesCompleted | Custom | CloudWatch | ✅ Active | - | Variable |
+| Nudges | NudgesDeferred | Custom | CloudWatch | Not deployed | - | One per eligible farmer per poll outside 06:00-19:00 IST |
 | Nudges | Completion Rate | Calculated | Dashboard | ✅ Active | - | ~25-50% |
 | Users | Total Registered | Manual | DynamoDB | ✅ Active | - | 7 users |
 | Users | Allowlisted | Manual | DynamoDB | ✅ Active | - | 1 user |

@@ -56,6 +56,20 @@ Parameters:
       Bedrock inference profile ID for the cheap photo relevance check that
       runs before vision diagnosis.
 
+  NudgeSendWindowStartHour:
+    Type: Number
+    Default: 6
+    MinValue: 0
+    MaxValue: 23
+    Description: First Asia/Kolkata hour (inclusive) in which weather nudges may be sent.
+
+  NudgeSendWindowEndHour:
+    Type: Number
+    Default: 19
+    MinValue: 1
+    MaxValue: 24
+    Description: Asia/Kolkata hour (exclusive) at which the nudge send window closes. Must be greater than the start hour.
+
   VisitorTtlDays:
     Type: Number
     Default: 7
@@ -854,6 +868,8 @@ Resources:
           USE_NUDGE_TEMPLATE: "true"
           NUDGE_BEDROCK_LINER: "false"
           NUDGE_LINER_MODEL_ID: anthropic.claude-3-haiku-20240307-v1:0
+          NUDGE_WINDOW_START_HOUR: !Ref NudgeSendWindowStartHour
+          NUDGE_WINDOW_END_HOUR: !Ref NudgeSendWindowEndHour
       Policies:
         - CloudWatchPutMetricPolicy: {}
         - DynamoDBCrudPolicy:

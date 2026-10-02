@@ -142,6 +142,28 @@ def emit_metric(name: str, value: float = 1.0):
         print(f"Failed to emit metric {name}: {e}")
 
 
+IST_OFFSET = timedelta(hours=5, minutes=30)  # Asia/Kolkata has no DST
+
+
+def _utcnow() -> datetime:
+    return datetime.utcnow()
+
+
+def in_send_window(now_utc: datetime) -> bool:
+    """True when Asia/Kolkata local time is within [start, end). Bad config sends nothing."""
+    try:
+        start = int(os.environ.get('NUDGE_WINDOW_START_HOUR', '6'))
+        end = int(os.environ.get('NUDGE_WINDOW_END_HOUR', '19'))
+    except ValueError:
+        print("Nudge send window unreadable - deferring all nudges")
+        return False
+    if not 0 <= start < end <= 24:
+        print(f"Nudge send window invalid ({start}-{end}) - deferring all nudges")
+        return False
+    local = now_utc + IST_OFFSET
+    return start <= local.hour < end
+
+
 def has_open_nudge(phone_number: str, activity: str, max_age_hours: int = 96) -> bool:
     """
     Check if user already has an OPEN nudge for this activity (SENT/REMINDED).
@@ -160,7 +182,7 @@ def has_open_nudge(phone_number: str, activity: str, max_age_hours: int = 96) ->
         }
     )
 
-    now = datetime.utcnow()
+    now = _utcnow()
     max_age = timedelta(hours=max_age_hours)
 
     for item in response.get('Items', []):
@@ -195,7 +217,13 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     location = event.get('location')
     weather = convert_floats_to_decimal(event.get('weather', {}))
     activity = event.get('activity', 'spray')
-    
+    # Demo path only: bypasses the send window, never the consent gates.
+    force = event.get('force') is True
+    now = _utcnow()
+    window_open = force or in_send_window(now)
+    if force:
+        print("force=true - send window bypassed")
+
     # Query farmers in this location
     response = table.query(
         IndexName='GSI1',
@@ -210,7 +238,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     
     nudges_sent = 0
     nudges_skipped = 0
-    
+    nudges_deferred = 0
+
     for farmer in farmers:
         phone_number = farmer.get('phone_number')
         dialect = farmer.get('dialect', 'hi')
@@ -248,6 +277,12 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             nudges_skipped += 1
             continue
 
+        if not window_open:
+            print(f"Deferring {redact_phone(phone_number)} - outside nudge send window")
+            emit_metric('NudgesDeferred', 1)
+            nudges_deferred += 1
+            continue
+
         crop = profile.get('crop', 'Cotton')
         district_key = profile.get('location') or location
 
@@ -266,9 +301,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         )
 
         # Create nudge record in DynamoDB
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = now.isoformat()
         nudge_id = f"{timestamp}#{activity}"
-        ttl = int(datetime.utcnow().timestamp()) + (180 * 24 * 60 * 60)  # 180 days
+        ttl = int(now.timestamp()) + (180 * 24 * 60 * 60)  # 180 days
 
         table.put_item(
             Item={
@@ -326,5 +361,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         'statusCode': 200,
         'nudges_sent': nudges_sent,
         'nudges_skipped': nudges_skipped,
+        'nudges_deferred': nudges_deferred,
         'location': location
     }

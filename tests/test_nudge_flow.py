@@ -96,6 +96,7 @@ def test_nudge_sends_context_aware_message_and_template_fallback(monkeypatch):
     }
     monkeypatch.setattr(sender, "table", fake_table)
     monkeypatch.setattr(sender, "has_open_nudge", lambda *args, **kwargs: False)
+    monkeypatch.setattr(sender, "_utcnow", lambda: datetime(2026, 10, 3, 4, 30))  # 10:00 IST
 
     captured_buttons = {}
     captured_template = {}

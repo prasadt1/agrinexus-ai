@@ -233,6 +233,90 @@ class TestScheduleCreation:
         assert "failed to create expiry schedule" in out.lower()
 
 
+# ---------------------------------------------------------------------------
+# Send window and cooldown
+# ---------------------------------------------------------------------------
+
+# 10:00 Asia/Kolkata
+NOW = datetime(2026, 10, 3, 4, 30)
+
+
+def _ist(hour, minute=0, day=3):
+    return datetime(2026, 10, day, hour, minute) - timedelta(hours=5, minutes=30)
+
+
+def _run_handler(sender, monkeypatch, now=NOW, nudges=(), force=None):
+    farmer = {"phone_number": "491234", "dialect": "en"}
+    profile = {
+        "onboarding_complete": True, "consent": True, "crop": "Cotton",
+        "location": "Latur", "demo_tier": "full",
+    }
+    puts, metrics, sends = [], [], []
+
+    def query(**kw):
+        if kw.get("IndexName") == "GSI1":
+            return {"Items": [farmer]}
+        return {"Items": list(nudges)}
+
+    monkeypatch.setattr(sender, "table", types.SimpleNamespace(
+        query=query,
+        get_item=lambda **kw: {"Item": profile},
+        put_item=lambda **kw: puts.append(kw),
+    ))
+    monkeypatch.setattr(sender, "_utcnow", lambda: now)
+    monkeypatch.setattr(sender, "emit_metric", lambda name, value=1.0: metrics.append(name))
+    monkeypatch.setattr(sender, "send_whatsapp_buttons", lambda *a, **k: sends.append(a) or True)
+    monkeypatch.setattr(sender, "create_reminder_schedule", lambda *a, **k: None)
+    monkeypatch.setattr(sender, "create_expiry_schedule", lambda *a, **k: None)
+    event = {"location": "Latur", "weather": {"wind_speed": 5.0}, "activity": "spray"}
+    if force is not None:
+        event["force"] = force
+    out = sender.lambda_handler(event, None)
+    return out, puts, metrics, sends
+
+
+class TestSendWindow:
+    def test_night_run_defers_instead_of_sending(self, sender, monkeypatch):
+        out, puts, metrics, sends = _run_handler(sender, monkeypatch, now=_ist(23))
+        assert out["nudges_sent"] == 0
+        assert puts == [] and sends == []
+        assert "NudgesDeferred" in metrics
+        assert "NudgesSent" not in metrics
+
+    def test_daytime_run_sends(self, sender, monkeypatch):
+        out, puts, metrics, sends = _run_handler(sender, monkeypatch, now=_ist(10))
+        assert out["nudges_sent"] == 1 and len(sends) == 1
+        assert "NudgesDeferred" not in metrics
+
+    @pytest.mark.parametrize("hour,minute,inside", [
+        (5, 59, False), (6, 0, True), (18, 59, True), (19, 0, False), (0, 30, False),
+    ])
+    def test_window_is_0600_to_1900_kolkata(self, sender, hour, minute, inside):
+        assert sender.in_send_window(_ist(hour, minute)) is inside
+
+    def test_window_hours_come_from_env(self, sender, monkeypatch):
+        monkeypatch.setenv("NUDGE_WINDOW_START_HOUR", "8")
+        monkeypatch.setenv("NUDGE_WINDOW_END_HOUR", "12")
+        assert sender.in_send_window(_ist(7, 30)) is False
+        assert sender.in_send_window(_ist(11, 59)) is True
+        assert sender.in_send_window(_ist(12)) is False
+
+    @pytest.mark.parametrize("start,end", [("x", "19"), ("19", "6"), ("6", "6")])
+    def test_unreadable_window_sends_nothing(self, sender, monkeypatch, start, end):
+        monkeypatch.setenv("NUDGE_WINDOW_START_HOUR", start)
+        monkeypatch.setenv("NUDGE_WINDOW_END_HOUR", end)
+        assert sender.in_send_window(_ist(10)) is False
+
+    def test_force_sends_at_night(self, sender, monkeypatch):
+        out, _, metrics, sends = _run_handler(sender, monkeypatch, now=_ist(23), force=True)
+        assert out["nudges_sent"] == 1 and len(sends) == 1
+        assert "NudgesDeferred" not in metrics
+
+    def test_only_boolean_true_forces(self, sender, monkeypatch):
+        out, *_ = _run_handler(sender, monkeypatch, now=_ist(23), force="true")
+        assert out["nudges_sent"] == 0
+
+
 class TestScheduleCleanup:
     @pytest.mark.parametrize("make", ["reminder", "expiry"])
     def test_one_shot_schedules_delete_themselves(self, sender, monkeypatch, make):
