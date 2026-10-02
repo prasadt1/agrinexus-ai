@@ -10,7 +10,8 @@ The generic "FAO/ICAR Agricultural Guidelines" line is no longer shown. Because
 `retrievedReferences` is always empty, the line was attached to every answer and
 never named the document the answer came from. A reader could fairly take it as a
 citation that was not checked. A source is now shown only when a retrieved document
-name is available; otherwise no source line is added. This applies to WhatsApp
+name is available; otherwise no source line is added. Source lines the model writes in
+its own prose are removed, since nothing checks them against what was retrieved. This applies to WhatsApp
 replies, the web chat API, and the web demo page, which had its own copy of the
 generic label.
 

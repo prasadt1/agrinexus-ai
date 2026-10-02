@@ -73,7 +73,7 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 **REQ-CONV-003**: The system shall respond to farmer queries in Hindi, Marathi, or Telugu based on the user's profile dialect preference.
 
-**REQ-CONV-004** (amended 2 Oct 2026): When a retrieved document name is available, the advisory response shall name it as the source. When none is available, the system shall not add a generic source line. Knowledge base refusals shall carry no source line.
+**REQ-CONV-004** (amended 2 Oct 2026): When a retrieved document name is available, the advisory response shall name it as the source. When none is available, the system shall not add a generic source line. Source lines written by the model shall be removed. Knowledge base refusals shall carry no source line.
 
 **REQ-CONV-005**: The system shall log the full source attribution (document name, chunk, confidence score) to CloudWatch for auditability.
 

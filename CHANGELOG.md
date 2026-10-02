@@ -11,19 +11,22 @@ Live Marathi refusals came back with "स्त्रोत: FAO/ICAR शेत�
 
 ### What changed
 - **Refusal markers.** The knowledge base prompt asks for `NO_KB_ANSWER` when the context does not cover the question and `NOT_FARMING` for off-topic questions. `common/guardrail_reply.py` replaces these, and Bedrock's English "Sorry, I am unable to assist you with this request.", with a fixed refusal in the farmer's language. Refusals carry no source line and no referral footer. Phrase checks remain as a fallback.
-- **No generic source line.** WhatsApp replies, the web chat API and the web demo page show a source only when a retrieved document name is available. ADR 0005 amended; REQ-CONV-004 and AC-002 amended.
+- **No generic source line.** WhatsApp replies, the web chat API and the web demo page show a source only when a retrieved document name is available. Source lines the model writes itself (for example an ICAR institute name in the prose) are removed, because nothing checks them against what was retrieved. ADR 0005 amended; REQ-CONV-004 and AC-002 amended.
+- **Pesticide questions state the policy.** A pesticide or spray question the knowledge base cannot answer no longer gets "I don't have information on this", which implies the system would name a product if it knew. It gets a fixed line in the farmer's language ("I can't give pesticide names or quantities. Send a photo of the affected plant…") followed by the KVK referral and Kisan Call Centre number. When the knowledge base does answer, the prompt asks the model to open with the same sentence.
+- **Marathi larva term.** Photo prompts ask for अळी (गुलाबी बोंडअळी) instead of the Hindi इल्ली or इळी; a photo F replay used गुलाबी बोंडअळी in 4 of 4 runs.
 - **Retrieval hints.** Marathi "कापसावरील" (oblique stem कापस) now maps to cotton; whitefly terms in Hindi, Marathi and Telugu and "फवार" (spray) were added. A "pest management" hint was tried and removed: it pulled in product dose tables and generation declined every time.
 
 ### Evidence
 - Against Bedrock: the neem dose question returned `NO_KB_ANSWER` in 3 of 3 runs and became the fixed Marathi refusal; whitefly and pink bollworm questions still answered with traps, thresholds and the KVK referral.
 
 ### Known limits
+- **Advice filter not yet seen firing on WhatsApp.** A live hit is confirmed only on `web_text` (log line and `AdviceFilterHit` datapoint). Two WhatsApp text attempts and photo F came back clean from the model, so `whatsapp_text`, `whatsapp_voice` and `whatsapp_photo` are covered by wiring tests but unproven live. The metric will show the first real hit.
 - A Telugu rice blast question retrieved a weeding chunk for direct-seeded rice and answered off-topic. There is no Telugu hint for blast yet.
 - The web demo page change goes live only when `main` is updated (GitHub Pages serves `main:/docs`).
 
 ---
 
-## 2 October 2026 — no pesticide recommendations: identify and refer (code; not deployed)
+## 2 October 2026 — no pesticide recommendations: identify and refer
 
 ### Decision
 The product identifies the pest and gives non-chemical steps. It does not name pesticide products or doses on any path. Chemical choice and rate are referred to the farmer's local KVK (Krishi Vigyan Kendra). This applies to photo, text and voice.
