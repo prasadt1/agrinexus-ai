@@ -137,6 +137,9 @@ def test_recommendations_that_were_all_chemical_leave_a_dash():
         "Mix 5 ml neem oil in 1 litre of water and spray.",
         "नीम तेल 5 मिली/लीटर का छिड़काव करें।",
         "Apply 200 ml per acre as a spray.",
+        "नीम तेल (Azadirachtin 1500 ppm) 2.5 लिटर/हेक्टर + डिटर्जंट 1 ग्रॅम/लिटर पाण्यात मिसळून फवारणी करू शकता",
+        "Use azadirachtin-based neem oil.",
+        "Neem oil 1500 ppm is effective.",
     ],
 )
 def test_other_languages_and_neem_doses_are_removed(text):

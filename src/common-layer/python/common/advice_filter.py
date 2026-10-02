@@ -53,6 +53,7 @@ _ACTIVES_LATIN = (
     "endosulfan", "paraquat", "glyphosate", "mancozeb", "carbendazim", "hexaconazole",
     "propiconazole", "tebuconazole", "copper oxychloride", "metalaxyl", "thiophanate",
     "tricyclazole", "azoxystrobin", "spinetoram", "lufenuron", "thiodicarb",
+    "azadirachtin",
 )
 _ACTIVES_INDIC = (
     # Devanagari (Marathi / Hindi)
@@ -72,6 +73,7 @@ _ACTIVES_INDIC = (
     "डायफेंथियुरॉन", "डायफेन्थियुरॉन", "डायफेंथियूरॉन", "डाइफेंथियूरॉन",
     "क्लोरपायरीफॉस", "क्लोरपायरिफॉस", "क्लोरपायरीफोस", "क्लोरोपायरीफॉस",
     "मोनोक्रोटोफॉस", "ट्रायझोफॉस", "इंडोक्झाकार्ब", "इंडोक्साकार्ब", "फ्लुबेंडियामाइड",
+    "अझाडिरेक्टिन", "अॅझाडिरॅक्टिन", "एज़ाडिरेक्टिन", "एजाडिरेक्टिन", "अजाडिरेक्टिन",
     "मॅलेथिऑन", "मैलाथियान", "मॅन्कोझेब", "मैन्कोजेब", "कार्बेन्डाझिम", "कार्बेन्डाजिम",
     "हेक्झाकोनाझोल", "हेक्साकोनाजोल", "प्रोपिकोनाझोल", "अॅसिटामिप्रिड", "एसिटामिप्रिड",
     "कॉपर ऑक्सिक्लोराईड", "कॉपर ऑक्सीक्लोराइड",
@@ -95,7 +97,7 @@ _INDIC_TERMS = tuple(dict.fromkeys(_normalize(t) for t in _ACTIVES_INDIC + _BRAN
 _LATIN_RE = re.compile(r"(?<![a-z])(?:" + "|".join(re.escape(t) for t in _LATIN_TERMS) + r")")
 
 _FORMULATION_RE = re.compile(
-    r"\d+(?:[.,]\d+)?\s*(?:%\s*(?:ec|sl|wg|wdg|sc|wp|sg|sp|gr|cs|od|ew|fs|zc|ds|ws)(?![a-z])"
+    r"\d+(?:[.,]\d+)?\s*(?:ppm(?![a-z])|पीपीएम|%\s*(?:ec|sl|wg|wdg|sc|wp|sg|sp|gr|cs|od|ew|fs|zc|ds|ws)(?![a-z])"
     r"|%?\s*(?:ec|sl|wg|wdg|sc|wp|sg|od|ew|zc)(?![a-z])"
     r"|%?\s*-?\s*(?:ईसी|ई\.सी\.|एसएल|एस\.एल\.|डब्ल्यूजी|डब्लूजी|डब्ल्यूडीजी|डब्ल्यूपी|डब्लूपी|एससी|एस\.सी\.|एसजी|ఈసీ|ఎస్ఎల్|డబ్ల్యూజీ|డబ్ల్యూపీ|ఎస్సీ))"
 )
