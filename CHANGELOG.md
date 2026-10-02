@@ -4,9 +4,9 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
-## 2 October 2026 — external review, phase 2 and hygiene (not deployed)
+## 2 October 2026 — external review, phase 2 and hygiene (deployed 2 October)
 
-Each item below has its own commit and a test that failed before the fix.
+Each item below has its own commit and a test that failed before the fix. Deployed together with phase 1 at 67cc97a; after the deploy the stale-schedule script ran with `--apply` and deleted 141 schedules, leaving 4.
 
 ### Message delivery
 - **Photo path had no guardrail.** Both `invoke_model` calls in `src/processor/analyzer.py` now carry the content guardrail. A guardrail intervention on a diagnosis sends only the localized farming-only refusal, on every photo route (first pass, assumed-crop second pass, crop-confirm tap). Probed against the live guardrail with sample photos E, F and G in Marathi and Hindi: none blocked. REQ-GUARD-015.
@@ -36,13 +36,15 @@ Each item below has its own commit and a test that failed before the fix.
 
 ### Found during this work, not fixed
 - **Photo relevance check is dead.** Claude 3 Haiku has reached end of life, so `classify_image_relevance` always fails and returns `unclear`. In the last 14 days of logs all 15 checks did (all from the beta processor; the main processor logged none). Non-farming photos still reach the main vision model, which rejects them, but the cheap pre-check never runs. Needs a current model ID.
+- **Nudge liner model.** `NUDGE_LINER_MODEL_ID` is also Claude 3 Haiku. The liner is off (`NUDGE_BEDROCK_LINER=false`) and falls back to the static hint on any error, so nothing is broken today, but enabling it would still send only the static hint until the model ID is changed.
+- **Advice filter can strip a non-chemical step.** On the deployed web chat, "which pesticide and dose for pink bollworm" removed one segment as a dose, and the reply kept the follow-on sentence "Repeat two more times at 30-day intervals" without the step it refers to. The reply was otherwise correct (no product, no dose, non-chemical steps, KVK, Kisan Call Centre).
 - **Python 3.11 Lambda runtime.** `cfn-lint` reports it deprecated (June 2026), with function updates disabled from 31 August 2026. Deploys succeeded this week, but the runtime needs upgrading.
 - `scripts/delete-user-data.sh` (operator erasure) deletes no S3 media.
 - `BetaMessageDLQ` has no consumer, so failures on the beta queue get no farmer-facing error.
 
 ---
 
-## 2 October 2026 — external review, phase 1: weather fails closed, filter gaps (not deployed)
+## 2 October 2026 — external review, phase 1: weather fails closed, filter gaps (deployed 2 October)
 
 An external code review verified these against source.
 
