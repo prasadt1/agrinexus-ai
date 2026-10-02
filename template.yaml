@@ -258,6 +258,17 @@ Resources:
       VisibilityTimeout: 180
       MessageRetentionPeriod: 345600  # 4 days
       ReceiveMessageWaitTimeSeconds: 20  # Long polling - reduces SQS API calls
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt VoiceDLQ.Arn
+        maxReceiveCount: 3
+
+  VoiceDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub agrinexus-voice-dlq-${Environment}.fifo
+      FifoQueue: true
+      MessageRetentionPeriod: 1209600  # 14 days
+      ReceiveMessageWaitTimeSeconds: 20
 
   # ============================================================================
   # S3 Bucket for Temporary Audio Storage
@@ -705,6 +716,12 @@ Resources:
           Type: SQS
           Properties:
             Queue: !GetAtt MessageDLQ.Arn
+            Enabled: true
+            BatchSize: 10
+        VoiceDLQEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt VoiceDLQ.Arn
             Enabled: true
             BatchSize: 10
 
