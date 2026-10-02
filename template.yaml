@@ -853,6 +853,9 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref TableName
+        - CloudWatchPutMetricPolicy: {}
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt ResponseDetectorFailureQueue.QueueName
         - Statement:
             - Effect: Allow
               Action:
@@ -959,6 +962,21 @@ Resources:
       StartingPosition: LATEST
       BatchSize: 100
       MaximumBatchingWindowInSeconds: 10
+      MaximumRetryAttempts: 2
+      MaximumRecordAgeInSeconds: 3600
+      BisectBatchOnFunctionError: true
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
+      DestinationConfig:
+        OnFailure:
+          Destination: !GetAtt ResponseDetectorFailureQueue.Arn
+
+  # Stream batches that still fail after retries land here (record metadata only).
+  ResponseDetectorFailureQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub agrinexus-response-detector-failures-${Environment}
+      MessageRetentionPeriod: 1209600  # 14 days
 
   # ============================================================================
   # Cost Monitoring: Budget Alert

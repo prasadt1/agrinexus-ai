@@ -44,3 +44,19 @@ def test_voice_dlq_is_drained_by_dlq_handler():
     events = r["DLQHandler"]["Properties"]["Events"].values()
     queues = [e["Properties"]["Queue"]["GetAtt"] for e in events if e["Type"] == "SQS"]
     assert f"{dlq_name}.Arn" in queues
+
+
+def test_response_detector_stream_has_bounded_retries_and_failure_destination():
+    r = _resources()
+    esm = r["ResponseDetectorEventSourceMapping"]["Properties"]
+    assert 0 <= esm["MaximumRetryAttempts"] <= 3
+    assert esm["BisectBatchOnFunctionError"] is True
+    assert "ReportBatchItemFailures" in esm["FunctionResponseTypes"]
+    dest = esm["DestinationConfig"]["OnFailure"]["Destination"]["GetAtt"].split(".")[0]
+    assert r[dest]["Type"] == "AWS::SQS::Queue"
+    policies = r["ResponseDetector"]["Properties"]["Policies"]
+    assert any(
+        isinstance(p, dict) and "SQSSendMessagePolicy" in p
+        and p["SQSSendMessagePolicy"]["QueueName"] == {"GetAtt": f"{dest}.QueueName"}
+        for p in policies
+    )
