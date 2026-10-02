@@ -119,7 +119,7 @@ The product identifies the pest or problem and gives non-chemical steps. It does
 
 **REQ-GUARD-009**: When a farmer-facing advice message is ready to send, the system shall pass it through the advice output filter before sending it and before converting it to speech.
 
-**REQ-GUARD-010**: If the output filter detects an active ingredient name, a brand, a formulation strength or a dilution in a sentence, then the system shall remove that sentence and keep the rest of the message. A bare quantity shall be removed only when the same sentence concerns spraying, mixing, a pesticide, neem or a trap.
+**REQ-GUARD-010** (amended 2 Oct 2026): If the output filter detects an active ingredient name, a brand, a name ending typical of a pesticide class (for example -fos, -thrin, -conazole, -cloprid, -mectin), a formulation strength, a dilution, or a small-unit amount per acre or hectare in a sentence, then the system shall remove that sentence and keep the rest of the message. Quantities written as digits or as number words (English, Hindi, Marathi, Telugu) count. A bare quantity shall be removed only when the same sentence concerns spraying, mixing, a pesticide, neem or a trap, or uses an apply/use verb and is not about fertilizer, seed or irrigation.
 
 **REQ-GUARD-011**: When the output filter removes content, the system shall emit the CloudWatch metric `AgriNexus/Advice` `AdviceFilterHit` with the channel and the kind of match.
 

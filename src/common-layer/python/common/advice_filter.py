@@ -53,7 +53,8 @@ _ACTIVES_LATIN = (
     "endosulfan", "paraquat", "glyphosate", "mancozeb", "carbendazim", "hexaconazole",
     "propiconazole", "tebuconazole", "copper oxychloride", "metalaxyl", "thiophanate",
     "tricyclazole", "azoxystrobin", "spinetoram", "lufenuron", "thiodicarb",
-    "azadirachtin",
+    "azadirachtin", "cartap", "dichlorvos", "methomyl", "chlorfenapyr", "dicofol",
+    "pendimethalin", "atrazine", "chlorothalonil", "streptocycline", "validamycin",
 )
 _ACTIVES_INDIC = (
     # Devanagari (Marathi / Hindi)
@@ -77,6 +78,13 @@ _ACTIVES_INDIC = (
     "मॅलेथिऑन", "मैलाथियान", "मॅन्कोझेब", "मैन्कोजेब", "कार्बेन्डाझिम", "कार्बेन्डाजिम",
     "हेक्झाकोनाझोल", "हेक्साकोनाजोल", "प्रोपिकोनाझोल", "अॅसिटामिप्रिड", "एसिटामिप्रिड",
     "कॉपर ऑक्सिक्लोराईड", "कॉपर ऑक्सीक्लोराइड",
+    "कार्टाप", "कारटाप", "डायक्लोरव्हॉस", "डायक्लोरवॉस", "डाइक्लोरवास", "डायक्लोरवास",
+    "मेथोमिल", "मिथोमिल", "मेथोमाइल", "क्लोरफेनापायर", "क्लोरफेनपायर", "क्लोरफेनापिर",
+    "डायकोफॉल", "डाइकोफोल", "डायकोफोल", "पेंडीमेथालिन", "पेंडिमेथालिन", "पेंडीमिथेलिन",
+    "अॅट्राझिन", "अॅट्राझीन", "एट्राजीन", "एट्राजिन", "अट्राझिन",
+    "क्लोरोथॅलोनिल", "क्लोरोथालोनिल", "क्लोरोथैलोनिल",
+    "स्ट्रेप्टोसायक्लिन", "स्ट्रेप्टोसाइक्लिन", "स्ट्रेप्टोसायक्लीन",
+    "व्हॅलिडामायसिन", "वैलिडामाइसिन", "वॅलिडामायसिन", "व्हॅलिडामायसीन",
     # Telugu
     "ఇమిడాక్లోప్రిడ్", "థయామెథాక్సామ్", "థియామెథాక్సామ్", "ప్రొఫెనోఫాస్", "ప్రోఫెనోఫాస్",
     "సైపర్‌మెత్రిన్", "సైపర్మెత్రిన్", "క్లోరాంట్రానిలిప్రోల్", "క్లోరంట్రానిలిప్రోల్",
@@ -84,12 +92,42 @@ _ACTIVES_INDIC = (
     "ఎసిఫేట్", "అసిఫేట్", "ఎమామెక్టిన్", "ఫిప్రోనిల్", "లాంబ్డా", "సైహలోత్రిన్",
     "బుప్రోఫెజిన్", "డయాఫెంథియురాన్", "డయాఫెన్థియురాన్", "క్లోర్‌పైరిఫాస్", "క్లోర్పైరిఫాస్",
     "మాంకోజెబ్", "కార్బెండజిమ్",
+    "కార్టాప్", "డైక్లోర్వాస్", "డైక్లోరోవాస్", "మెథోమిల్", "క్లోర్ఫెనాపైర్", "డైకోఫాల్",
+    "పెండిమిథాలిన్", "పెండిమెథాలిన్", "అట్రాజిన్", "ఆట్రాజిన్", "క్లోరోథలోనిల్",
+    "స్ట్రెప్టోసైక్లిన్", "వాలిడామైసిన్",
 )
 # Brand names seen in replies ("जसे की कॉन्फिडॉर") and common equivalents.
 _BRANDS = (
     "confidor", "actara", "coragen", "ampligo", "ulala", "pegasus", "tracer",
+    "rogor", "karate", "regent", "lannate",
     "कॉन्फिडॉर", "कॉन्फिडोर", "अॅक्टारा", "ऍक्टारा", "एक्टारा", "कोराजेन", "कोरेजन",
     "కాన్ఫిడార్", "ఆక్టారా", "కొరాజెన్",
+)
+
+# Short brand names that are also parts of ordinary words (रोगर in रोगराई) only match
+# when no letter of the same script follows.
+_BOUNDED_BRANDS_INDIC = (
+    "रोगर", "रोगोर", "कराटे", "रीजेंट", "रिजेंट", "लॅनेट", "लैनेट", "लेनेट",
+    "రోగర్", "కరాటే", "రీజెంట్", "లానేట్",
+)
+_BOUNDED_INDIC_RE = re.compile(
+    r"(?:" + "|".join(re.escape(_normalize(t)) for t in _BOUNDED_BRANDS_INDIC) + r")(?![\u0900-\u097F\u0C00-\u0C7F])"
+)
+_TWO_FOUR_D_RE = re.compile(r"(?<!\d)2\s*,\s*4\s*-?\s*(?:d(?![a-z])|डी|డి)")
+
+# Fallback for actives not in the lists: most share a name ending by chemical class.
+_SUFFIX_LATIN_RE = re.compile(
+    r"\b[a-z]+(?:fos|phos|thrin|conazole|cloprid|amiprid|carb|mectin|iliprole|diamide|thoate"
+    r"|achlor|fop|uron|buzin|zeb|ineb|mycin|apyr|pyrad|meton|thion|sulfuron)\b"
+)
+_SUFFIX_INDIC_RE = re.compile(
+    r"[\u0900-\u097F]{2,}(?:" + "|".join(re.escape(_normalize(x)) for x in (
+        "फॉस", "थ्रिन", "थ्रीन", "कोनाझोल", "कोनाजोल", "क्लोप्रिड", "क्लोप्रीड", "मिप्रिड",
+        "मेक्टिन", "थोएट", "मायसिन", "माइसिन", "लाक्लोर", "युरॉन", "बुझिन", "बुजिन",
+    )) + r")"
+    r"|[\u0C00-\u0C7F]{2,}(?:" + "|".join(re.escape(_normalize(x)) for x in (
+        "ఫాస్", "త్రిన్", "కోనజోల్", "క్లోప్రిడ్", "మైసిన్", "మెక్టిన్", "థోయేట్",
+    )) + r")"
 )
 
 _LATIN_TERMS = tuple(_normalize(t) for t in _ACTIVES_LATIN + _BRANDS if t.isascii())
@@ -102,7 +140,27 @@ _FORMULATION_RE = re.compile(
     r"|%?\s*-?\s*(?:ईसी|ई\.सी\.|एसएल|एस\.एल\.|डब्ल्यूजी|डब्लूजी|डब्ल्यूडीजी|डब्ल्यूपी|डब्लूपी|एससी|एस\.सी\.|एसजी|ఈసీ|ఎస్ఎల్|డబ్ల్యూజీ|డబ్ల్యూపీ|ఎస్సీ))"
 )
 
-_QTY = r"\d+(?:[.,]\d+)?(?:\s*(?:-|–|to|ते|से)\s*\d+(?:[.,]\d+)?)?"
+_NUMBER_WORDS = tuple(
+    sorted(
+        {
+            _normalize(w)
+            for w in (
+                "one", "two", "three", "four", "five", "six", "ten", "half", "quarter",
+                "एक", "दो", "तीन", "चार", "पांच", "पाँच", "आधा", "आधी", "आधे", "डेढ़", "ढाई", "सवा",
+                "दोन", "पाच", "अर्धा", "अर्धी", "अर्धे", "दीड", "अडीच", "सव्वा", "पाव",
+                "ఒక", "ఒకటి", "రెండు", "మూడు", "నాలుగు", "ఐదు", "అర",
+            )
+        },
+        key=len,
+        reverse=True,
+    )
+)
+_NUM = (
+    r"(?:\d+(?:[.,]\d+)?|(?<![a-z\u0900-\u097F\u0C00-\u0C7F])(?:"
+    + "|".join(re.escape(w) for w in _NUMBER_WORDS)
+    + r")(?:\s+an?(?=\s))?)"
+)
+_QTY = _NUM + r"(?:\s*(?:-|–|to|or|ते|से|किंवा|या)\s*" + _NUM + r")?"
 _UNITS = tuple(
     sorted(
         {
@@ -128,6 +186,19 @@ _LITRE = r"(?:लिटर|लीटर|litre|liter|ltr|lit|l(?![a-z])|लि|�
 
 _DILUTION_RE = re.compile(_QTY + r"\s*" + _UNIT + r"\s*" + _PER + r"\s*(?:" + _QTY + r"\s*)?" + _LITRE)
 _QUANTITY_RE = re.compile(_QTY + r"\s*" + _UNIT)
+_SMALL_UNIT = r"(?:" + "|".join(
+    re.escape(_normalize(u)) for u in sorted(
+        ("millilitres", "milliliters", "millilitre", "milliliter", "ml", "grams", "gram", "gms", "gm", "g",
+         "litres", "liters", "litre", "liter", "ltr", "l",
+         "मिलीलीटर", "मिलीलिटर", "मि.ली.", "मि.ली", "मिली", "मिलि", "ग्रॅम", "ग्राम", "ग्रा", "लिटर", "लीटर",
+         "మి.లీ", "మిల్లీలీటర్", "మిలీ", "గ్రాములు", "గ్రాము", "గ్రా", "లీటర్లు", "లీటర్", "లీటరు"),
+        key=len, reverse=True)
+) + r")(?![a-z])"
+_AREA = r"(?:acres?|ha(?![a-z])|hectares?|एकर|एकड़|एकड|हेक्टर|हेक्टेयर|हेक्टेअर|ఎకరా|ఎకరాకు|ఎకరానికి|హెక్టారు|హెక్టార్)"
+_AREA_DOSE_RE = re.compile(
+    _QTY + r"\s*" + _SMALL_UNIT + r"\s*" + _PER + r"\s*(?:an?\s+)?" + _AREA
+    + r"|" + _AREA + r"\s*(?:" + _PER + r"\s*)?" + _QTY + r"\s*" + _SMALL_UNIT
+)
 
 _SPRAY_CONTEXT = tuple(
     _normalize(w)
@@ -141,6 +212,31 @@ _SPRAY_CONTEXT = tuple(
     )
 )
 
+# Apply/use verbs count as spray context unless the sentence is about fertilizer, seed or
+# irrigation, so "Apply 50 kg urea per acre" survives but "Apply 200 ml per acre" does not.
+_USE_VERBS = tuple(
+    _normalize(w)
+    for w in (
+        "apply", "use", "dose", "drench",
+        "वापर", "टाका", "टाकावे", "द्यावे", "डालें", "डाले", "डालना", "इस्तेमाल", "प्रयोग", "उपयोग",
+        "వాడ", "ఉపయోగ", "వేయ", "చల్ల",
+    )
+)
+_FERTILIZER_OR_SEED = tuple(
+    _normalize(w)
+    for w in (
+        "urea", "dap", "potash", "fertili", "compost", "manure", "fym", "seed", "npk",
+        "युरिया", "यूरिया", "खत", "खाद", "डीएपी", "पोटॅश", "पोटाश", "शेणखत", "कंपोस्ट", "बियाणे", "बीज",
+        "ఎరువు", "యూరియా", "విత్తన", "కంపోస్ట్",
+    )
+)
+# Irrigation amounts are not doses; this exempts only the apply/use verb rule, so a
+# dilution in water is still caught by _DILUTION_RE.
+_WATER = tuple(
+    _normalize(w)
+    for w in ("water", "irrigat", "पाणी", "पाण्य", "पानी", "सिंचन", "सिंचाई", "నీరు", "నీటి", "నీళ్ళు")
+)
+
 _ABBREVIATIONS = tuple(_normalize(a) for a in ("मि", "ली", "ग्रा", "कि", "मि.ली", "कि.ग्रा", "డా", "మి", "e.g", "i.e", "approx", "dr", "no"))
 _ENUM_RE = re.compile(r"(?:^|(?<=[\s,;:]))(\(?)([0-9०-९౦-౯]{1,2})([).])(?=\s)")
 _LABEL_RE = re.compile(r"^\s*\*[^*\n]+\*\s*")
@@ -150,12 +246,27 @@ def classify(segment: str) -> Set[str]:
     """Kinds of chemical advice found in one sentence: active, formulation, dose."""
     norm = _normalize(segment)
     kinds: Set[str] = set()
-    if _LATIN_RE.search(norm) or any(t in norm for t in _INDIC_TERMS):
+    if (
+        _LATIN_RE.search(norm)
+        or any(t in norm for t in _INDIC_TERMS)
+        or _BOUNDED_INDIC_RE.search(norm)
+        or _TWO_FOUR_D_RE.search(norm)
+        or _SUFFIX_LATIN_RE.search(norm)
+        or _SUFFIX_INDIC_RE.search(norm)
+    ):
         kinds.add("active")
     if _FORMULATION_RE.search(norm):
         kinds.add("formulation")
-    if _DILUTION_RE.search(norm) or (
-        _QUANTITY_RE.search(norm) and any(w in norm for w in _SPRAY_CONTEXT)
+    fertilizer = any(w in norm for w in _FERTILIZER_OR_SEED)
+    spray = any(w in norm for w in _SPRAY_CONTEXT) or (
+        not fertilizer
+        and not any(w in norm for w in _WATER)
+        and any(w in norm for w in _USE_VERBS)
+    )
+    if (
+        _DILUTION_RE.search(norm)
+        or (_AREA_DOSE_RE.search(norm) and not fertilizer)
+        or (_QUANTITY_RE.search(norm) and spray)
     ):
         kinds.add("dose")
     return kinds
