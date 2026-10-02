@@ -65,6 +65,14 @@ def _select_queue_url(from_number: str) -> str:
     return QUEUE_URL
 
 
+def _release_dedup(wamid: str) -> None:
+    """Drop the WAMID claim so Meta's retry of a message that never reached SQS is processed."""
+    try:
+        table.delete_item(Key={'PK': f'WAMID#{wamid}', 'SK': 'DEDUP'})
+    except Exception as e:
+        logger.error(f"Error releasing deduplication record for {wamid}: {e}")
+
+
 def check_rate_limit(phone_number: str) -> bool:
     """Count inbound user messages only in the time window.
 
@@ -376,7 +384,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         continue
                 except Exception as e:
                     logger.error(f"Error queuing audio message: {e}")
-                    continue
+                    _release_dedup(wamid)
+                    raise
             
             # Check if message should skip RAG processing (DONE/NOT YET keywords)
             message_text = ''
@@ -406,6 +415,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 logger.info(f"Message queued successfully - wamid: {wamid}, beta={target_queue_url == QUEUE_URL_BETA}")
             except Exception as e:
                 logger.error(f"Error queuing message: {e}")
+                _release_dedup(wamid)
                 raise
         
         # Always return 200 OK within 2 seconds
