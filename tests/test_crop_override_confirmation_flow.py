@@ -48,6 +48,9 @@ def _install_common_stubs(sent_messages):
     import common.nudge_keywords as nk_mod  # noqa: E402
     import common.visitor as visitor_mod  # noqa: E402
     import common.guardrail_reply as guardrail_reply_mod  # noqa: E402
+    import common.advice_filter as advice_mod  # noqa: E402
+
+    advice_mod._cloudwatch = types.SimpleNamespace(put_metric_data=lambda **kw: None)
 
     common_pkg = types.ModuleType("common")
     sys.modules["common"] = common_pkg
@@ -78,6 +81,7 @@ def _install_common_stubs(sent_messages):
     sys.modules["common.nudge_keywords"] = nk_mod
     sys.modules["common.visitor"] = visitor_mod
     sys.modules["common.guardrail_reply"] = guardrail_reply_mod
+    sys.modules["common.advice_filter"] = advice_mod
     common_pkg.redact = redact_mod
     common_pkg.nudge_keywords = nk_mod
     common_pkg.visitor = visitor_mod

@@ -15,6 +15,7 @@ from decimal import Decimal
 import hashlib
 from botocore.exceptions import ClientError
 from common.guardrail_reply import apply_localized_guardrail_reply
+from common.advice_filter import filter_advice
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -682,7 +683,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'headers': headers,
                     'body': json.dumps({'error': str(ve)})
                 }
-            analysis = analyze_image(images[0], dialect)
+            analysis = filter_advice(analyze_image(images[0], dialect), dialect, "web_photo", kind="photo")
 
             return {
                 'statusCode': 200,
@@ -702,6 +703,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         reply_text = result.get('text') or ''
         reply_text = strip_llm_xml_citation_tags(reply_text)
         reply_text = strip_all_numeric_source_footers(reply_text)
+        reply_text = filter_advice(
+            reply_text, dialect, "web_text", kind="answer",
+            add_referral=not is_rag_refusal_response(reply_text),
+        )
 
         # Format citations
         citations = []

@@ -20,6 +20,7 @@ import analyzer
 from common.whatsapp import send_whatsapp_message, send_whatsapp_list
 from common.whatsapp import send_whatsapp_buttons as _send_whatsapp_buttons
 from common.district_helplines import maybe_append_helpline_footer
+from common.advice_filter import filter_advice
 from common.allowlist import is_approved_user, allowlist_expiry_hint
 from common.redact import redact_phone
 from common.nudge_keywords import is_nudge_reply
@@ -840,7 +841,8 @@ def _diagnose_image_with_confirmed_crop(
     this too, so both produce identical text for the same image bytes + crop +
     dialect + district.
     """
-    return analyzer.diagnose_with_confirmed_crop(image_bytes, dialect, crop, district=district)
+    text = analyzer.diagnose_with_confirmed_crop(image_bytes, dialect, crop, district=district)
+    return filter_advice(text, dialect, "whatsapp_photo", kind="photo", district=district)
 
 
 def _run_visitor_sample_vision(from_number: str, profile: Dict[str, Any], wamid: str) -> None:
@@ -1355,7 +1357,10 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                         image_bytes = obj["Body"].read()
                         district = profile.get("district") or profile.get("location")
                         result = analyzer.analyze_crop_image(image_bytes, dialect, chosen, district=district)
-                        reply_text = str(result.get("recommendations") or "")
+                        reply_text = filter_advice(
+                            str(result.get("recommendations") or ""),
+                            dialect, "whatsapp_photo", kind="photo", district=district,
+                        )
                         save_message(from_number, wamid, message, reply_text, "vision_last_image_override")
                         send_whatsapp_message(from_number, reply_text)
                     finally:
@@ -1430,11 +1435,20 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                     source_text = source_attributions.get(dialect, source_attributions['en'])
                     response_text += f"\n\n{source_keyword} {source_text}"
 
+            location = (profile.get("district") or profile.get("location")) if profile else None
+            response_text = filter_advice(
+                response_text,
+                dialect,
+                "whatsapp_voice" if voice_source in ("voice", "voice_test") else "whatsapp_text",
+                kind="answer",
+                district=location,
+                add_referral=not is_rag_refusal_response(response_text),
+            )
             reply_text = maybe_append_helpline_footer(
                 response_text,
                 text,
                 dialect,
-                profile.get("location") if profile else None,
+                location,
             )
             
             # Save to DynamoDB
@@ -1508,7 +1522,13 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                 pending.setdefault("dialect", dialect)
                 pending.setdefault("profile_crop", profile.get("crop"))
                 _put_pending_crop_confirm(from_number, pending)
-                text_out = str(analysis.get("text") or "")
+                photo_district = profile.get("district") or profile.get("location")
+                # A crop question is not advice yet; an assumed-crop answer is.
+                text_out = filter_advice(
+                    str(analysis.get("text") or ""),
+                    dialect, "whatsapp_photo", kind="photo", district=photo_district,
+                    add_referral=bool(pending.get("assumed")),
+                )
                 save_message(
                     from_number, wamid, message, text_out, "vision_crop_confirm",
                     ttl_days=_msg_ttl_days(profile),
@@ -1523,6 +1543,10 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             # Backward compatible (string return)
             if isinstance(analysis, dict):
                 analysis = str(analysis.get("text") or analysis.get("recommendations") or "")
+            analysis = filter_advice(
+                analysis, dialect, "whatsapp_photo", kind="photo",
+                district=profile.get("district") or profile.get("location"),
+            )
             
             # Save to DynamoDB
             save_message(

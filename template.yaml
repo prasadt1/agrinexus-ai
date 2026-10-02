@@ -438,6 +438,7 @@ Resources:
           WEB_IMAGE_MAX_BYTES: "5242880"
           WEB_MAX_IMAGES: "1"
       Policies:
+        - CloudWatchPutMetricPolicy: {}
         - DynamoDBCrudPolicy:
             TableName: !Ref TableName
         - Statement:
@@ -519,6 +520,7 @@ Resources:
           VISITOR_SAMPLE_IMAGE_KEY: visitor-samples/crop-leaf.jpg
           VISITOR_SAMPLE_IMAGE_CROP: !Ref VisitorSampleImageCrop
       Policies:
+        - CloudWatchPutMetricPolicy: {}
         - DynamoDBCrudPolicy:
             TableName: !Ref TableName
         - S3CrudPolicy:
@@ -586,6 +588,7 @@ Resources:
           VISITOR_SAMPLE_IMAGE_KEY: visitor-samples/crop-leaf.jpg
           VISITOR_SAMPLE_IMAGE_CROP: !Ref VisitorSampleImageCrop
       Policies:
+        - CloudWatchPutMetricPolicy: {}
         - DynamoDBCrudPolicy:
             TableName: !Ref TableName
         - S3CrudPolicy:
@@ -761,6 +764,7 @@ Resources:
           NUDGE_BEDROCK_LINER: "false"
           NUDGE_LINER_MODEL_ID: anthropic.claude-3-haiku-20240307-v1:0
       Policies:
+        - CloudWatchPutMetricPolicy: {}
         - DynamoDBCrudPolicy:
             TableName: !Ref TableName
         - Statement:

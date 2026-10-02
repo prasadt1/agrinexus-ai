@@ -52,6 +52,8 @@ def sender(monkeypatch):
             sys.modules.pop(name, None)
     import importlib
     redact_mod = importlib.import_module("common.redact")
+    advice_mod = importlib.import_module("common.advice_filter")
+    advice_mod._cloudwatch = mock_cw
 
     common_mod = types.ModuleType("common")
     common_mod.__path__ = []  # mark as package for submodule imports
@@ -66,6 +68,7 @@ def sender(monkeypatch):
     monkeypatch.setitem(sys.modules, "common.whatsapp", common_mod.whatsapp)
     monkeypatch.setitem(sys.modules, "common.allowlist", common_mod.allowlist)
     monkeypatch.setitem(sys.modules, "common.redact", redact_mod)
+    monkeypatch.setitem(sys.modules, "common.advice_filter", advice_mod)
 
     # Avoid importing a cached sender from a previous test
     sys.modules.pop("nudge_sender", None)

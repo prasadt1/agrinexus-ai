@@ -12,6 +12,7 @@ from typing import Dict, Any
 from common.whatsapp import send_whatsapp_message, send_whatsapp_template, send_whatsapp_buttons
 from common.redact import redact_phone
 from common.allowlist import is_approved_user
+from common.advice_filter import filter_advice
 
 # Lambda uses Handler sender.lambda_handler (flat zip); tests use src.nudge.sender
 _nudge_dir = os.path.dirname(os.path.abspath(__file__))
@@ -255,8 +256,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         hint_override = None
         if os.environ.get("NUDGE_BEDROCK_LINER", "").lower() in ("1", "true", "yes"):
             try:
-                hint_override = invoke_nudge_focus_line(
-                    dialect, crop, str(district_key), wind_speed
+                hint_override = filter_advice(
+                    invoke_nudge_focus_line(dialect, crop, str(district_key), wind_speed),
+                    dialect, "nudge_liner", add_referral=False,
                 )
             except Exception as e:
                 print(f"Nudge Bedrock liner skipped: {e}")

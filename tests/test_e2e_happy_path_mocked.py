@@ -23,6 +23,8 @@ def _install_common_stubs(sent_messages):
     nk_mod = importlib.import_module("common.nudge_keywords")
     visitor_mod = importlib.import_module("common.visitor")
     guardrail_reply_mod = importlib.import_module("common.guardrail_reply")
+    advice_mod = importlib.import_module("common.advice_filter")
+    advice_mod._cloudwatch = types.SimpleNamespace(put_metric_data=lambda **kw: None)
 
     common_pkg = types.ModuleType("common")
     common_pkg.__path__ = []
@@ -59,6 +61,7 @@ def _install_common_stubs(sent_messages):
     sys.modules["common.nudge_keywords"] = nk_mod
     sys.modules["common.visitor"] = visitor_mod
     sys.modules["common.guardrail_reply"] = guardrail_reply_mod
+    sys.modules["common.advice_filter"] = advice_mod
     common_pkg.redact = redact_mod
     common_pkg.nudge_keywords = nk_mod
     common_pkg.whatsapp = whatsapp
