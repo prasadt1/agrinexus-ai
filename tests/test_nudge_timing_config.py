@@ -1,4 +1,6 @@
-"""Nudge send window and cooldown are wired through the stack."""
+"""Nudge send window, cooldown and the demo force path are wired through the stack and script."""
+import json
+import re
 from pathlib import Path
 
 import yaml
@@ -43,3 +45,17 @@ def test_sender_receives_window_and_cooldown():
 def test_poll_schedule_stays_six_hourly():
     events = _template()["Resources"]["WeatherPoller"]["Properties"]["Events"]
     assert events["ScheduledPoll"]["Properties"]["Schedule"] == "rate(6 hours)"
+
+
+def test_state_machine_passes_full_input_to_sender():
+    asl = json.loads((ROOT / "statemachine" / "nudge-workflow.asl.json").read_text())
+    task = asl["States"]["SendNudgeToFarmers"]
+    for key in ("Parameters", "InputPath", "Arguments"):
+        assert key not in task, f"{key} would drop 'force' from the sender's input"
+
+
+def test_demo_script_forces_the_poll():
+    script = (ROOT / "scripts" / "test-complete-flow.sh").read_text()
+    invoke = re.search(r"aws lambda invoke --function-name \"\$WEATHER_LAMBDA\"[^\n]*", script).group(0)
+    assert '"force": true' in invoke or '"force":true' in invoke
+    assert "--cli-binary-format raw-in-base64-out" in invoke

@@ -215,13 +215,16 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if weather.get('favorable'):
             favorable_locations.append(weather)
 
+            workflow_input = {
+                'location': location,
+                'weather': weather,
+                'activity': 'spray'
+            }
+            if (event or {}).get('force') is True:
+                workflow_input['force'] = True
             stepfunctions.start_execution(
                 stateMachineArn=STATE_MACHINE_ARN,
-                input=json.dumps({
-                    'location': location,
-                    'weather': weather,
-                    'activity': 'spray'
-                })
+                input=json.dumps(workflow_input)
             )
 
             print(f"Triggered nudge workflow for {location}")

@@ -118,6 +118,16 @@ class TestLambdaHandlerMock:
         assert result["favorable_locations"] == 1
         assert len(executions) == 1
 
+    @pytest.mark.parametrize("event,expected", [({"force": True}, True), ({}, None), ({"force": "true"}, None)])
+    def test_force_reaches_the_workflow_only_when_true(self, weather_module, monkeypatch, event, expected):
+        monkeypatch.setattr(weather_module, "get_unique_locations", lambda: ["Latur"])
+        monkeypatch.setattr(weather_module, "MOCK_WEATHER", True)
+        executions = []
+        monkeypatch.setattr(weather_module, "stepfunctions",
+                            types.SimpleNamespace(start_execution=lambda **kw: executions.append(kw)))
+        weather_module.lambda_handler(event, None)
+        assert json.loads(executions[0]["input"]).get("force") is expected
+
     def test_no_trigger_without_state_machine(self, weather_module, monkeypatch):
         monkeypatch.setattr(weather_module, "STATE_MACHINE_ARN", None)
         result = weather_module.lambda_handler({}, None)
