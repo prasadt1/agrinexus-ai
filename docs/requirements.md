@@ -97,7 +97,7 @@ All functional requirements follow EARS (Easy Approach to Requirements Syntax):
 
 ### 2.4 Safety Guardrails (Tier 1 - Full Depth)
 
-**REQ-GUARD-001**: The guardrails shall block 100% of requests for banned pesticides including Paraquat, Endosulfan, and other substances on India's banned list.
+**REQ-GUARD-001** (rewritten 2 Oct 2026): The system shall not name a pesticide on India's banned list (CIB&RC "banned for manufacture, import and use", plus endosulfan) in any farmer-facing advice. The output filter (REQ-GUARD-008 to 010) enforces this: it lists those actives by name in Latin script, and the commonest in Devanagari and Telugu. A question asking for a banned pesticide receives the pesticide policy reply (REQ-GUARD-013). Questions are not blocked on input; the earlier wording promised input-side blocking that was never built.
 
 **REQ-GUARD-002** (retired 2 Oct 2026, superseded by REQ-GUARD-008): ~~The system shall include explicit disclaimers when providing pesticide dosage information, directing farmers to read product labels.~~
 

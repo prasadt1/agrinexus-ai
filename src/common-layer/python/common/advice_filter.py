@@ -98,6 +98,23 @@ _ACTIVES_INDIC = (
     "పెండిమిథాలిన్", "పెండిమెథాలిన్", "అట్రాజిన్", "ఆట్రాజిన్", "క్లోరోథలోనిల్",
     "స్ట్రెప్టోసైక్లిన్", "వాలిడామైసిన్",
 )
+# Banned for manufacture, import and use in India (CIB&RC list). Named so a banned
+# active is removed even when no class ending or other list covers it.
+_BANNED_IN_INDIA = (
+    "aldicarb", "aldrin", "benzene hexachloride", "bhc", "calcium cyanide", "chlordane",
+    "copper acetoarsenite", "dibromochloropropane", "dieldrin", "endrin", "ethyl mercury chloride",
+    "ethyl parathion", "heptachlor", "lindane", "maleic hydrazide", "menazone", "nitrofen",
+    "paraquat dimethyl sulphate", "pentachloronitrobenzene", "pentachlorophenol",
+    "phenyl mercury acetate", "sodium methane arsonate", "tetradifon", "toxaphene", "camphechlor",
+    "benomyl", "carbaryl", "diazinon", "fenarimol", "fenthion", "linuron", "methyl parathion",
+    "thiometon", "tridemorph", "trifluralin", "alachlor", "dichlorvos", "phorate", "phosphamidon",
+    "triazophos", "trichlorfon", "endosulfan", "ddt",
+    "एंडोसल्फान", "एन्डोसल्फान", "एंडोसल्फॉन", "लिंडेन", "लिंडेन", "डीडीटी", "बीएचसी", "फोरेट",
+    "फॉस्फामिडॉन", "फॉस्फामिडोन", "फास्फामिडान", "पैराथियान", "पॅराथिऑन", "पॅराथियॉन",
+    "ऍल्ड्रिन", "अॅल्ड्रिन", "एल्ड्रिन", "डिल्ड्रिन", "डायल्ड्रिन", "क्लोरडेन", "क्लोर्डेन", "हेप्टाक्लोर",
+    "ఎండోసల్ఫాన్", "లిండేన్", "డిడిటి", "డీడీటీ", "ఫోరేట్", "పారాథియాన్", "ఆల్డ్రిన్", "డైల్డ్రిన్",
+)
+
 # Brand names seen in replies ("जसे की कॉन्फिडॉर") and common equivalents.
 _BRANDS = (
     "confidor", "actara", "coragen", "ampligo", "ulala", "pegasus", "tracer",
@@ -132,8 +149,10 @@ _SUFFIX_INDIC_RE = re.compile(
     )) + r")"
 )
 
-_LATIN_TERMS = tuple(_normalize(t) for t in _ACTIVES_LATIN + _BRANDS if t.isascii())
-_INDIC_TERMS = tuple(dict.fromkeys(_normalize(t) for t in _ACTIVES_INDIC + _BRANDS if not t.isascii()))
+_LATIN_TERMS = tuple(_normalize(t) for t in _ACTIVES_LATIN + _BANNED_IN_INDIA + _BRANDS if t.isascii())
+_INDIC_TERMS = tuple(dict.fromkeys(
+    _normalize(t) for t in _ACTIVES_INDIC + _BANNED_IN_INDIA + _BRANDS if not t.isascii()
+))
 _LATIN_RE = re.compile(r"(?<![a-z])(?:" + "|".join(re.escape(t) for t in _LATIN_TERMS) + r")")
 
 _FORMULATION_RE = re.compile(
