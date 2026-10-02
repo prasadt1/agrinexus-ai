@@ -1,4 +1,4 @@
-"""Nudge send window, cooldown and the demo force path are wired through the stack and script."""
+"""Nudge send window, cooldown and the demo force path are wired through the stack, script and spec."""
 import json
 import re
 from pathlib import Path
@@ -59,3 +59,11 @@ def test_demo_script_forces_the_poll():
     invoke = re.search(r"aws lambda invoke --function-name \"\$WEATHER_LAMBDA\"[^\n]*", script).group(0)
     assert '"force": true' in invoke or '"force":true' in invoke
     assert "--cli-binary-format raw-in-base64-out" in invoke
+
+
+def test_req_nudge_011_states_the_rules():
+    text = (ROOT / "docs" / "requirements.md").read_text()
+    req = re.search(r"^\*\*REQ-NUDGE-011\*\*.*$", text, re.M).group(0)
+    assert "2 per farmer per day" not in req
+    for phrase in ("06:00", "19:00", "Asia/Kolkata", "NudgesDeferred", "7 days", "force"):
+        assert phrase in req, phrase

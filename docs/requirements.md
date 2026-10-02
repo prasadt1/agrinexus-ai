@@ -169,7 +169,7 @@ The product identifies the pest or problem and gives non-chemical steps. It does
 
 **REQ-NUDGE-010**: If no response is received within 72 hours, then the system shall mark the nudge as "no_response" and log for analytics.
 
-**REQ-NUDGE-011**: The system shall limit nudges to a maximum of 2 per farmer per day to avoid notification fatigue.
+**REQ-NUDGE-011**: When a weather nudge is due outside the send window of 06:00 to 19:00 Asia/Kolkata (stack parameters `NudgeSendWindowStartHour` and `NudgeSendWindowEndHour`; an unreadable or invalid window sends nothing), the system shall skip that farmer and emit a `NudgesDeferred` metric; the next 6-hourly poll inside the window sends it. If the farmer's last DONE or EXPIRED nudge for the same activity closed within `NUDGE_COOLDOWN_DAYS` (default 7 days; close time is `completedAt` or `expiredAt`, else creation + 72 hours; an unreadable close time blocks), then the system shall not send a new nudge for that activity. Only an invocation with `"force": true` (the demo script) bypasses the window and the cooldown; consent, allowlist and open-nudge gates still apply. Reminders are not affected.
 
 ### 2.7 WhatsApp Integration (Tier 1 - Full Depth)
 

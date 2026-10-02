@@ -4,6 +4,16 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 2 October 2026 — nudge send window and cooldown (not deployed)
+
+- **Nudges went out at any hour and repeated after every close.** The weather poller runs every 6 hours (UTC), so a spray nudge could arrive around midnight in India. The only repeat control was the open-nudge check: as soon as a nudge was DONE or EXPIRED, the next favourable poll nudged the same farmer again. REQ-NUDGE-011 promised "max 2 per farmer per day", which was never implemented.
+- **Send window.** NudgeSender now sends only between 06:00 and 19:00 Asia/Kolkata (fixed UTC+5:30), set by the stack parameters `NudgeSendWindowStartHour` and `NudgeSendWindowEndHour`. Outside the window, each farmer who passed every other gate is skipped and counted in a new `NudgesDeferred` metric; the next poll inside the window sends. An unreadable or inverted window sends nothing. The 6-hour schedule is unchanged, and reminders are not affected.
+- **Cooldown.** `NUDGE_COOLDOWN_DAYS` (default 7) blocks a new nudge for the same farmer and activity within that many days of the last DONE or EXPIRED nudge. Close time is `completedAt` for DONE and the new `expiredAt` for EXPIRED, which both expiry paths (T+72h auto-expiry and a final "not yet") now record. Older EXPIRED rows without it count from creation + 72 hours. An unreadable close time blocks.
+- **Demo path.** `scripts/test-complete-flow.sh` invokes the weather poller with `{"force": true}`; the poller passes it through the state machine to NudgeSender, which then skips the window and cooldown only. Consent, allowlist, visitor, onboarding and open-nudge gates still apply. Only a JSON boolean `true` forces.
+- REQ-NUDGE-011 rewritten to state these rules. 31 new tests: 27 failed before the change, and 4 pin behaviour that must not change (6-hour schedule, state machine passes its full input, no force without a boolean `true`); full suite 883 passed, 30 skipped; `sam validate --lint` clean.
+
+---
+
 ## 2 October 2026 — filter leaves no orphaned repeat steps (not deployed)
 
 - **Removing a chemical step left its follow-up behind.** On the deployed web chat, a pink bollworm reply lost a dose sentence and kept "Repeat two more times at 30-day intervals", which then pointed at nothing. Separately, steps were renumbered only within one line: when a whole numbered line was dropped, the list read 1, 3, 4, and a kept line such as "2. Destroy crop residue." became "1." because numbering restarted on each line. The filter now drops a step directly after a removed one when it only says to repeat or reapply (English, Hindi, Marathi, Telugu); repeating a check or inspection stays. Numbering runs across the whole message and restarts after a heading ending in ":" or when the original numbers start over. Replies with nothing removed are returned unchanged. Orphan drops are logged but not counted in `AdviceFilterHit`, which still counts chemical advice only. On the 119 stored and live replies, one output changed: a Marathi "(३) …३-४ दिवसांनी पुन्हा फवारणी करा" (spray again after 3-4 days) that followed a removed insecticide step. REQ-GUARD-010 amended.
