@@ -4,6 +4,29 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 2 October 2026 — external review, phase 1: weather fails closed, filter gaps (not deployed)
+
+An external code review verified these against source.
+
+### Weather invented good weather
+`check_weather_real` fell back to `check_weather_mock` on a missing API key or any request error, and the mock reports 8.5 km/h wind and no rain for every configured district. A dead key or an OpenWeatherMap outage would have sent spray nudges regardless of real conditions. A response without a `wind` field was also read as 0 km/h. Now each of these marks the district unfavorable (`reason: weather_unavailable`), sends no nudge for it, and emits `AgriNexus/Weather` `WeatherFetchFailed` with `Location` and `Reason`. The mock is reachable only through `MOCK_WEATHER=true`, which is logged. REQ-ERROR-008 previously promised cached weather that was never built; amended.
+
+### Advice filter gaps
+Five sentences classified as clean and would have reached a farmer verbatim: "Use cartap hydrochloride granules in the maize whorl.", "Spray dichlorvos on the affected plants.", "Rogor is effective against aphids.", "Mix two ml per litre of water and spray.", "दोन मिली प्रति लिटर पाण्यात मिसळून फवारणी करा." Fixed by:
+- the requested actives (cartap, dichlorvos, methomyl, chlorfenapyr, dicofol, 2,4-D, pendimethalin, atrazine, chlorothalonil, streptocycline, validamycin) and brands (Rogor, Karate, Regent, Lannate) in Latin, Devanagari and Telugu;
+- a fallback on pesticide-class name endings (-fos, -thrin, -conazole, -cloprid, -mectin, -achlor, -fop, -uron, -mycin and others) in all three scripts, so an unlisted active is still removed;
+- number words as quantities (one/two/half, एक/दो/दोन/आधा/अर्धा/दीड, ఒక/రెండు/అర);
+- apply/use verbs (apply, use, वापरा, टाका, डालें, वाडండి) as spray context, except in sentences about fertilizer, seed or irrigation;
+- small-unit amounts per acre or hectare.
+
+`tests/test_advice_filter_adversarial.py` keeps the five sentences as regression cases and probes 22 actives that are deliberately not in the explicit lists. Run against every reply stored in `docs/try/replays/`, the new filter removes no sentence the old one kept.
+
+### Known limits
+- The name-ending fallback misses actives whose names have none of those endings; sulfoxaflor, etofenprox and pymetrozine were found this way and added by name. Others will need the same.
+- Brand names that are ordinary English words ("Karate", "Regent") are removed wherever they appear.
+
+---
+
 ## 2 October 2026 — knowledge base refusals and source line
 
 ### Problem
