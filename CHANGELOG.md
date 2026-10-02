@@ -4,6 +4,25 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 2 October 2026 — knowledge base refusals and source line
+
+### Problem
+Live Marathi refusals came back with "स्त्रोत: FAO/ICAR शेती मार्गदर्शक" and a second KVK referral. The model paraphrased the refusal sentence differently each time ("ज्ञानकोशात", "ज्ञान भांडारात", "माझ्या माहितीमध्ये … उपलब्ध नाही"), so phrase matching kept missing it. Separately, `retrievedReferences` is always empty, so the generic FAO/ICAR line was attached to every answer without naming any retrieved document.
+
+### What changed
+- **Refusal markers.** The knowledge base prompt asks for `NO_KB_ANSWER` when the context does not cover the question and `NOT_FARMING` for off-topic questions. `common/guardrail_reply.py` replaces these, and Bedrock's English "Sorry, I am unable to assist you with this request.", with a fixed refusal in the farmer's language. Refusals carry no source line and no referral footer. Phrase checks remain as a fallback.
+- **No generic source line.** WhatsApp replies, the web chat API and the web demo page show a source only when a retrieved document name is available. ADR 0005 amended; REQ-CONV-004 and AC-002 amended.
+- **Retrieval hints.** Marathi "कापसावरील" (oblique stem कापस) now maps to cotton; whitefly terms in Hindi, Marathi and Telugu and "फवार" (spray) were added. A "pest management" hint was tried and removed: it pulled in product dose tables and generation declined every time.
+
+### Evidence
+- Against Bedrock: the neem dose question returned `NO_KB_ANSWER` in 3 of 3 runs and became the fixed Marathi refusal; whitefly and pink bollworm questions still answered with traps, thresholds and the KVK referral.
+
+### Known limits
+- A Telugu rice blast question retrieved a weeding chunk for direct-seeded rice and answered off-topic. There is no Telugu hint for blast yet.
+- The web demo page change goes live only when `main` is updated (GitHub Pages serves `main:/docs`).
+
+---
+
 ## 2 October 2026 — no pesticide recommendations: identify and refer (code; not deployed)
 
 ### Decision
