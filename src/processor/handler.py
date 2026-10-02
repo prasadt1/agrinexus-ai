@@ -929,14 +929,16 @@ def query_bedrock(query: str, dialect: str = 'hi', session_id: Optional[str] = N
     retrieval_query = query
     if dialect != 'en':
         _keyword_hints = {
-            'कपास': 'cotton', 'कापूस': 'cotton', 'పత్తి': 'cotton',
+            'कपास': 'cotton', 'कापूस': 'cotton', 'कापस': 'cotton', 'పత్తి': 'cotton',
             'गेहूं': 'wheat', 'गहू': 'wheat', 'గోధుమ': 'wheat',
             'सोयाबीन': 'soybean', 'సోయాబీన్': 'soybean',
             'मक्का': 'maize', 'मका': 'maize', 'మొక్కజొన్న': 'maize',
             'धान': 'rice', 'भात': 'rice', 'వరి': 'rice',
             'कीट': 'pest', 'कीड': 'pest', 'పురుగు': 'pest',
             'रोग': 'disease', 'వ్యాధి': 'disease',
-            'स्प्रे': 'spray', 'फवारणी': 'spray', 'స్ప్రే': 'spray',
+            'कीटनाशक': 'pest management', 'कीटकनाशक': 'pest management', 'పురుగుమందు': 'pest management',
+            'सफेद मक्खी': 'whitefly', 'पांढरी माशी': 'whitefly', 'पांढऱ्या माशी': 'whitefly', 'తెల్ల దోమ': 'whitefly',
+            'स्प्रे': 'spray', 'फवार': 'spray', 'స్ప్రే': 'spray',
             'खाद': 'fertilizer', 'खत': 'fertilizer', 'ఎరువు': 'fertilizer',
             'पाने': 'leaves', 'पान': 'leaves', 'ఆకులు': 'leaves',
             'पीले': 'yellow', 'पिवळी': 'yellow', 'పసుపు': 'yellow',

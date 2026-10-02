@@ -214,6 +214,42 @@ def test_web_chat_prompts_forbid_products(webchat):
     assert "Never name a pesticide" in seen["vision"] and "local KVK" in seen["vision"]
 
 
+WHITEFLY_MR = "कापसावरील पांढऱ्या माशीसाठी कोणते कीटकनाशक फवारावे?"
+
+
+def _retrieval_text(seen):
+    return seen["input"]["text"]
+
+
+def test_whatsapp_marathi_whitefly_question_gets_english_retrieval_hints(processor):
+    seen = {}
+
+    def _rag(**kwargs):
+        seen.update(kwargs)
+        return {"output": {"text": "ok"}, "citations": [], "sessionId": "s"}
+
+    processor.bedrock_agent.retrieve_and_generate = _rag
+    processor.query_bedrock(WHITEFLY_MR, "mr")
+    q = _retrieval_text(seen)
+    for hint in ("cotton", "whitefly", "spray", "pest management"):
+        assert hint in q
+    assert "pesticide" not in q
+
+
+def test_web_chat_marathi_whitefly_question_gets_english_retrieval_hints(webchat):
+    seen = {}
+
+    def _rag(**kwargs):
+        seen.update(kwargs)
+        return {"output": {"text": "ok"}, "citations": []}
+
+    webchat.bedrock_agent = types.SimpleNamespace(retrieve_and_generate=_rag)
+    webchat.query_bedrock(WHITEFLY_MR, "mr")
+    q = _retrieval_text(seen)
+    for hint in ("cotton", "whitefly", "spray", "pest management"):
+        assert hint in q
+
+
 def test_web_chat_photo_answer_is_filtered(webchat):
     webchat.analyze_image = lambda *_a, **_k: CHEM
     webchat._decode_image_payload = lambda _raw: ("image/jpeg", "x", b"x")
