@@ -1255,7 +1255,9 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                 if onboarding_response['type'] == 'buttons':
                     send_whatsapp_buttons(from_number, onboarding_response['content'], onboarding_response['buttons'])
                 elif onboarding_response['type'] == 'list':
-                    from common.whatsapp import send_whatsapp_list
+                    # send_whatsapp_list is imported at the top of the module. An import here
+                    # would make the name local to this whole function, and the visitor
+                    # welcome above would then fail with UnboundLocalError.
                     send_whatsapp_list(
                         from_number,
                         onboarding_response['content'],
