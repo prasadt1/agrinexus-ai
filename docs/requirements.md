@@ -227,7 +227,7 @@ The product identifies the pest or problem and gives non-chemical steps. It does
 
 **REQ-VISITOR-001**: When an unknown number’s first message contains `re:invent` or `reinvent` (case-insensitive), the system shall enter the visitor path and shall not run farmer onboarding.
 
-**REQ-VISITOR-002** (amended 3 Oct 2026): On visitor entry, the system shall reply in English with a short welcome and an interactive list of five sample questions plus a photo-diagnosis option. Each list row shall carry a title of at most 24 characters and the full question as its description. The list shall offer no way into farmer onboarding, because that path keeps a number and its messages longer than the visitor expiry in REQ-VISITOR-006.
+**REQ-VISITOR-002** (amended 3 Oct 2026): On visitor entry, the system shall reply in English with a short welcome and an interactive list of five sample questions plus a photo-diagnosis option. Each list row shall carry a title of at most 24 characters and the full question as its description. The list shall offer no way into farmer onboarding, because that path keeps a number and its messages longer than the visitor expiry in REQ-VISITOR-006. When a visitor sends the phrase again as a short greeting (40 characters or fewer), the system shall send the welcome again without a model call and without counting it as an answer.
 
 **REQ-VISITOR-003**: The system shall accept free-text farming questions from visitors in English via the existing RAG path.
 

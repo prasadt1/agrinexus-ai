@@ -300,6 +300,38 @@ class TestFirstMessage:
             ("Photo diagnosis", "Show me a photo diagnosis (sample crop image)"),
         ]
 
+    def test_the_same_greeting_again_shows_the_welcome_again(self, bot):
+        """Pressing the landing page button a second time sends "Hi from re:Invent" again."""
+        bot.text("Hi from re:Invent")
+        expiry = bot.table.rows()["PROFILE"]["ttl"]
+        bot.text("Hi from re:Invent")
+
+        assert len(bot.lists) == 2 and bot.lists[1] == bot.lists[0]
+        assert bot.bedrock_calls == []                      # no knowledge base search for a greeting
+        assert bot.texts() == []                            # and no "farming questions only" reply
+        assert not [k for k in bot.table.items if k[0].startswith("COUNTER#")]  # none of the day's answers used
+        assert bot.table.rows()["PROFILE"]["ttl"] == expiry  # the 7 days are not restarted
+        assert bot.metrics == ["visitor_started"]           # still one visitor
+
+    def test_a_longer_question_that_mentions_reinvent_is_answered(self, bot):
+        bot.text("Hi from re:Invent")
+        question = "At re:Invent I heard about whitefly traps for cotton. Do they work?"
+        bot.text(question)
+        assert len(bot.lists) == 1
+        assert [c["input"]["text"] for c in bot.bedrock_calls] == [question]
+
+    def test_a_number_with_a_farmer_profile_keeps_it(self, bot):
+        """Open decision: someone who signed up as a farmer earlier does not get the visitor welcome."""
+        farmer = {
+            "PK": f"USER#{PHONE}", "SK": "PROFILE", "phone_number": PHONE, "dialect": "en",
+            "onboarding_complete": True, "demo_tier": "public", "location": "Latur", "crop": "Cotton",
+        }
+        bot.table.put_item(Item=farmer)
+        bot.text("Hi from re:Invent")
+        assert bot.lists == []
+        assert bot.table.rows()["PROFILE"] == farmer
+        assert len(bot.bedrock_calls) == 1
+
     def test_welcome_wording(self, bot):
         welcome = bot.mod.visitor_mod.VISITOR_WELCOME
         assert "—" not in welcome and "–" not in welcome  # no dashes used as punctuation

@@ -92,6 +92,17 @@ def matches_reinvent_trigger(text: str) -> bool:
     return bool(_TRIGGER_RE.search(text))
 
 
+# The landing page types "Hi from re:Invent" (17 characters). A visitor who presses its button
+# a second time sends that greeting again; a real question that mentions re:Invent is longer.
+GREETING_MAX_CHARS = 40
+
+
+def is_visitor_greeting(text: str) -> bool:
+    """The trigger phrase sent as a short greeting, not inside a longer question."""
+    stripped = (text or "").strip()
+    return len(stripped) <= GREETING_MAX_CHARS and matches_reinvent_trigger(stripped)
+
+
 def is_visitor_profile(profile: Optional[Dict[str, Any]]) -> bool:
     if not profile:
         return False

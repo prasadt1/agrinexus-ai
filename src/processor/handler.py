@@ -1234,6 +1234,23 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             )
             continue
 
+        # A visitor who presses the landing page button again sends the same greeting again.
+        # Show the welcome again instead of searching the knowledge base for a greeting. It
+        # costs no model call and none of the day's answers, and the profile keeps its expiry.
+        if (
+            message_type == 'text'
+            and visitor_mod.is_visitor_profile(profile)
+            and visitor_mod.is_visitor_greeting(early_text)
+        ):
+            welcome = visitor_mod.visitor_welcome_list()
+            send_whatsapp_list(
+                from_number,
+                welcome['content'],
+                welcome['button_text'],
+                welcome['sections'],
+            )
+            continue
+
         # Check if onboarding is complete
         if not profile or not profile.get('onboarding_complete', False):
             # Handle onboarding
