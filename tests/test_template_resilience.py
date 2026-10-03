@@ -36,7 +36,28 @@ def test_voice_queue_has_dlq_with_same_receive_count():
     dlq_name = redrive["deadLetterTargetArn"]["GetAtt"].split(".")[0]
     dlq = r[dlq_name]["Properties"]
     assert dlq["FifoQueue"] is True
-    assert dlq["MessageRetentionPeriod"] == 1209600
+
+
+def test_a_failed_message_leaves_the_queues_within_the_visitor_promise():
+    """A queued message holds the sender's number and text.
+
+    The landing page promises visitors 7 days. On a FIFO queue the clock restarts when a
+    message moves to its dead-letter queue, so the two retention periods add up.
+    """
+    r = _resources()
+    promise = int(yaml.load(TEMPLATE.read_text(), Loader=_CfnLoader)["Parameters"]["VisitorTtlDays"]["Default"])
+    assert promise == 7
+    checked = 0
+    for name, res in r.items():
+        if res["Type"] != "AWS::SQS::Queue" or "RedrivePolicy" not in res["Properties"]:
+            continue
+        props = res["Properties"]
+        dlq = r[props["RedrivePolicy"]["deadLetterTargetArn"]["GetAtt"].split(".")[0]]["Properties"]
+        assert props["FifoQueue"] is True and dlq["FifoQueue"] is True, name
+        total = props["MessageRetentionPeriod"] + dlq["MessageRetentionPeriod"]
+        assert total <= promise * 24 * 3600, (name, total)
+        checked += 1
+    assert checked == 3  # messages, beta messages, voice
 
 
 def test_voice_dlq_is_drained_by_dlq_handler():

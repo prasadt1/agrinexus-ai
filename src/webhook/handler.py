@@ -65,10 +65,20 @@ def _select_queue_url(from_number: str) -> str:
     return QUEUE_URL
 
 
+def _dedup_key(wamid: str) -> Dict[str, str]:
+    """Key of the dedup row for a message.
+
+    A wamid holds the sender's full phone number, so the row is keyed by a one-way hash of
+    it and stores no number. DELETE therefore has nothing to remove here.
+    """
+    digest = hashlib.sha256(str(wamid).encode('utf-8')).hexdigest()
+    return {'PK': f'WAMID#{digest}', 'SK': 'DEDUP'}
+
+
 def _release_dedup(wamid: str) -> None:
     """Drop the WAMID claim so Meta's retry of a message that never reached SQS is processed."""
     try:
-        table.delete_item(Key={'PK': f'WAMID#{wamid}', 'SK': 'DEDUP'})
+        table.delete_item(Key=_dedup_key(wamid))
     except Exception as e:
         logger.error(f"Error releasing deduplication record for {wamid}: {e}")
 
@@ -309,9 +319,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 ttl = int(time.time()) + (24 * 60 * 60)
                 table.put_item(
                     Item={
-                        'PK': f'WAMID#{wamid}',
-                        'SK': 'DEDUP',
-                        'from': from_number,
+                        **_dedup_key(wamid),
                         'processed_at': datetime.utcnow().isoformat(),
                         'ttl': ttl
                     },

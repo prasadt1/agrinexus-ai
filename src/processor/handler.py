@@ -414,6 +414,8 @@ def handle_onboarding(phone_number: str, message_text: str, profile: Optional[Di
                     'onboarding_state': 'location',
                     'onboarding_complete': False,
                     'demo_tier': 'public',
+                    # Unfinished sign-ups expire; create_user_profile() replaces the row without it.
+                    'ttl': visitor_mod.unfinished_signup_expiry(),
                 }
             )
             location_prompt = {
@@ -442,6 +444,8 @@ def handle_onboarding(phone_number: str, message_text: str, profile: Optional[Di
                 'onboarding_state': 'language',
                 'onboarding_complete': False,
                 'demo_tier': 'public',
+                # Unfinished sign-ups expire; create_user_profile() replaces the row without it.
+                'ttl': visitor_mod.unfinished_signup_expiry(),
             }
         )
         multilingual_welcome = """Welcome to AgriNexus AI! 🌾
@@ -908,7 +912,7 @@ def _run_visitor_sample_vision(from_number: str, profile: Dict[str, Any], wamid:
     visitor_mod.emit_visitor_metric(cloudwatch, "visitor_photo_answered")
 
 
-def _handle_delete_command(from_number: str) -> None:
+def _handle_delete_command(from_number: str, was_visitor: bool = False) -> None:
     visitor_mod.delete_user_conversation_data(table, from_number)
     media_bucket = os.environ.get("TEMP_AUDIO_BUCKET") or ""
     try:
@@ -916,7 +920,10 @@ def _handle_delete_command(from_number: str) -> None:
     except Exception as e:
         print(f"Visitor media delete failed for {redact_phone(from_number)}: {e}")
     visitor_mod.emit_visitor_metric(cloudwatch, "visitor_delete")
-    send_whatsapp_message(from_number, visitor_mod.DELETE_CONFIRM_MSG)
+    send_whatsapp_message(
+        from_number,
+        visitor_mod.VISITOR_DELETE_CONFIRM_MSG if was_visitor else visitor_mod.DELETE_CONFIRM_MSG,
+    )
 
 
 def query_bedrock(query: str, dialect: str = 'hi', session_id: Optional[str] = None) -> Dict[str, Any]:
@@ -1210,7 +1217,7 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                 early_text = list_reply.get('id') or list_reply.get('title', '')
 
         if early_text and visitor_mod.is_delete_command(early_text):
-            _handle_delete_command(from_number)
+            _handle_delete_command(from_number, was_visitor=visitor_mod.is_visitor_profile(profile))
             continue
 
         # re:Invent visitor path: unknown number + trigger phrase → skip farmer onboarding
@@ -1282,23 +1289,6 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                 # Unhandled interactive types (e.g. nfm_reply) and blank text carry nothing
                 # to answer; Bedrock rejects empty input and SQS would retry the ack.
                 print(f"Empty {message_type} payload from {redact_phone(from_number)}; skipping")
-                continue
-
-            # Visitor: switch to farmer onboarding
-            if is_visitor and visitor_mod.is_farmer_onboard_selection(text):
-                visitor_mod.delete_user_conversation_data(table, from_number)
-                onboarding_response = handle_onboarding(from_number, "Hi", None, is_interactive=False)
-                if onboarding_response['type'] == 'list':
-                    send_whatsapp_list(
-                        from_number,
-                        onboarding_response['content'],
-                        onboarding_response['button_text'],
-                        onboarding_response['sections'],
-                    )
-                elif onboarding_response['type'] == 'buttons':
-                    send_whatsapp_buttons(from_number, onboarding_response['content'], onboarding_response['buttons'])
-                else:
-                    send_whatsapp_message(from_number, onboarding_response['content'])
                 continue
 
             # Visitor: sample photo diagnosis (counts against caps)

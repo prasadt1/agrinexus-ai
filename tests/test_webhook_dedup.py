@@ -83,7 +83,8 @@ def test_failed_enqueue_does_not_leave_dedup_row(webhook, monkeypatch, kind):
     monkeypatch.setattr(webhook, "sqs", sqs)
     with pytest.raises(Exception):
         webhook.lambda_handler(_event(_one(_msg("wamid.A", kind))), None)
-    assert ("WAMID#wamid.A", "DEDUP") not in table.items
+    # The dedup row is keyed by a hash of the message ID, so look for any dedup row.
+    assert not [key for key in table.items if key[1] == "DEDUP"]
 
     resp = webhook.lambda_handler(_event(_one(_msg("wamid.A", kind))), None)
     assert resp["statusCode"] == 200
@@ -97,3 +98,14 @@ def test_successful_enqueue_still_dedups_redelivery(webhook, monkeypatch):
     webhook.lambda_handler(_event(_one(_msg("wamid.B"))), None)
     webhook.lambda_handler(_event(_one(_msg("wamid.B"))), None)
     assert len(sqs.sent) == 1
+    assert len([key for key in table.items if key[1] == "DEDUP"]) == 1
+
+
+def test_two_messages_get_two_dedup_rows(webhook, monkeypatch):
+    table, sqs = _Table(webhook), _Sqs()
+    monkeypatch.setattr(webhook, "table", table)
+    monkeypatch.setattr(webhook, "sqs", sqs)
+    webhook.lambda_handler(_event(_one(_msg("wamid.C"))), None)
+    webhook.lambda_handler(_event(_one(_msg("wamid.D"))), None)
+    assert len(sqs.sent) == 2
+    assert len([key for key in table.items if key[1] == "DEDUP"]) == 2
