@@ -4,7 +4,7 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
-## 3 October 2026 — text answers: no stray refusal, one KVK line, WhatsApp bold (not deployed)
+## 3 October 2026 — text answers: no stray refusal, one KVK line, WhatsApp bold (deployed 3 October 2026)
 
 Found in the live phone test of the visitor path. The sample question "Whitefly on cotton" (sent as "How do I control whitefly on cotton?") got an answer with three defects. `tests/test_answer_tidy.py` holds that answer as the model wrote it.
 
@@ -12,7 +12,8 @@ Found in the live phone test of the visitor path. The sample question "Whitefly 
 - **Two KVK referral lines.** The prompt told the model to refer the farmer to the KVK for chemical control, and the filter then added its own referral footer. The prompt now tells the model not to write that line. The filter also drops the model's closing sentence when it names the KVK, is about a chemical, pesticide, product or dose, and tells the farmer to contact someone, and only when the footer follows. It looks at the last sentence before any source line and nowhere else. Across the 164 replies stored in `docs/try/replays/`, this removes three sentences, all the Marathi "रासायनिक नियंत्रणासाठी तुमच्या जवळच्या कृषी विज्ञान केंद्राशी संपर्क साधा" at the end of a photo reply; a test pins that.
 - **Markdown bold.** The model wrote `**Monitor early:**`. WhatsApp bold is `*text*`, and the web chat shows text as typed. The filter now turns `**text**` into `*text*` on WhatsApp and into plain text on the web chat, and the prompt asks for plain text.
 - Applies to WhatsApp text and voice answers and to the web chat. Photo replies get the bold and referral rules, not the opener rule. 34 new tests, 31 of which fail against the code before the change. Full suite 1004 passed, 30 skipped.
-- **Not checked.** The prompt changes have not been replayed against Bedrock, so how the model follows them is unknown until the deploy; the filter rules do not depend on it. Voice replies still pass asterisks to Polly, as before.
+- **Deployed 3 October 2026 and checked live.** After `sam deploy`, the same sample question was sent from a reset number (`--as-visitor`) at about 21:15 CEST. The reply opened with "To control whitefly on cotton, start with these non-chemical steps:", had no asterisks, and ended with one KVK line, the footer. One reply cannot show whether the model followed the new prompt or the filter removed something.
+- **Not checked.** The prompt changes were not replayed against Bedrock beyond that one live reply. Hindi, Marathi and Telugu answers and the web chat were not re-tested. Voice replies still pass asterisks to Polly, as before.
 - **Seen, not changed.** The same answer said "Spray neem oil twice" and "Do not use pyrethroids or organophosphates before 120 days". Neem as a practice is allowed by design (see the filter's module note). The filter matches named active ingredients, not pesticide classes.
 
 ---
