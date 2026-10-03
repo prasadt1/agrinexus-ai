@@ -178,7 +178,7 @@ AgriNexus is a deployed, functional prototype with production-grade observabilit
 | Encryption at rest | ✅ Active | DynamoDB default encryption |
 | Encryption in transit | ✅ Active | HTTPS only |
 | Data retention TTL | ✅ Active | Farmer conversations 90d / webhook MSG copies 7d / Nudges 180d / WAMID dedup 24h / **re:Invent visitor profile+MSG: 7d** (`VisitorTtlDays`). Code ready 3 Oct 2026, not deployed: unfinished farmer sign-up 7d (was kept for good), dead-letter queues 3d (was 14d), dedup rows keyed by a hash with no number. DynamoDB removes an expired row within a few days of its expiry. |
-| No pesticide recommendations | ⏳ Code ready 2 Oct 2026; not deployed | Every advice reply (WhatsApp text, voice, photo; web chat) passes through `common/advice_filter.py`, which drops sentences naming an active ingredient, brand, formulation or dose (Latin, Devanagari and Telugu) and ends the reply with a KVK referral. Each removal emits `AgriNexus/Advice` `AdviceFilterHit`. Requirements REQ-GUARD-008 to 014. |
+| No pesticide recommendations | ✅ Active (deployed 2 Oct 2026; web chat re-checked 3 Oct 2026) | Every advice reply (WhatsApp text, voice, photo; web chat) passes through `common/advice_filter.py`, which drops sentences naming an active ingredient, brand, formulation or dose (Latin, Devanagari and Telugu) and ends the reply with a KVK referral. Each removal emits `AgriNexus/Advice` `AdviceFilterHit`. Requirements REQ-GUARD-008 to 014. |
 | Log retention | ✅ Active (set 27 Sept 2026) | CloudWatch Logs kept 90 days on all Lambda and canary log groups ([`scripts/set-log-retention.sh`](scripts/set-log-retention.sh)); previously never expired |
 
 ### Verification Note
