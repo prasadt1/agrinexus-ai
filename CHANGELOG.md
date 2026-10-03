@@ -11,7 +11,7 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
-## 3 October 2026 — re:Invent visitor path: first message, data promises, logs (not deployed)
+## 3 October 2026 — re:Invent visitor path: first message, data promises, logs (deployed 3 October 2026)
 
 Found while checking the new landing page (`docs/try/`) against the code. The page tells a visitor: records expire after 7 days, DELETE erases them, no reminders. Each item below has a test that failed before the fix.
 
@@ -26,33 +26,34 @@ Found while checking the new landing page (`docs/try/`) against the code. The pa
 - **Old rows.** Unfinished sign-ups written before this change still have no expiry. `scripts/expire-unfinished-signups.py` lists them (dry run) and, with `--apply`, gives them 7 days from now. Run it once after the deploy.
 - REQ-VISITOR-002, REQ-VISITOR-006 and REQ-SEC-006 amended; the requirement count is unchanged. 87 new tests: 71 fail against the code before the change, 5 cover the clean-up script, and the rest pin behavior that must stay. One existing test updated. Full suite 970 passed, 30 skipped; template lints clean with cfn-lint.
 - **Seen, not changed.** Visitors cannot send voice notes (webhook gate). A "done" or "not yet" from a number with no open nudge gets no reply. After DELETE, EventBridge schedules of an open farmer nudge stay until they fire (up to 72 hours) and then remove themselves. REQ-SEC-009 says photos are deleted after 24 hours; the bucket rule is 7 days.
+- **Deployed 3 October 2026, 19:25 CEST.** `sam deploy` from `main` at 5582b42, then `set-log-retention.sh` and `expire-unfinished-signups.py --apply`, which gave 3 old unfinished sign-ups a 7-day expiry. Live phone test the same evening on a reset number (`--as-visitor`, not a number new to the bot): the welcome and sample list arrived, "Whitefly on cotton" was answered, a second "Hi from re:Invent" brought the welcome again, and DELETE returned the visitor confirmation. Not tested live: the "Photo diagnosis" row, the daily limit, and the new log lines.
 
 ---
 
-## 3 October 2026 — nudge send window and cooldown (deployed; id collision fix not deployed)
+## 3 October 2026 — nudge send window and cooldown (deployed; id collision fix deployed 3 October 2026)
 
 - **Nudges went out at any hour and repeated after every close.** The weather poller runs every 6 hours (UTC), so a spray nudge could arrive around midnight in India. The only repeat control was the open-nudge check: as soon as a nudge was DONE or EXPIRED, the next favourable poll nudged the same farmer again. REQ-NUDGE-011 promised "max 2 per farmer per day", which was never implemented.
 - **Send window.** NudgeSender now sends only between 06:00 and 19:00 Asia/Kolkata (fixed UTC+5:30), set by the stack parameters `NudgeSendWindowStartHour` and `NudgeSendWindowEndHour`. Outside the window, each farmer who passed every other gate is skipped and counted in a new `NudgesDeferred` metric; the next poll inside the window sends. An unreadable or inverted window sends nothing. The 6-hour schedule is unchanged, and reminders are not affected.
 - **Cooldown.** `NUDGE_COOLDOWN_DAYS` (default 7) blocks a new nudge for the same farmer and activity within that many days of the last DONE or EXPIRED nudge. Close time is `completedAt` for DONE and the new `expiredAt` for EXPIRED, which both expiry paths (T+72h auto-expiry and a final "not yet") now record. Older EXPIRED rows without it count from creation + 72 hours. An unreadable close time blocks.
 - **Demo path.** `scripts/test-complete-flow.sh` invokes the weather poller with `{"force": true}`; the poller passes it through the state machine to NudgeSender, which then skips the window and cooldown only. Consent, allowlist, visitor, onboarding and open-nudge gates still apply. Only a JSON boolean `true` forces.
-- **Regression (deployed):** the window/cooldown change took one `now` before the farmer loop and built every `nudge_id` from it. Schedule names come only from `nudge_id`, so the second farmer in a district hit `ConflictException` on create_schedule (logged as "already exists (OK)"). Only the first farmer got T+24h/T+48h reminders and T+72h expiry; the others got the nudge with no follow-up, and a DONE from any of them deleted the first farmer's timers. Fix (not deployed): stamp each farmer inside the loop with `_utcnow()` plus a per-send microsecond offset so ids stay distinct when the clock does not advance; the single `now` is still used only for the send-window and cooldown decisions. Schedule name format unchanged.
+- **Regression (deployed):** the window/cooldown change took one `now` before the farmer loop and built every `nudge_id` from it. Schedule names come only from `nudge_id`, so the second farmer in a district hit `ConflictException` on create_schedule (logged as "already exists (OK)"). Only the first farmer got T+24h/T+48h reminders and T+72h expiry; the others got the nudge with no follow-up, and a DONE from any of them deleted the first farmer's timers. Fix (deployed 3 October 2026): stamp each farmer inside the loop with `_utcnow()` plus a per-send microsecond offset so ids stay distinct when the clock does not advance; the single `now` is still used only for the send-window and cooldown decisions. Schedule name format unchanged.
 - REQ-NUDGE-011 rewritten to state these rules. Tests include the two-farmer distinct-id case; `sam validate --lint` clean.
 
 ---
 
-## 2 October 2026 — filter leaves no orphaned repeat steps (not deployed)
+## 2 October 2026 — filter leaves no orphaned repeat steps (deployed 3 October 2026)
 
 - **Removing a chemical step left its follow-up behind.** On the deployed web chat, a pink bollworm reply lost a dose sentence and kept "Repeat two more times at 30-day intervals", which then pointed at nothing. Separately, steps were renumbered only within one line: when a whole numbered line was dropped, the list read 1, 3, 4, and a kept line such as "2. Destroy crop residue." became "1." because numbering restarted on each line. The filter now drops a step directly after a removed one when it only says to repeat or reapply (English, Hindi, Marathi, Telugu); repeating a check or inspection stays. Numbering runs across the whole message and restarts after a heading ending in ":" or when the original numbers start over. Replies with nothing removed are returned unchanged. Orphan drops are logged but not counted in `AdviceFilterHit`, which still counts chemical advice only. On the 119 stored and live replies, one output changed: a Marathi "(३) …३-४ दिवसांनी पुन्हा फवारणी करा" (spray again after 3-4 days) that followed a removed insecticide step. REQ-GUARD-010 amended.
 
 ---
 
-## 2 October 2026 — Lambda runtime Python 3.13 (not deployed)
+## 2 October 2026 — Lambda runtime Python 3.13 (deployed 3 October 2026)
 
 - **Runtime was past its update cut-off.** Every function and the common layer ran `python3.11`, which AWS deprecated on 30 June 2026 with function updates disabled from 31 August 2026; `sam validate --lint` failed on it, so the lint step at the end of CI failed too. All functions (one global setting, no per-function overrides) and the layer now use `python3.13`, and CI tests on 3.13. In a clean Python 3.13 environment without AWS credentials the suite passes (839 passed, 30 skipped) and the template lints clean. `sam build` packages Pillow 11.3.0 as the `cp313` manylinux x86_64 wheel. Remaining 3.13 warnings are deprecations only (`datetime.utcnow`, `utcfromtimestamp`). A test keeps functions, layer and CI on one supported version.
 
 ---
 
-## 2 October 2026 — photo relevance check restored (not deployed)
+## 2 October 2026 — photo relevance check restored (deployed 3 October 2026)
 
 - **Relevance check ran on an end-of-life model.** `classify_image_relevance` called Claude 3 Haiku, which Bedrock now rejects ("This model version has reached the end of its life"), so every check returned `unclear`. It now uses the Claude Haiku 4.5 inference profile, set by the new stack parameter `RelevanceModelId` and passed to both processors as `VISION_RELEVANCE_MODEL_ID`. IAM on both processors is limited to that profile and its foundation model; a session-policy probe against live Bedrock succeeded 6 of 6 times, and a control without the foundation-model ARN was denied.
 - **Swapping the model alone would have blocked a real pest photo.** With the old prompt, Haiku 4.5 labelled the pink bollworm sample `not_agri`/`animal` with high confidence in 3 of 3 runs; confident `not_agri` is a hard block. The prompt now counts insects, larvae, caterpillars and mites on crops as farm photos and excludes crop pests from "animals". Live, 3 runs each: all 8 crop and pest photos `agri_photo`/high; logo, diagram and app screenshot `not_agri`/high; a WhatsApp screenshot containing a leaf photo `agri_photo`, which the diagnosis model's non-photo check still handles.
