@@ -93,17 +93,16 @@ def farmer_reply(handler, question: str, dialect: str, result: dict) -> dict:
     if policy_reply:
         text = advice_filter.pesticide_policy(dialect)
     text = strip_source_lines(handler.strip_llm_xml_citation_tags(text))
+    from common.source_labels import source_line
+
     labels = []
     if not policy_reply and not handler.is_rag_refusal_response(text):
         labels = handler.source_labels_from_citations(result.get("citations"))
-        if labels:
-            keyword = {"hi": "स्रोत:", "mr": "स्त्रोत:", "te": "మూలం:", "en": "Source:"}.get(dialect, "Source:")
-            tail = ", ".join(labels[:5]) + (" …" if len(labels) > 5 else "")
-            text += f"\n\n{keyword} {tail}"
     reply = advice_filter.filter_advice(
         text, dialect, "whatsapp_text", kind="answer",
         add_referral=not handler.is_rag_refusal_response(text),
         question=question,
+        source_line=source_line(labels, dialect),
     )
     return {"reply_text": reply, "source_labels": labels, "policy_reply": policy_reply}
 

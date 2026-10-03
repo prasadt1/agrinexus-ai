@@ -22,6 +22,7 @@ from common.whatsapp import send_whatsapp_buttons as _send_whatsapp_buttons
 from common.district_helplines import maybe_append_helpline_footer
 from common.advice_filter import filter_advice, is_pesticide_question, pesticide_policy
 from common.source_line import strip_source_lines
+from common.source_labels import source_labels, source_line as format_source_line
 from common.allowlist import is_approved_user, allowlist_expiry_hint
 from common.redact import redact_phone
 from common.nudge_keywords import is_nudge_reply
@@ -782,21 +783,8 @@ def strip_all_numeric_source_footers(text: str) -> str:
 
 
 def source_labels_from_citations(citations: Any) -> List[str]:
-    """Basenames from S3 URIs in retrieve_and_generate citations (same idea as web-chat handler)."""
-    if not citations:
-        return []
-    labels: List[str] = []
-    for citation in citations:
-        for ref in citation.get("retrievedReferences") or []:
-            loc = ref.get("location") or {}
-            s3_loc = loc.get("s3Location") or {}
-            uri = s3_loc.get("uri") or ""
-            if not uri:
-                continue
-            name = uri.rstrip("/").split("/")[-1]
-            if name and name not in labels:
-                labels.append(name)
-    return labels
+    """Document titles from metadata, else file names, in citation order (common.source_labels)."""
+    return source_labels(citations)
 
 
 def save_message(
@@ -1462,14 +1450,9 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             response_text = strip_llm_xml_citation_tags(response_text)
             response_text = strip_source_lines(response_text)
 
+            cited = ""
             if not policy_reply and not is_rag_refusal_response(response_text):
-                labels = source_labels_from_citations(result.get("citations"))
-                if labels:
-                    max_show = 5
-                    tail = ", ".join(labels[:max_show])
-                    if len(labels) > max_show:
-                        tail += " …"
-                    response_text += f"\n\n{source_keyword} {tail}"
+                cited = format_source_line(source_labels_from_citations(result.get("citations")), dialect)
 
             location = (profile.get("district") or profile.get("location")) if profile else None
             response_text = filter_advice(
@@ -1480,6 +1463,7 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                 district=location,
                 add_referral=not is_rag_refusal_response(response_text),
                 question=text,
+                source_line=cited,
             )
             reply_text = maybe_append_helpline_footer(
                 response_text,

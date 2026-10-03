@@ -531,6 +531,31 @@ def test_whatsapp_text_answer_names_the_cited_document(processor):
     assert reply.rstrip().endswith("1800-180-1551")
 
 
+TITLED_REF = {"retrievedReferences": [{
+    "location": {"s3Location": {"uri": "s3://kb/en/cotton-08-e75ba3c0.pdf"}},
+    "metadata": {"title": "ICAR-CICR Cotton Pest Advisory 2024"},
+}]}
+
+
+def test_whatsapp_source_line_uses_the_document_title(processor):
+    processor.bedrock_agent.retrieve_and_generate = lambda **_k: {
+        "output": {"text": "Install yellow sticky traps."}, "citations": [TITLED_REF], "sessionId": "s",
+    }
+    _run(processor, "text", {"text": {"body": "How do I control whitefly on cotton?"}})
+    reply = _last_reply(processor)
+    assert "Install yellow sticky traps.\n\nSource: ICAR-CICR Cotton Pest Advisory 2024\n\n" in reply
+    assert "e75ba3c0" not in reply
+
+
+def test_web_chat_citations_use_the_document_title(webchat):
+    webchat.query_bedrock = lambda *_a, **_k: {"text": "Install yellow sticky traps.", "citations": [TITLED_REF, KB_REF]}
+    resp = webchat.lambda_handler(
+        {"httpMethod": "POST", "body": json.dumps({"message": "How do I control whitefly?", "language": "en"}), "requestContext": {}},
+        None,
+    )
+    assert json.loads(resp["body"])["citations"] == ["ICAR-CICR Cotton Pest Advisory 2024", "cicr-cotton-ipm.pdf"]
+
+
 # Keep a test that uses the webchat fixture last: it drops the processor fixture's
 # stand-ins for common.* from sys.modules, which later test files would otherwise import.
 def test_knowledge_base_prompts_name_classes_and_cap_the_length(processor, webchat):

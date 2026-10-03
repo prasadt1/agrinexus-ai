@@ -50,6 +50,7 @@ def _install_common_stubs(sent_messages):
     import common.guardrail_reply as guardrail_reply_mod  # noqa: E402
     import common.advice_filter as advice_mod  # noqa: E402
     import common.source_line as source_line_mod  # noqa: E402
+    import common.source_labels as source_labels_mod  # noqa: E402
 
     advice_mod._cloudwatch = types.SimpleNamespace(put_metric_data=lambda **kw: None)
 
@@ -84,6 +85,7 @@ def _install_common_stubs(sent_messages):
     sys.modules["common.guardrail_reply"] = guardrail_reply_mod
     sys.modules["common.advice_filter"] = advice_mod
     sys.modules["common.source_line"] = source_line_mod
+    sys.modules["common.source_labels"] = source_labels_mod
     common_pkg.redact = redact_mod
     common_pkg.nudge_keywords = nk_mod
     common_pkg.visitor = visitor_mod
