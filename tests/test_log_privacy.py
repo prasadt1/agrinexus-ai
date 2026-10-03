@@ -187,6 +187,12 @@ class TestOutgoingMessageLogs:
         out = self._check(capsys, wa)
         assert "voice-output" not in out and "X-Amz-Signature" not in out
 
+    def test_image_does_not_log_the_presigned_link(self, wa, capsys):
+        url = "https://bucket.s3.amazonaws.com/visitor-samples/crop-leaf.jpg?X-Amz-Signature=abc"
+        assert wa.send_whatsapp_image(PHONE, url, "Sample crop photo.") is True
+        out = self._check(capsys, wa)
+        assert "visitor-samples" not in out and "X-Amz-Signature" not in out
+
     def test_buttons(self, wa, capsys):
         assert wa.send_whatsapp_buttons(PHONE, REPLY, [{"id": "a", "title": "A"}]) is True
         self._check(capsys, wa, REPLY)
@@ -213,9 +219,10 @@ class TestOutgoingMessageLogs:
         assert wa.send_whatsapp_buttons(PHONE, REPLY, [{"id": "a", "title": "A"}]) is False
         assert wa.send_whatsapp_list(PHONE, REPLY, "Pick", [{"title": "T", "rows": []}]) is False
         assert wa.send_whatsapp_template(PHONE, "weather_nudge", "en") is False
+        assert wa.send_whatsapp_image(PHONE, "https://example.test/a.jpg", "c") is False
         out = capsys.readouterr().out
         _assert_no_personal_data(out, REPLY)
-        assert out.count("131030") == 8  # the error code stays readable, twice per body
+        assert out.count("131030") == 10  # the error code stays readable, twice per body
         assert "not in allowed list" in out
 
 

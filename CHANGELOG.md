@@ -4,6 +4,16 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 4 October 2026 — visitor sees the sample photo; photo advice matched to what is visible (not deployed)
+
+- **The visitor never saw the photo being diagnosed.** The "Photo diagnosis" row sent "Running photo diagnosis on a sample crop image..." and then a diagnosis of an image the visitor could not see, so the reply could not be checked. The processor now sends the sample image first (`common.whatsapp.send_whatsapp_image`, a WhatsApp image message by link) with the caption "Sample crop photo. Running photo diagnosis on this image...", then the diagnosis. The link is a presigned S3 URL that expires after 10 minutes, the same way voice replies are sent, so the bucket stays private; the link is never logged. If the link or the send fails, the old text notice goes out and the diagnosis still follows. REQ-VISITOR-004 amended.
+- **Photo advice did not fit the photo.** The live sample reply on 3 October (chewing damage on cotton leaves, no insect visible) advised yellow sticky traps "to catch flying adult pests" and gave Confidence: High. The vision prompt now names yellow sticky traps only when small flying insects are visible, pheromone traps only for moths or bollworm, and for chewing damage with no insect visible asks for checking leaf undersides and hand-picking. Confidence now refers to the diagnosis, not the crop, and is at most Medium when the cause is inferred from damage alone. This prompt serves farmer photos too.
+- Not run against Bedrock or WhatsApp. Check after deploy: pick "Photo diagnosis" as a visitor; the photo should arrive first with its caption, then a diagnosis without trap advice and with Medium confidence for the current sample.
+- The web chat has no sample photo option, so it is unchanged.
+- 9 new tests; full suite 1053 passed, 30 skipped.
+
+---
+
 ## 3 October 2026 — soybean sample question, document titles in the source line (not deployed)
 
 - **Soybean sample refused often.** "How often should I irrigate soybean?" returned the no-information reply in four of nine replays on 3 October, with the old and the new prompt alike. The knowledge base covers when soybean needs water (dry spells at flowering and pod filling, about 75% soil moisture) but gives no schedule, so the model often judged the context insufficient for "how often". The row keeps its title "Irrigating soybean" and now sends "When does soybean need irrigation?". Not replayed yet.

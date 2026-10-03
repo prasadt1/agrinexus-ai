@@ -646,8 +646,11 @@ JSON OUTPUT (all fields required):
 **STRUCTURED OUTPUT RULES:**
 - "diagnosis": What's wrong OR what you see (e.g., "कपास की फली पर इल्ली दिखाई दे रही है" or "पौधे की पहचान स्पष्ट नहीं")
 - "severity": How serious the problem is (or "none" if healthy, "unknown" if can't tell)
-- "recommendations": Non-chemical steps the farmer can take today for the visible problem (remove and destroy affected parts, hand-pick larvae, yellow sticky traps, pheromone traps, field sanitation, regular checks).
-- "confidence_text": Explain your confidence level (e.g., "उच्च - कपास की फली स्पष्ट दिखाई दे रही है" or "कम - फोटो धुंधली है")
+- "recommendations": Non-chemical steps the farmer can take today for the visible problem (remove and destroy affected parts, hand-pick larvae, field sanitation, regular checks). Match each step to what the photo shows:
+  - Yellow sticky traps only when small flying insects (whitefly, aphid, jassid, thrips) are visible or their signs are clear.
+  - Pheromone traps only when moths or bollworm larvae are visible or their damage is clear on bolls or squares.
+  - For chewing damage with no insect visible, advise checking leaf undersides and growing tips and hand-picking; do not suggest traps.
+- "confidence_text": Confidence in the DIAGNOSIS (what is causing the problem), not in the crop. Start with the level, then why (e.g., "उच्च - कपास की फली पर गुलाबी बोंडअळी स्पष्ट दिखाई दे रही है" or "कम - फोटो धुंधली है"). If no insect, larva, fungus or other cause is visible and the cause is inferred from damage alone, the level is at most Medium, and say the cause is not visible.
 - NO VISIBLE PROBLEM IS A VALID DIAGNOSIS (healthy photos are allowed): use severity="none", visible_problem=false, and give preventive monitoring guidance.
 
 NO PESTICIDES (applies to every field):

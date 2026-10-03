@@ -17,7 +17,7 @@ from output import text_to_speech, truncate_for_voice, voice_truncation_prefix
 import analyzer
 
 # Import WhatsApp utilities from common layer (with Secrets Manager caching)
-from common.whatsapp import send_whatsapp_message, send_whatsapp_list
+from common.whatsapp import send_whatsapp_message, send_whatsapp_list, send_whatsapp_image
 from common.whatsapp import send_whatsapp_buttons as _send_whatsapp_buttons
 from common.district_helplines import maybe_append_helpline_footer
 from common.advice_filter import filter_advice, is_pesticide_question, pesticide_policy
@@ -855,6 +855,18 @@ def _diagnose_image_with_confirmed_crop(
     return filter_advice(text, dialect, "whatsapp_photo", kind="photo", district=district)
 
 
+def _send_visitor_sample_image(from_number: str, bucket: str, key: str) -> bool:
+    """Send the sample crop photo itself, by a 10-minute presigned link. True if sent."""
+    try:
+        link = s3.generate_presigned_url(
+            "get_object", Params={"Bucket": bucket, "Key": key}, ExpiresIn=600
+        )
+    except Exception as e:
+        print(f"Visitor sample image link failed: {e}")
+        return False
+    return bool(send_whatsapp_image(from_number, link, visitor_mod.SAMPLE_PHOTO_CAPTION))
+
+
 def _run_visitor_sample_vision(from_number: str, profile: Dict[str, Any], wamid: str) -> None:
     """Run real vision path on the configured sample crop image (S3)."""
     bucket = (
@@ -879,7 +891,10 @@ def _run_visitor_sample_vision(from_number: str, profile: Dict[str, Any], wamid:
             "Sample photo is temporarily unavailable. Please send your own crop/leaf photo, or ask in text.",
         )
         return
-    send_whatsapp_message(from_number, "✓ Running photo diagnosis on a sample crop image...")
+    # Show the visitor the photo first, so the diagnosis can be checked against it.
+    # Falls back to the text-only notice if the image cannot be sent.
+    if not _send_visitor_sample_image(from_number, bucket, key):
+        send_whatsapp_message(from_number, "✓ Running photo diagnosis on a sample crop image...")
     dialect = profile.get("dialect") or "en"
     # Configured crop for the sample image (not a model guess) — same confirmed-crop
     # path as farmer crop-confirm reprocess.

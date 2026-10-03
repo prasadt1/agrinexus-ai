@@ -231,7 +231,7 @@ The product identifies the pest or problem and gives non-chemical steps. It does
 
 **REQ-VISITOR-003**: The system shall accept free-text farming questions from visitors in English via the existing RAG path.
 
-**REQ-VISITOR-004**: When a visitor selects the photo-diagnosis list option, the system shall run the real vision path on the stored sample image and return the model result.
+**REQ-VISITOR-004** (amended 4 Oct 2026): When a visitor selects the photo-diagnosis list option, the system shall first send the stored sample image to the visitor, by a presigned link that expires within 10 minutes, with a caption saying it is the sample photo being diagnosed; it shall then run the real vision path on that image and return the model result. If the image cannot be sent, the system shall send a text notice instead and still return the diagnosis.
 
 **REQ-VISITOR-005**: While `demo_tier` is `visitor`, the system shall accept visitor-uploaded crop photos through the real vision path, subject to the same visitor answer caps.
 
