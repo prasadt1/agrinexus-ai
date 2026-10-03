@@ -933,7 +933,9 @@ def query_bedrock(query: str, dialect: str = 'hi', session_id: Optional[str] = N
     Args:
         query: User's question
         dialect: User's language dialect
-        session_id: Optional session ID for conversation context (uses phone number)
+        session_id: Optional session ID that Bedrock returned from an earlier call. Bedrock
+            issues these itself and rejects any other value, so never pass a phone number.
+            The handler passes none today: every question is answered on its own.
     
     Returns:
         Dict with 'text' and 'citations'
@@ -1046,10 +1048,9 @@ REMEMBER: If the Context above does not contain information to answer the Questi
     # Try with sessionId first (for conversation context)
     if session_id:
         request_params['sessionId'] = session_id
-        print(f"Attempting to use session ID for conversation context: {session_id[:10]}***")
+        print("Continuing an existing Bedrock session")
         try:
             response = bedrock_agent.retrieve_and_generate(**request_params)
-            print(f"Successfully used existing session: {session_id[:10]}***")
             result = {
                 'text': response['output']['text'],
                 'citations': response.get('citations', []),
@@ -1060,7 +1061,7 @@ REMEMBER: If the Context above does not contain information to answer the Questi
         except bedrock_agent.exceptions.ValidationException as e:
             # Session doesn't exist yet, create new one by calling without sessionId
             if 'Session with Id' in str(e) and 'is not valid' in str(e):
-                print(f"Session {session_id[:10]}*** not found, creating new session")
+                print("Bedrock session no longer valid, starting a new one")
                 del request_params['sessionId']
             else:
                 raise
@@ -1069,8 +1070,8 @@ REMEMBER: If the Context above does not contain information to answer the Questi
     response = bedrock_agent.retrieve_and_generate(**request_params)
     
     if session_id:
-        print(f"Created new session: {response.get('sessionId', 'unknown')}")
-    
+        print("Started a new Bedrock session")
+
     result = {
         'text': response['output']['text'],
         'citations': response.get('citations', []),
@@ -1412,14 +1413,11 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                 }
                 send_whatsapp_message(from_number, ack_messages.get(dialect, ack_messages['hi']))
             
-            # Voice: skip Bedrock session so retrieve+generate is not skewed by prior turns;
-            # STT text also differs from typed queries.
-            rag_session = (
-                None
-                if voice_source in ("voice", "voice_test")
-                else from_number
-            )
-            result = query_bedrock(text, dialect, session_id=rag_session)
+            # Every question is answered on its own, typed or spoken. The phone number used to
+            # be passed as the Bedrock session ID here. Bedrock issues session IDs itself and
+            # rejects one chosen by the caller, so that only added a failed first call to every
+            # typed question and put the first ten digits of the number in the log.
+            result = query_bedrock(text, dialect)
             
             response_text = result["text"]
             policy_reply = (

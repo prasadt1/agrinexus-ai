@@ -452,7 +452,7 @@ SENSITIVE_NAMES = {
     "wamid", "phone", "phone_number", "from_number", "to_number",
     "text", "early_text", "message", "message_text", "body", "body_text", "payload",
     "transcript", "transcript_text", "query", "question", "reply", "reply_text", "response_text",
-    "final_msg", "audio_url", "s3_key", "event", "record",
+    "final_msg", "audio_url", "s3_key", "event", "record", "session_id", "rag_session",
 }
 SENSITIVE_KEYS = {"text", "body", "from", "wamid", "message", "transcript", "phone_number", "response"}
 

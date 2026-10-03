@@ -346,6 +346,19 @@ class TestQuestions:
         bot.text(own)
         assert bot.bedrock_calls[0]["input"]["text"] == own
 
+    def test_own_question_is_answered_in_one_bedrock_call_without_the_number(self, bot, capsys):
+        bot.text("Hi from re:Invent")
+        capsys.readouterr()
+        bot.text("Why are my soybean leaves turning yellow?")
+
+        assert len(bot.bedrock_calls) == 1
+        call = bot.bedrock_calls[0]
+        assert "sessionId" not in call
+        assert PHONE not in json.dumps(call, default=str)
+        logs = capsys.readouterr().out
+        assert PHONE not in logs and PHONE[:10] not in logs and PHONE[3:] not in logs
+        assert "soybean" not in logs and ANSWER not in logs
+
     def test_conversation_rows_expire_in_7_days(self, bot):
         bot.text("Hi from re:Invent")
         bot.text("Why are my soybean leaves turning yellow?")
