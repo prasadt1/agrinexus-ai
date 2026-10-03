@@ -349,6 +349,7 @@ class TestPhoneRedaction:
 
     def test_whatsapp_send_success_log_omits_recipient(self, monkeypatch, capsys):
         import common.whatsapp as wa
+        from common.redact import message_ref
 
         phone = "919876543210"
 
@@ -369,4 +370,7 @@ class TestPhoneRedaction:
         assert wa.send_whatsapp_buttons(phone, "pick", [{"id": "a", "title": "A"}]) is True
         out = capsys.readouterr().out
         assert phone not in out
-        assert "wamid.TEST" in out
+        # A real message ID holds the recipient's number in base64, so the log carries a
+        # one-way reference to it instead (tests/test_log_privacy.py).
+        assert "wamid.TEST" not in out
+        assert out.count(message_ref("wamid.TEST")) == 2

@@ -274,7 +274,7 @@ Error rate (download/model failures)  # Expect: <0.5%
 
 **CloudWatch Insights Query**:
 ```
-fields @timestamp, phone_suffix, heuristics_decision, crop_confidence, was_overridden, heuristics_error
+fields @timestamp, phone, heuristics_decision, crop_confidence, was_overridden, heuristics_error
 | filter ispresent(crop_confidence)
 | stats count() by crop_confidence, was_overridden
 ```

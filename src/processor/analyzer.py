@@ -18,6 +18,7 @@ from messages import get_crop_question, get_crop_mismatch_question
 from enforcement import enforce_message_safety
 from enforcement import format_crop_message
 from common.guardrail_reply import localized_guardrail_refusal
+from common.redact import redact_phone, text_for_log
 
 bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
 s3 = boto3.client('s3', region_name='us-east-1')
@@ -983,7 +984,8 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
             Body=image_bytes,
             ContentType='image/jpeg'
         )
-        print(f"Saved to S3: s3://{TEMP_BUCKET}/{s3_key}")
+        # The key holds the full number: log it with the number masked.
+        print(f"Saved to S3: s3://{TEMP_BUCKET}/images/{redact_phone(phone)}/{timestamp}.jpg")
 
         # LAYER 2: Vision model
         district = user_profile.get("district") or user_profile.get("location")
@@ -1109,13 +1111,12 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
 
         final_msg = enforce_message_safety(vision, crop, dialect)
 
-        print(f"Final message (enforced): {final_msg[:100]}...")
+        print(f"Final message (enforced): {text_for_log(final_msg, limit=100)}")
 
-        # Diagnostic logging (full decision path)
-        phone_suffix = phone[-4:] if phone and len(phone) >= 4 else 'unknown'
-
+        # Diagnostic logging (full decision path). Same masking as every other log line:
+        # the first three digits of the number, and text lengths instead of text.
         log_data = {
-            'phone_suffix': phone_suffix,
+            'phone': redact_phone(phone),
             'heuristics_decision': heuristics.get('decision', 'pass'),
             'heuristics_error': heuristics_error,
             'is_real_crop_photo': vision.get('is_real_crop_photo'),
@@ -1123,8 +1124,8 @@ def process_image_message(message: Dict[str, Any], user_profile: Dict[str, Any])
             'crop_confidence': vision.get('crop_confidence'),
             'visible_problem': vision.get('visible_problem'),
             'severity': vision.get('severity'),
-            'raw_message_preview': vision.get('recommendations', '')[:120],
-            'final_message_preview': final_msg[:120],
+            'raw_message': text_for_log(vision.get('recommendations', ''), limit=120),
+            'final_message': text_for_log(final_msg, limit=120),
             'was_overridden': (vision.get('recommendations', '') != final_msg)
         }
 

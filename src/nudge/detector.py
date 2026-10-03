@@ -8,7 +8,7 @@ import sys
 import boto3
 from typing import Dict, Any, List
 from common.whatsapp import send_whatsapp_message
-from common.redact import redact_phone
+from common.redact import redact_phone, text_for_log
 from common.nudge_keywords import (
     DONE_KEYWORDS,
     NOT_YET_KEYWORDS,
@@ -164,7 +164,8 @@ def _parse_record(record: Dict[str, Any]):
 
 def _handle_reply(pk: str, phone_number: str, sk: str, text: str) -> None:
     print(f"Processing message for user: {redact_phone(phone_number)}")
-    print(f"Checking keywords in: {text}")
+    # Every incoming text passes here, visitors included: log its length, not the text.
+    print(f"Checking keywords in: {text_for_log(text)}")
     
     # Exact short-message match only — otherwise fall through (no ack / no status change)
     if is_not_yet_reply(text):

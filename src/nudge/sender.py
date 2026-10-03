@@ -351,10 +351,14 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             dialect, district_key, crop, wind_speed, context_hint_override=hint_override
         )
 
-        # Create nudge record in DynamoDB
-        timestamp = now.isoformat()
+        # Create nudge record in DynamoDB. Stamp each farmer inside the loop so
+        # schedule names (derived only from nudge_id) do not collide across
+        # farmers in the same district run. `now` above stays for window/cooldown.
+        # Microsecond offset keeps ids distinct when wall clock does not advance.
+        sent_at = _utcnow() + timedelta(microseconds=nudges_sent)
+        timestamp = sent_at.isoformat()
         nudge_id = f"{timestamp}#{activity}"
-        ttl = int(now.timestamp()) + (180 * 24 * 60 * 60)  # 180 days
+        ttl = int(sent_at.timestamp()) + (180 * 24 * 60 * 60)  # 180 days
 
         table.put_item(
             Item={

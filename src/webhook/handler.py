@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 
 from common.whatsapp import send_whatsapp_message, VOICE_RECEIVED_ACK
 from common.allowlist import is_approved_user, allowlist_expiry_hint
-from common.redact import redact_phone
+from common.redact import message_ref, redact_phone
 from common.nudge_keywords import is_nudge_reply
 
 logger = logging.getLogger()
@@ -65,12 +65,22 @@ def _select_queue_url(from_number: str) -> str:
     return QUEUE_URL
 
 
+def _dedup_key(wamid: str) -> Dict[str, str]:
+    """Key of the dedup row for a message.
+
+    A wamid holds the sender's full phone number, so the row is keyed by a one-way hash of
+    it and stores no number. DELETE therefore has nothing to remove here.
+    """
+    digest = hashlib.sha256(str(wamid).encode('utf-8')).hexdigest()
+    return {'PK': f'WAMID#{digest}', 'SK': 'DEDUP'}
+
+
 def _release_dedup(wamid: str) -> None:
     """Drop the WAMID claim so Meta's retry of a message that never reached SQS is processed."""
     try:
-        table.delete_item(Key={'PK': f'WAMID#{wamid}', 'SK': 'DEDUP'})
+        table.delete_item(Key=_dedup_key(wamid))
     except Exception as e:
-        logger.error(f"Error releasing deduplication record for {wamid}: {e}")
+        logger.error(f"Error releasing deduplication record for {message_ref(wamid)}: {e}")
 
 
 def check_rate_limit(phone_number: str) -> bool:
@@ -284,11 +294,12 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             from_number = message.get('from')
             message_type = message.get('type')
             
-            logger.info(f"Message - wamid: {wamid}, from: {redact_phone(from_number)}, type: {message_type}")
+            # A wamid holds the sender's number, so log lines carry message_ref(wamid) instead.
+            logger.info(f"Message - id: {message_ref(wamid)}, from: {redact_phone(from_number)}, type: {message_type}")
             
             # Rate limit check
             if not check_rate_limit(from_number):
-                logger.warning(f"Rate limit exceeded for {redact_phone(from_number)}, dropping message {wamid}")
+                logger.warning(f"Rate limit exceeded for {redact_phone(from_number)}, dropping message {message_ref(wamid)}")
                 rate_limit_msg = {
                     'hi': 'आपने बहुत सारे संदेश भेजे हैं। कृपया 1 घंटे बाद पुनः प्रयास करें।',
                     'mr': 'तुम्ही खूप संदेश पाठवले आहेत. कृपया 1 तासानंतर पुन्हा प्रयत्न करा.',
@@ -309,18 +320,16 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 ttl = int(time.time()) + (24 * 60 * 60)
                 table.put_item(
                     Item={
-                        'PK': f'WAMID#{wamid}',
-                        'SK': 'DEDUP',
-                        'from': from_number,
+                        **_dedup_key(wamid),
                         'processed_at': datetime.utcnow().isoformat(),
                         'ttl': ttl
                     },
                     ConditionExpression='attribute_not_exists(PK)'
                 )
-                logger.info(f"Stored deduplication record for wamid: {wamid}")
+                logger.info(f"Stored deduplication record for {message_ref(wamid)}")
             
             except dynamodb.meta.client.exceptions.ConditionalCheckFailedException:
-                logger.info(f"Duplicate message detected: {wamid} - skipping")
+                logger.info(f"Duplicate message detected: {message_ref(wamid)} - skipping")
                 continue
             except Exception as e:
                 logger.error(f"Error checking idempotency: {e}")
@@ -376,7 +385,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                             MessageGroupId=from_number,
                             MessageDeduplicationId=wamid
                         )
-                        logger.info(f"Audio message queued for voice processing - wamid: {wamid}")
+                        logger.info(f"Audio message queued for voice processing - id: {message_ref(wamid)}")
                         continue
                     else:
                         logger.warning("VOICE_QUEUE_URL not configured - skipping audio message")
@@ -411,7 +420,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     MessageGroupId=from_number,  # Group by phone number to maintain order per user
                     MessageDeduplicationId=wamid  # Use wamid for deduplication
                 )
-                logger.info(f"Message queued successfully - wamid: {wamid}, beta={target_queue_url == QUEUE_URL_BETA}")
+                logger.info(f"Message queued successfully - id: {message_ref(wamid)}, beta={target_queue_url == QUEUE_URL_BETA}")
             except Exception as e:
                 logger.error(f"Error queuing message: {e}")
                 _release_dedup(wamid)

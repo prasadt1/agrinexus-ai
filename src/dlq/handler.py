@@ -6,7 +6,7 @@ import json
 import os
 import boto3
 from typing import Dict, Any
-from common.redact import redact_phone
+from common.redact import redact_phone, scrub_numbers
 
 dynamodb = boto3.resource('dynamodb')
 secrets = boto3.client('secretsmanager')
@@ -82,8 +82,8 @@ def send_error_message(phone_number: str, dialect: str):
             print(f"Error message sent successfully to {redact_phone(phone_number)} in {dialect}")
         else:
             status = response.status_code if response else 'no_response'
-            text = response.text if response else 'no_response_body'
-            print(f"Failed to send error message: {status} - {text}")
+            error_body = scrub_numbers(response.text) if response else 'no_response_body'
+            print(f"Failed to send error message: {status} - {error_body}")
     except Exception as e:
         print(f"Exception sending error message to {redact_phone(phone_number)}: {str(e)}")
 

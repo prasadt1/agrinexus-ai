@@ -244,7 +244,9 @@ Resources:
     Properties:
       QueueName: !Sub agrinexus-messages-dlq-${Environment}.fifo
       FifoQueue: true
-      MessageRetentionPeriod: 1209600  # 14 days
+      # A failed message can wait 4 days in the work queue and then land here, and it holds
+      # the sender's number and text. 4 + 3 days keeps it inside the 7-day visitor promise.
+      MessageRetentionPeriod: 259200  # 3 days
       ReceiveMessageWaitTimeSeconds: 20  # Long polling - reduces SQS API calls
 
   # ============================================================================
@@ -268,7 +270,9 @@ Resources:
     Properties:
       QueueName: !Sub agrinexus-messages-beta-dlq-${Environment}.fifo
       FifoQueue: true
-      MessageRetentionPeriod: 1209600  # 14 days
+      # A failed message can wait 4 days in the work queue and then land here, and it holds
+      # the sender's number and text. 4 + 3 days keeps it inside the 7-day visitor promise.
+      MessageRetentionPeriod: 259200  # 3 days
       ReceiveMessageWaitTimeSeconds: 20
 
   # ============================================================================
@@ -292,7 +296,9 @@ Resources:
     Properties:
       QueueName: !Sub agrinexus-voice-dlq-${Environment}.fifo
       FifoQueue: true
-      MessageRetentionPeriod: 1209600  # 14 days
+      # A failed message can wait 4 days in the work queue and then land here, and it holds
+      # the sender's number and text. 4 + 3 days keeps it inside the 7-day visitor promise.
+      MessageRetentionPeriod: 259200  # 3 days
       ReceiveMessageWaitTimeSeconds: 20
 
   # ============================================================================

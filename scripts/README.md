@@ -11,6 +11,7 @@ Scripts actually present in this repo (others may live under `scripts/local/` on
 - `reset-onboard-and-demo.sh` — `--as-visitor` / `--restore` for re:Invent visitor acceptance on the owner number
 - `visitor-acceptance.sh` — Scripted English visitor trigger + question + DELETE (after `--as-visitor`)
 - `set-log-retention.sh` — Sets CloudWatch Logs retention (default 90 days) on all AgriNexus Lambda and canary log groups; run after deploys that add a function
+- `expire-unfinished-signups.py` — One-off after the 3 Oct 2026 change: gives farmer sign-ups that were started and never finished the 7-day expiry new ones get. Dry run by default; `--apply` sets it
 - `vision-replay.py` — Fixed replay set for the vision prompt: runs the sample photos through the first-pass and confirmed-crop paths against real Bedrock (WhatsApp and S3 stubbed) and writes every result to JSON. Run before and after any vision prompt change.
 
 **Deploy:** use the SAM CLI from the repo root (see **README.md**): `sam build --template-file template.yaml` then `sam deploy --config-file samconfig-week2.toml`.

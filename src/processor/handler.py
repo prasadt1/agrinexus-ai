@@ -414,6 +414,8 @@ def handle_onboarding(phone_number: str, message_text: str, profile: Optional[Di
                     'onboarding_state': 'location',
                     'onboarding_complete': False,
                     'demo_tier': 'public',
+                    # Unfinished sign-ups expire; create_user_profile() replaces the row without it.
+                    'ttl': visitor_mod.unfinished_signup_expiry(),
                 }
             )
             location_prompt = {
@@ -442,6 +444,8 @@ def handle_onboarding(phone_number: str, message_text: str, profile: Optional[Di
                 'onboarding_state': 'language',
                 'onboarding_complete': False,
                 'demo_tier': 'public',
+                # Unfinished sign-ups expire; create_user_profile() replaces the row without it.
+                'ttl': visitor_mod.unfinished_signup_expiry(),
             }
         )
         multilingual_welcome = """Welcome to AgriNexus AI! 🌾
@@ -908,7 +912,7 @@ def _run_visitor_sample_vision(from_number: str, profile: Dict[str, Any], wamid:
     visitor_mod.emit_visitor_metric(cloudwatch, "visitor_photo_answered")
 
 
-def _handle_delete_command(from_number: str) -> None:
+def _handle_delete_command(from_number: str, was_visitor: bool = False) -> None:
     visitor_mod.delete_user_conversation_data(table, from_number)
     media_bucket = os.environ.get("TEMP_AUDIO_BUCKET") or ""
     try:
@@ -916,7 +920,10 @@ def _handle_delete_command(from_number: str) -> None:
     except Exception as e:
         print(f"Visitor media delete failed for {redact_phone(from_number)}: {e}")
     visitor_mod.emit_visitor_metric(cloudwatch, "visitor_delete")
-    send_whatsapp_message(from_number, visitor_mod.DELETE_CONFIRM_MSG)
+    send_whatsapp_message(
+        from_number,
+        visitor_mod.VISITOR_DELETE_CONFIRM_MSG if was_visitor else visitor_mod.DELETE_CONFIRM_MSG,
+    )
 
 
 def query_bedrock(query: str, dialect: str = 'hi', session_id: Optional[str] = None) -> Dict[str, Any]:
@@ -926,7 +933,9 @@ def query_bedrock(query: str, dialect: str = 'hi', session_id: Optional[str] = N
     Args:
         query: User's question
         dialect: User's language dialect
-        session_id: Optional session ID for conversation context (uses phone number)
+        session_id: Optional session ID that Bedrock returned from an earlier call. Bedrock
+            issues these itself and rejects any other value, so never pass a phone number.
+            The handler passes none today: every question is answered on its own.
     
     Returns:
         Dict with 'text' and 'citations'
@@ -1039,10 +1048,9 @@ REMEMBER: If the Context above does not contain information to answer the Questi
     # Try with sessionId first (for conversation context)
     if session_id:
         request_params['sessionId'] = session_id
-        print(f"Attempting to use session ID for conversation context: {session_id[:10]}***")
+        print("Continuing an existing Bedrock session")
         try:
             response = bedrock_agent.retrieve_and_generate(**request_params)
-            print(f"Successfully used existing session: {session_id[:10]}***")
             result = {
                 'text': response['output']['text'],
                 'citations': response.get('citations', []),
@@ -1053,7 +1061,7 @@ REMEMBER: If the Context above does not contain information to answer the Questi
         except bedrock_agent.exceptions.ValidationException as e:
             # Session doesn't exist yet, create new one by calling without sessionId
             if 'Session with Id' in str(e) and 'is not valid' in str(e):
-                print(f"Session {session_id[:10]}*** not found, creating new session")
+                print("Bedrock session no longer valid, starting a new one")
                 del request_params['sessionId']
             else:
                 raise
@@ -1062,8 +1070,8 @@ REMEMBER: If the Context above does not contain information to answer the Questi
     response = bedrock_agent.retrieve_and_generate(**request_params)
     
     if session_id:
-        print(f"Created new session: {response.get('sessionId', 'unknown')}")
-    
+        print("Started a new Bedrock session")
+
     result = {
         'text': response['output']['text'],
         'citations': response.get('citations', []),
@@ -1210,13 +1218,30 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                 early_text = list_reply.get('id') or list_reply.get('title', '')
 
         if early_text and visitor_mod.is_delete_command(early_text):
-            _handle_delete_command(from_number)
+            _handle_delete_command(from_number, was_visitor=visitor_mod.is_visitor_profile(profile))
             continue
 
         # re:Invent visitor path: unknown number + trigger phrase → skip farmer onboarding
         if (not profile) and message_type == 'text' and visitor_mod.matches_reinvent_trigger(early_text):
             profile = visitor_mod.create_visitor_profile(table, from_number)
             visitor_mod.emit_visitor_metric(cloudwatch, "visitor_started")
+            welcome = visitor_mod.visitor_welcome_list()
+            send_whatsapp_list(
+                from_number,
+                welcome['content'],
+                welcome['button_text'],
+                welcome['sections'],
+            )
+            continue
+
+        # A visitor who presses the landing page button again sends the same greeting again.
+        # Show the welcome again instead of searching the knowledge base for a greeting. It
+        # costs no model call and none of the day's answers, and the profile keeps its expiry.
+        if (
+            message_type == 'text'
+            and visitor_mod.is_visitor_profile(profile)
+            and visitor_mod.is_visitor_greeting(early_text)
+        ):
             welcome = visitor_mod.visitor_welcome_list()
             send_whatsapp_list(
                 from_number,
@@ -1255,7 +1280,9 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                 if onboarding_response['type'] == 'buttons':
                     send_whatsapp_buttons(from_number, onboarding_response['content'], onboarding_response['buttons'])
                 elif onboarding_response['type'] == 'list':
-                    from common.whatsapp import send_whatsapp_list
+                    # send_whatsapp_list is imported at the top of the module. An import here
+                    # would make the name local to this whole function, and the visitor
+                    # welcome above would then fail with UnboundLocalError.
                     send_whatsapp_list(
                         from_number,
                         onboarding_response['content'],
@@ -1280,23 +1307,6 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                 # Unhandled interactive types (e.g. nfm_reply) and blank text carry nothing
                 # to answer; Bedrock rejects empty input and SQS would retry the ack.
                 print(f"Empty {message_type} payload from {redact_phone(from_number)}; skipping")
-                continue
-
-            # Visitor: switch to farmer onboarding
-            if is_visitor and visitor_mod.is_farmer_onboard_selection(text):
-                visitor_mod.delete_user_conversation_data(table, from_number)
-                onboarding_response = handle_onboarding(from_number, "Hi", None, is_interactive=False)
-                if onboarding_response['type'] == 'list':
-                    send_whatsapp_list(
-                        from_number,
-                        onboarding_response['content'],
-                        onboarding_response['button_text'],
-                        onboarding_response['sections'],
-                    )
-                elif onboarding_response['type'] == 'buttons':
-                    send_whatsapp_buttons(from_number, onboarding_response['content'], onboarding_response['buttons'])
-                else:
-                    send_whatsapp_message(from_number, onboarding_response['content'])
                 continue
 
             # Visitor: sample photo diagnosis (counts against caps)
@@ -1420,14 +1430,11 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                 }
                 send_whatsapp_message(from_number, ack_messages.get(dialect, ack_messages['hi']))
             
-            # Voice: skip Bedrock session so retrieve+generate is not skewed by prior turns;
-            # STT text also differs from typed queries.
-            rag_session = (
-                None
-                if voice_source in ("voice", "voice_test")
-                else from_number
-            )
-            result = query_bedrock(text, dialect, session_id=rag_session)
+            # Every question is answered on its own, typed or spoken. The phone number used to
+            # be passed as the Bedrock session ID here. Bedrock issues session IDs itself and
+            # rejects one chosen by the caller, so that only added a failed first call to every
+            # typed question and put the first ten digits of the number in the log.
+            result = query_bedrock(text, dialect)
             
             response_text = result["text"]
             policy_reply = (

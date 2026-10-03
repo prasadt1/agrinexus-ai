@@ -5,6 +5,7 @@ Converts text responses to speech using Amazon Polly
 import boto3
 import os
 from typing import Optional, Tuple
+from common.redact import redact_phone, text_for_log
 
 polly = boto3.client('polly', region_name='us-east-1')
 s3 = boto3.client('s3', region_name='us-east-1')
@@ -91,7 +92,7 @@ def text_to_speech(text: str, dialect: str, phone_number: str) -> Optional[str]:
             text = text[:2900] + '…'
 
         print(f"Converting text to speech: dialect={dialect}, voice={voice_id}, lang={language_code}, engine={engine}")
-        print(f"Text preview: {text[:100]}... ({len(text)} chars)")
+        print(f"Text to speak: {text_for_log(text, limit=100)}")
         
         # Synthesize speech with appropriate engine
         response = polly.synthesize_speech(
@@ -121,7 +122,8 @@ def text_to_speech(text: str, dialect: str, phone_number: str) -> Optional[str]:
             ExpiresIn=3600
         )
         
-        print(f"Voice output generated: {audio_url}")
+        # The key and the presigned URL hold the full number: log the key with the number masked.
+        print(f"Voice output generated: voice-output/{redact_phone(phone_number)}/{timestamp}.mp3")
         return audio_url
         
     except Exception as e:

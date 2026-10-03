@@ -9,6 +9,7 @@ import boto3
 import requests
 from typing import Optional, Tuple
 from datetime import datetime, timedelta
+from common.redact import message_ref, redact_phone, scrub_numbers, text_for_log
 
 secrets = boto3.client('secretsmanager')
 
@@ -23,9 +24,13 @@ CACHE_TTL_SECONDS = 300  # 5 minutes
 
 
 def _sent_message_ids(response) -> list:
-    """Message IDs from a Graph API send response; its contacts block echoes the full recipient number."""
+    """Log references for the messages in a Graph API send response.
+
+    The response's contacts block echoes the full recipient number, and each message ID
+    holds that number too, so only message_ref() of each ID is returned.
+    """
     try:
-        return [m.get('id') for m in response.json().get('messages', [])]
+        return [message_ref(m.get('id')) for m in response.json().get('messages', [])]
     except Exception:
         return []
 
@@ -107,7 +112,8 @@ def send_whatsapp_message(phone_number: str, message: str, audio_url: Optional[s
                     "link": audio_url
                 }
             }
-            print(f"Sending voice message to {phone_number[:6]}***: {audio_url}")
+            # The audio URL holds the full number in its S3 key (voice-output/{phone}/...): never log it.
+            print(f"Sending voice message to {redact_phone(phone_number)}")
         else:
             # Send text message
             payload = {
@@ -118,7 +124,7 @@ def send_whatsapp_message(phone_number: str, message: str, audio_url: Optional[s
                     "body": message
                 }
             }
-            print(f"Sending text to {phone_number[:6]}***: {message[:50]}...")
+            print(f"Sending text to {redact_phone(phone_number)}: {text_for_log(message)}")
         
         # Retry logic with exponential backoff
         response = None
@@ -136,8 +142,8 @@ def send_whatsapp_message(phone_number: str, message: str, audio_url: Optional[s
             return True
         else:
             status = response.status_code if response else 'no_response'
-            text = response.text if response else 'no_response_body'
-            print(f"Failed to send message: {status} - {text}")
+            error_body = scrub_numbers(response.text) if response else 'no_response_body'
+            print(f"Failed to send message: {status} - {error_body}")
             return False
     
     except Exception as e:
@@ -177,7 +183,7 @@ def send_whatsapp_template(phone_number: str, template_name: str, language_code:
             }
         }
         
-        print(f"Sending template '{template_name}' ({language_code}) to {phone_number[:6]}***...")
+        print(f"Sending template '{template_name}' ({language_code}) to {redact_phone(phone_number)}")
         response = None
         for attempt in range(3):
             try:
@@ -193,8 +199,8 @@ def send_whatsapp_template(phone_number: str, template_name: str, language_code:
             return True
         
         status = response.status_code if response else 'no_response'
-        text = response.text if response else 'no_response_body'
-        print(f"Failed to send template: {status} - {text}")
+        error_body = scrub_numbers(response.text) if response else 'no_response_body'
+        print(f"Failed to send template: {status} - {error_body}")
         return False
     
     except Exception as e:
@@ -239,7 +245,7 @@ def send_whatsapp_buttons(phone_number: str, body_text: str, buttons: list) -> b
             }
         }
 
-        print(f"Sending button message to {phone_number[:6]}***: {body_text[:50]}...")
+        print(f"Sending button message to {redact_phone(phone_number)}: {text_for_log(body_text)}")
         response = None
         for attempt in range(3):
             try:
@@ -255,8 +261,8 @@ def send_whatsapp_buttons(phone_number: str, body_text: str, buttons: list) -> b
             return True
 
         status = response.status_code if response else 'no_response'
-        text = response.text if response else 'no_response_body'
-        print(f"Failed to send button message: {status} - {text}")
+        error_body = scrub_numbers(response.text) if response else 'no_response_body'
+        print(f"Failed to send button message: {status} - {error_body}")
         return False
 
     except Exception as e:
@@ -302,7 +308,7 @@ def send_whatsapp_list(phone_number: str, body_text: str, button_text: str, sect
             }
         }
         
-        print(f"Sending list message to {phone_number[:6]}***: {body_text[:50]}...")
+        print(f"Sending list message to {redact_phone(phone_number)}: {text_for_log(body_text)}")
         response = None
         for attempt in range(3):
             try:
@@ -318,8 +324,8 @@ def send_whatsapp_list(phone_number: str, body_text: str, button_text: str, sect
             return True
         
         status = response.status_code if response else 'no_response'
-        text = response.text if response else 'no_response_body'
-        print(f"Failed to send list message: {status} - {text}")
+        error_body = scrub_numbers(response.text) if response else 'no_response_body'
+        print(f"Failed to send list message: {status} - {error_body}")
         return False
     
     except Exception as e:

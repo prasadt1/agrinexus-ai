@@ -227,7 +227,7 @@ The product identifies the pest or problem and gives non-chemical steps. It does
 
 **REQ-VISITOR-001**: When an unknown number’s first message contains `re:invent` or `reinvent` (case-insensitive), the system shall enter the visitor path and shall not run farmer onboarding.
 
-**REQ-VISITOR-002**: On visitor entry, the system shall reply in English with a short welcome and an interactive list of five sample questions plus a photo-diagnosis option and a farmer-onboarding option.
+**REQ-VISITOR-002** (amended 3 Oct 2026): On visitor entry, the system shall reply in English with a short welcome and an interactive list of five sample questions plus a photo-diagnosis option. Each list row shall carry a title of at most 24 characters and the full question as its description. The list shall offer no way into farmer onboarding, because that path keeps a number and its messages longer than the visitor expiry in REQ-VISITOR-006. When a visitor sends the phrase again as a short greeting (40 characters or fewer), the system shall send the welcome again without a model call and without counting it as an answer.
 
 **REQ-VISITOR-003**: The system shall accept free-text farming questions from visitors in English via the existing RAG path.
 
@@ -235,7 +235,7 @@ The product identifies the pest or problem and gives non-chemical steps. It does
 
 **REQ-VISITOR-005**: While `demo_tier` is `visitor`, the system shall accept visitor-uploaded crop photos through the real vision path, subject to the same visitor answer caps.
 
-**REQ-VISITOR-006**: Visitor profiles shall use `demo_tier=visitor` and `source=reinvent-2026`, with TTL of `VisitorTtlDays` (default 7) on profile and conversation items.
+**REQ-VISITOR-006** (amended 3 Oct 2026): Visitor profiles shall use `demo_tier=visitor` and `source=reinvent-2026`, with TTL of `VisitorTtlDays` (default 7) on profile and conversation items. A farmer sign-up that is not finished shall carry the same TTL; a finished one shall carry none. A failed message shall leave the work queue and its dead-letter queue within `VisitorTtlDays` in total. When a number sends DELETE, the system shall remove every table row under that number (profile, messages, nudge records, pending state), its per-day visitor counters, and the photos and voice files stored under it, and shall tell a visitor how to start again; an allowlist row, if one exists, stays. WAMID dedup rows shall be keyed by a one-way hash of the message ID and shall hold no number.
 
 **REQ-VISITOR-007**: The system shall not send nudges, reminders, or any other proactive messages to visitor-tier numbers.
 
@@ -361,7 +361,7 @@ The product identifies the pest or problem and gives non-chemical steps. It does
 
 **REQ-SEC-005**: The system shall store WhatsApp access token and Weather API key in AWS Secrets Manager (not environment variables).
 
-**REQ-SEC-006**: When storing farmer data, the system shall store only phone_number as PK with no names or Aadhaar numbers.
+**REQ-SEC-006** (amended 3 Oct 2026): When storing farmer data, the system shall store only phone_number as PK with no names or Aadhaar numbers. Log lines shall carry no message or reply text (its length instead), no more than the first three digits of a phone number, no WhatsApp message ID (a one-way reference instead, because the ID contains the number), and no storage key or URL that contains a number. The system shall not send a phone number to Bedrock as a session ID.
 
 **REQ-SEC-007**: The system shall store location as region name (not precise GPS coordinates).
 
