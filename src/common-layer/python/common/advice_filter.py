@@ -519,7 +519,15 @@ _REFERRAL_TOPIC_INDIC = tuple(
 _REFERRAL_VERB_LATIN_RE = re.compile(
     r"(?<![a-z])(?:contact|consult|ask|visit|call|reach out to|check with|speak (?:to|with)|talk to)(?![a-z])"
 )
-_REFERRAL_VERB_INDIC = tuple(_normalize(w) for w in ("संपर्क", "सल्ला", "सलाह", "సంప్రదించ"))
+# "विचार" covers the Marathi "विचारा" / "विचारून पहा" (ask); "पूछ" the Hindi "पूछें".
+_REFERRAL_VERB_INDIC = tuple(
+    _normalize(w) for w in ("संपर्क", "सल्ला", "सलाह", "विचार", "पूछ", "సంప్రదించ", "అడగ")
+)
+
+
+def names_kvk(text: str) -> bool:
+    norm = _normalize(text)
+    return any(k in norm for k in _KVK_MARKERS)
 
 
 def _is_model_referral(segment: str) -> bool:

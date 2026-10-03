@@ -165,6 +165,26 @@ class TestModelReferral:
         assert last not in out
         assert out.startswith(body + "\n\n" + dh.REFERRAL_LINES["photo"][dialect])
 
+    def test_marathi_referral_from_the_text_replay(self):
+        # scripts/text-replay.py against Bedrock, 3 October 2026: the model wrote "ask at the
+        # local KVK" with no "contact" and no "KVK" in Latin script, and the farmer got two.
+        body = "पिवळे चिकट सापळे शेतात २० प्रति हेक्टर वापरा आणि शेतात तण काढून स्वच्छता ठेवा."
+        last = "स्थानिक कृषी विज्ञान केंद्रामध्ये योग्य कीटकनाशक व त्याचे प्रमाण विचारून पहा."
+        out = af.filter_advice(body + "\n\n" + last, "mr", "whatsapp_text", question="कापसावरील पांढरी माशी कशी नियंत्रित करावी?")
+        assert last not in out
+        assert out.startswith(body + "\n\n" + dh.REFERRAL_LINES["answer"]["mr"])
+        assert sum(1 for line in out.split("\n") if af.names_kvk(line)) == 1
+
+    @pytest.mark.parametrize(
+        "last",
+        [
+            "सही कीटनाशक के लिए अपने कृषि विज्ञान केंद्र से पूछें।",
+            "సరైన పురుగుమందు కోసం మీ కృషి విజ్ఞాన కేంద్రాన్ని అడగండి.",
+        ],
+    )
+    def test_ask_verbs_in_hindi_and_telugu(self, last):
+        assert af._is_model_referral(last)
+
     def test_replays_lose_only_closing_referrals(self):
         dropped = set()
         for path in sorted(glob.glob(os.path.join(REPLAY_DIR, "*.json"))):

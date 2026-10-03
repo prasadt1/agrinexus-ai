@@ -490,6 +490,10 @@ def test_text_replay_script_takes_the_same_steps_as_the_text_path(processor):
     assert out["source_labels"] == ["cotton-ipm.pdf"] and "Source: cotton-ipm.pdf" in out["reply_text"]
     c = replay.checks(TIDY, out, result)
     assert c["opener"] and c["markdown"] and c["kvk_lines"] == 1 and c["citations"] == 1
+    assert c["guardrail"] is False
+    mr = {"reply_text": "सापळे लावा.\nकृषी विज्ञान केंद्रामध्ये विचारा.\nजवळच्या कृषी विज्ञान केंद्राशी (KVK) संपर्क साधा.", "source_labels": []}
+    assert replay.checks("सापळे लावा.", mr, {"text": "x", "guardrail_localized": True})["kvk_lines"] == 2
+    assert replay.checks("सापळे लावा.", mr, {"text": "x", "guardrail_localized": True})["guardrail"] is True
 
 
 # Keep a test that uses the webchat fixture last: it drops the processor fixture's
