@@ -55,6 +55,8 @@ SAMPLE_QUESTIONS = [
 ]
 
 SAMPLE_PHOTO_ID = "vq_sample_photo"
+# Caption on the sample photo sent before its diagnosis.
+SAMPLE_PHOTO_CAPTION = "Sample crop photo. Running photo diagnosis on this image..."
 
 SAMPLE_QUESTION_BY_ID = {qid: question for qid, _title, question in SAMPLE_QUESTIONS}
 # Typed instead of tapped: the row title or the full question, in any letter case.

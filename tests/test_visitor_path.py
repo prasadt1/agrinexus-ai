@@ -186,6 +186,7 @@ class TestVisitorMetrics:
         wa = types.ModuleType("common.whatsapp")
         wa.send_whatsapp_message = MagicMock(return_value=True)
         wa.send_whatsapp_list = MagicMock(return_value=True)
+        wa.send_whatsapp_image = MagicMock(return_value=True)
         wa.send_whatsapp_buttons = MagicMock(return_value=True)
         monkeypatch.setitem(sys.modules, "common.whatsapp", wa)
 

@@ -99,6 +99,13 @@ class FakeS3:
     def get_object(self, Bucket, Key):
         return {"Body": types.SimpleNamespace(read=lambda: self.objects[Key])}
 
+    presign_fails = False
+
+    def generate_presigned_url(self, ClientMethod, Params, ExpiresIn):
+        if self.presign_fails:
+            raise RuntimeError("no credentials")
+        return f"https://{Params['Bucket']}.s3.test/{Params['Key']}?X-Amz-Expires={ExpiresIn}&X-Amz-Signature=sig"
+
     def list_objects_v2(self, Bucket, Prefix, **_k):
         return {"Contents": [{"Key": k} for k in sorted(self.objects) if k.startswith(Prefix)]}
 
@@ -123,6 +130,9 @@ class Bot:
 
     def texts(self):
         return [m["text"] for m in self.sent if m["text"]]
+
+    def images(self):
+        return [m for m in self.sent if m.get("image_url")]
 
     def _deliver(self, kind, message, phone):
         self._n += 1
@@ -420,6 +430,42 @@ class TestQuestions:
         bot.pick("vq_sample_photo", "Photo diagnosis")
         assert bot.texts()[-1].startswith("SAMPLE PHOTO ADVICE")
         assert "visitor_photo_answered" in bot.metrics
+
+    def test_sample_photo_is_shown_before_its_diagnosis(self, bot):
+        """The visitor sees the photo, so the diagnosis can be checked against it."""
+        bot.text("Hi from re:Invent")
+        bot.pick("vq_sample_photo", "Photo diagnosis")
+        (image,) = bot.images()
+        assert image["to"] == PHONE
+        assert "/visitor-samples/crop-leaf.jpg?" in image["image_url"]
+        assert "X-Amz-Expires=600" in image["image_url"]  # a short-lived link, the bucket stays private
+        assert image["caption"] == bot.mod.visitor_mod.SAMPLE_PHOTO_CAPTION
+        photo_at = bot.sent.index(image)
+        advice_at = next(i for i, m in enumerate(bot.sent) if (m["text"] or "").startswith("SAMPLE PHOTO ADVICE"))
+        assert photo_at < advice_at
+        assert not any("Running photo diagnosis on a sample crop image" in t for t in bot.texts())
+
+    def test_sample_photo_falls_back_to_text_notice_when_the_image_cannot_be_sent(self, bot):
+        bot.mod.send_whatsapp_image = lambda *_a, **_k: False
+        bot.text("Hi from re:Invent")
+        bot.pick("vq_sample_photo", "Photo diagnosis")
+        assert "✓ Running photo diagnosis on a sample crop image..." in bot.texts()
+        assert bot.texts()[-1].startswith("SAMPLE PHOTO ADVICE")
+
+    def test_sample_photo_falls_back_when_no_link_can_be_made(self, bot):
+        bot.s3.presign_fails = True
+        bot.text("Hi from re:Invent")
+        bot.pick("vq_sample_photo", "Photo diagnosis")
+        assert bot.images() == []
+        assert "✓ Running photo diagnosis on a sample crop image..." in bot.texts()
+        assert bot.texts()[-1].startswith("SAMPLE PHOTO ADVICE")
+
+    def test_missing_sample_photo_sends_no_image(self, bot):
+        del bot.s3.objects["visitor-samples/crop-leaf.jpg"]
+        bot.text("Hi from re:Invent")
+        bot.pick("vq_sample_photo", "Photo diagnosis")
+        assert bot.images() == []
+        assert bot.texts()[-1].startswith("Sample photo is temporarily unavailable")
 
     def test_eleventh_answer_of_the_day_is_refused_without_a_model_call(self, bot, monkeypatch):
         bot.text("Hi from re:Invent")

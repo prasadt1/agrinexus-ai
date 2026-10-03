@@ -72,6 +72,12 @@ def _install_common_stubs(sent_messages):
     whatsapp.send_whatsapp_message = send_whatsapp_message
     whatsapp.send_whatsapp_buttons = send_whatsapp_buttons
     whatsapp.send_whatsapp_list = send_whatsapp_list
+
+    def send_whatsapp_image(phone_number: str, image_url: str, caption=None):
+        sent_messages.append({"to": phone_number, "text": None, "image_url": image_url, "caption": caption})
+        return True
+
+    whatsapp.send_whatsapp_image = send_whatsapp_image
     sys.modules["common.whatsapp"] = whatsapp
 
     allowlist = types.ModuleType("common.allowlist")

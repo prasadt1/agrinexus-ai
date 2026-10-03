@@ -47,6 +47,7 @@ def _install_common_stubs(sent_messages):
     whatsapp.send_whatsapp_message = send_whatsapp_message
     whatsapp.send_whatsapp_list = send_whatsapp_list
     whatsapp.send_whatsapp_buttons = send_whatsapp_buttons
+    whatsapp.send_whatsapp_image = lambda *_a, **_k: True
     whatsapp.VOICE_RECEIVED_ACK = {"hi": "ACK"}
     sys.modules["common.whatsapp"] = whatsapp
 

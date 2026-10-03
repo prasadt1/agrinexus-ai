@@ -151,6 +151,58 @@ def send_whatsapp_message(phone_number: str, message: str, audio_url: Optional[s
         return False
 
 
+def send_whatsapp_image(phone_number: str, image_url: str, caption: Optional[str] = None) -> bool:
+    """
+    Send an image by URL (WhatsApp fetches it), with an optional caption.
+
+    Used to show the re:Invent visitor the sample crop photo before its diagnosis, so the
+    visitor can judge the reply against the picture. The URL is a short-lived presigned S3
+    link and carries a signature: never log it.
+
+    Returns:
+        True if WhatsApp accepted the message, False otherwise
+    """
+    try:
+        access_token, phone_number_id = get_whatsapp_credentials()
+        url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+        image = {"link": image_url}
+        if caption:
+            image["caption"] = caption
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": phone_number,
+            "type": "image",
+            "image": image,
+        }
+        print(f"Sending image to {redact_phone(phone_number)}")
+
+        response = None
+        for attempt in range(3):
+            try:
+                response = requests.post(url, headers=headers, json=payload, timeout=5)
+                if response.status_code < 500 and response.status_code != 429:
+                    break
+            except requests.RequestException as e:
+                print(f"WhatsApp request error (attempt {attempt + 1}): {e}")
+            time.sleep(0.5 * (2 ** attempt))
+
+        if response is not None and response.status_code == 200:
+            print(f"Image sent successfully: {_sent_message_ids(response)}")
+            return True
+        status = response.status_code if response is not None else 'no_response'
+        error_body = scrub_numbers(response.text) if response is not None else 'no_response_body'
+        print(f"Failed to send image: {status} - {error_body}")
+        return False
+
+    except Exception as e:
+        print(f"Exception sending WhatsApp image: {e}")
+        return False
+
+
 def send_whatsapp_template(phone_number: str, template_name: str, language_code: str) -> bool:
     """
     Send WhatsApp template message
