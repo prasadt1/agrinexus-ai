@@ -9,7 +9,7 @@ import time
 import urllib.request
 from typing import Dict, Any, Optional
 from common.whatsapp import get_whatsapp_credentials, send_whatsapp_message
-from common.redact import redact_phone
+from common.redact import redact_phone, text_for_log
 
 transcribe = boto3.client('transcribe')
 s3 = boto3.client('s3')
@@ -86,7 +86,7 @@ def _finalize_transcription(
         transcript_data = json.loads(response.read())
     transcript_text = transcript_data['results']['transcripts'][0]['transcript']
     confidence = get_average_confidence(transcript_data)
-    print(f"Transcription complete: '{transcript_text}' (confidence: {confidence:.2f})")
+    print(f"Transcription complete: {text_for_log(transcript_text)} (confidence: {confidence:.2f})")
     s3.delete_object(Bucket=TEMP_BUCKET, Key=s3_key)
     transcribe.delete_transcription_job(TranscriptionJobName=job_name)
     if confidence >= 0.5:
@@ -237,7 +237,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 MessageGroupId=from_number,
                 MessageDeduplicationId=f"{wamid}-transcribed"
             )
-            print(f"Queued transcribed text for processing: {result['text']}")
+            print(f"Queued transcribed text for processing: {text_for_log(result['text'])}")
         else:
             # Send error message
             error_messages = {
