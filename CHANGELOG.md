@@ -4,6 +4,15 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 3 October 2026 — soybean sample question, document titles in the source line (not deployed)
+
+- **Soybean sample refused often.** "How often should I irrigate soybean?" returned the no-information reply in four of nine replays on 3 October, with the old and the new prompt alike. The knowledge base covers when soybean needs water (dry spells at flowering and pod filling, about 75% soil moisture) but gives no schedule, so the model often judged the context insufficient for "how often". The row keeps its title "Irrigating soybean" and now sends "When does soybean need irrigation?". Not replayed yet.
+- **Source line showed generated file names.** Most cited files are stored under names such as `cotton-08-e75ba3c0.pdf`. `common/source_labels.py` now names a document by the `title` metadata attribute Bedrock returns with each citation, and falls back to the file name. WhatsApp text answers and the web chat `citations` both use it. The titles do not exist yet: `scripts/kb-titles.py` lists the documents in the knowledge base's S3 data source, suggests a title for each (the repo's `kb_manifest.csv`, then the PDF's Title field, then its first line) into `data/fao-pdfs/kb-titles.json` for review, and with `--apply` writes a `<file>.metadata.json` sidecar per document and starts an ingestion job.
+- **Source line no longer passes through the advice filter.** `filter_advice()` takes the source line as its own argument and places it between the advice and the referral footer without filtering it, since a document title such as "Neonicotinoid use in cotton" would otherwise be removed as a chemical class. The handler builds that line only from retrieval metadata, after removing any source line the model wrote.
+- 13 new tests; full suite 1044 passed, 30 skipped. `scripts/kb-titles.py` was exercised against stubbed AWS clients only.
+
+---
+
 ## 3 October 2026 — text answers: source line from Bedrock citations (not deployed)
 
 - **Text answers named no source.** Two live replies on 3 October carried no source line. The code adds one only from the document names in Bedrock's citations, and those have been empty since April (ADR 0005). Cause: both knowledge-base prompts are custom templates without `$output_format_instructions$`. AWS lists that placeholder as required and says: "Without this placeholder, the response won't contain citations."

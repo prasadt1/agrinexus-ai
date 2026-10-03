@@ -296,7 +296,7 @@ class TestFirstMessage:
             ("Yellow wheat leaves", "Why are my wheat leaves yellowing?"),
             ("Spraying after rain", "When is it safe to spray after rain?"),
             ("Bollworm on cotton", "How do I manage bollworm on cotton?"),
-            ("Irrigating soybean", "How often should I irrigate soybean?"),
+            ("Irrigating soybean", "When does soybean need irrigation?"),
             ("Photo diagnosis", "Show me a photo diagnosis (sample crop image)"),
         ]
 
@@ -360,7 +360,7 @@ class TestQuestions:
         ("vq_yellowing", "Why are my wheat leaves yellowing?"),
         ("vq_spray", "When is it safe to spray after rain?"),
         ("vq_bollworm", "How do I manage bollworm on cotton?"),
-        ("vq_irrigation", "How often should I irrigate soybean?"),
+        ("vq_irrigation", "When does soybean need irrigation?"),
     ])
     def test_every_list_row_sends_its_full_question_to_the_model(self, bot, row_id, question):
         bot.text("Hi from re:Invent")

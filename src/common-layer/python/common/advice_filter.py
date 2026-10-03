@@ -577,6 +577,7 @@ def filter_advice(
     district: Optional[str] = None,
     add_referral: bool = True,
     question: Optional[str] = None,
+    source_line: Optional[str] = None,
 ) -> str:
     """
     Remove chemical product and dose advice from a farmer-facing message and make
@@ -587,6 +588,10 @@ def filter_advice(
     KVK referral is dropped when the footer follows, and, when the farmer's question
     is passed and did not ask about a pesticide, an opening "I cannot recommend
     pesticides" sentence is dropped.
+
+    source_line is the system's own line naming the cited documents. It goes after the
+    advice and before the referral footer, and is not filtered: document titles are not
+    advice, and a title such as "Neonicotinoid use in cotton" would otherwise be removed.
     """
     if not text:
         return text
@@ -618,6 +623,8 @@ def filter_advice(
 
     if add_referral:
         out = _drop_model_referral(out)
+    if source_line:
+        out = (out + "\n\n" + source_line.strip()).strip()
     if add_referral and not _has_referral(out):
         footer = referral_footer(dialect, kind, district)
         if KISAN_CALL_CENTRE in out:
