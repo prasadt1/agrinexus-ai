@@ -13,7 +13,9 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
-## 3 October 2026 — text answers: source line from Bedrock citations (not deployed)
+## 3 October 2026 — text answers: source line from Bedrock citations (deployed 3 October 2026)
+
+- **Deployed 3 October 2026, about 22:30 CEST**, together with the entry below. Live check the same evening from a reset visitor number (`--as-visitor`): "Whitefly on cotton" returned a plain-text answer of about 90 words with "Source: icar-cicr-pest-disease-advisory-2024.pdf, cotton-08-e75ba3c0.pdf" above one KVK footer, and named no chemical class. Web chat and the other languages were not re-tested live.
 
 - **Text answers named no source.** Two live replies on 3 October carried no source line. The code adds one only from the document names in Bedrock's citations, and those have been empty since April (ADR 0005). Cause: both knowledge-base prompts are custom templates without `$output_format_instructions$`. AWS lists that placeholder as required and says: "Without this placeholder, the response won't contain citations."
 - **Change.** Both prompts carry `$output_format_instructions$` after `$search_results$`. The processor prompt's "DO NOT add any source citation" and the web chat prompt's "End with exactly ONE final line ... Source:" are replaced by one rule: no line beginning with "Source:" in the answer, cite only as the output format instructions ask. Code is unchanged: `source_labels_from_citations()` and the web chat already turn returned citations into document file names. ADR 0005 amended.
@@ -26,7 +28,7 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
-## 3 October 2026 — text answers: no chemical class names, shorter answers, text replay (not deployed)
+## 3 October 2026 — text answers: no chemical class names, shorter answers, text replay (deployed 3 October 2026)
 
 From the second live reply to the visitor sample question "Whitefly on cotton" (3 October, after the tidy rules below were deployed).
 
