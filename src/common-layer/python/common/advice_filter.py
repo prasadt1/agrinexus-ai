@@ -7,9 +7,9 @@ on any channel; chemical choice and rate are referred to the farmer's KVK.
 Prompts ask the model for this, but prompts are not a control: every advice
 message passes through filter_advice() before it is sent or spoken.
 
-A sentence (or numbered step) that names an active ingredient or brand, gives a
-formulation strength (e.g. "50% EC"), or gives a dilution (e.g. "2 ml per litre")
-is dropped. A bare quantity ("500 g", "10 litres") is dropped only when the same
+A sentence (or numbered step) that names an active ingredient, a brand or a chemical
+class (e.g. "pyrethroids"), gives a formulation strength (e.g. "50% EC"), or gives a
+dilution (e.g. "2 ml per litre") is dropped. A bare quantity ("500 g", "10 litres") is dropped only when the same
 sentence is about spraying, mixing, a pesticide, neem or a trap, so fertilizer
 and irrigation amounts survive. Neem, sticky traps and pheromone traps are
 allowed as practices; a quantity attached to them is not.
@@ -150,6 +150,22 @@ _SUFFIX_INDIC_RE = re.compile(
     )) + r")"
 )
 
+# Chemical classes. A class is not a product, but a sentence that names one still tells
+# the farmer which kind of chemical to use or to avoid, and that choice belongs to the KVK.
+_CLASS_LATIN_RE = re.compile(
+    r"(?<![a-z])(?:pyrethr(?:oid|in)s?|organo-?phosph(?:ate|orus)[a-z]*|organo-?chlorines?"
+    r"|neonicotinoids?|neonics?|carbamates?|diamides?|triazoles?|strobilurins?"
+    r"|benzimidazoles?|avermectins?|sulfonylureas?)(?![a-z])"
+)
+# Devanagari stems as the class names are usually transliterated. Telugu is not covered.
+_CLASS_INDIC = tuple(
+    _normalize(x)
+    for x in (
+        "पायरेथ्र", "पाइरेथ्र", "पायरिथ्र", "ऑर्गनोफॉस्फ", "ऑर्गेनोफॉस्फ", "ऑर्गॅनोफॉस्फ",
+        "निओनिकोटिन", "नियोनिकोटिन", "कार्बामेट",
+    )
+)
+
 _LATIN_TERMS = tuple(_normalize(t) for t in _ACTIVES_LATIN + _BANNED_IN_INDIA + _BRANDS if t.isascii())
 _INDIC_TERMS = tuple(dict.fromkeys(
     _normalize(t) for t in _ACTIVES_INDIC + _BANNED_IN_INDIA + _BRANDS if not t.isascii()
@@ -287,7 +303,7 @@ def _is_orphan_repeat(segment: str) -> bool:
 
 
 def classify(segment: str) -> Set[str]:
-    """Kinds of chemical advice found in one sentence: active, formulation, dose."""
+    """Kinds of chemical advice found in one sentence: active, class, formulation, dose."""
     norm = _normalize(segment)
     kinds: Set[str] = set()
     if (
@@ -299,6 +315,8 @@ def classify(segment: str) -> Set[str]:
         or _SUFFIX_INDIC_RE.search(norm)
     ):
         kinds.add("active")
+    if _CLASS_LATIN_RE.search(norm) or any(t in norm for t in _CLASS_INDIC):
+        kinds.add("class")
     if _FORMULATION_RE.search(norm):
         kinds.add("formulation")
     fertilizer = any(w in norm for w in _FERTILIZER_OR_SEED)
