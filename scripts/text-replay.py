@@ -23,10 +23,11 @@ Checks per reply (heuristics; read the stored text):
   words        words in the model's answer (the prompt asks for under 100)
   opener       the model opened with "I cannot recommend ..." (wanted only for a pesticide question)
   markdown     the model wrote ** or # markup
-  kvk_lines    lines naming the KVK in the farmer's reply (wanted: 1, the footer)
+  kvk_lines    lines naming the KVK, in any script, in the farmer's reply (wanted: 1, the footer)
   sources      document names from retrieval metadata (wanted: at least 1 for an answer)
   filter       kinds the advice filter matched in the model's answer
   marker       NO_KB_ANSWER / NOT_FARMING replaced by the fixed refusal
+  guardrail    the Bedrock guardrail stepped in and the fixed refusal was sent
 """
 from __future__ import annotations
 
@@ -115,11 +116,12 @@ def checks(model_text: str, reply: dict, result: dict) -> dict:
         "words": len(model_text.split()),
         "opener": bool(advice_filter._REFUSAL_OPENER_RE.match(model_text)),
         "markdown": "**" in model_text or bool(re.search(r"^#{1,6}\s", model_text, re.M)),
-        "kvk_lines": sum(1 for line in reply["reply_text"].split("\n") if "KVK" in line),
+        "kvk_lines": sum(1 for line in reply["reply_text"].split("\n") if advice_filter.names_kvk(line)),
         "sources": reply["source_labels"],
         "citations": len(result.get("citations") or []),
         "filter": kinds,
         "marker": bool(result.get("kb_no_answer") or result.get("kb_not_farming")),
+        "guardrail": bool(result.get("guardrail_localized")),
     }
 
 
@@ -162,7 +164,7 @@ def main() -> int:
             print(f"\n=== [{dialect}] {question}   (expect: {expect}, {time.time() - started:.1f}s)")
             print(f"words={c['words']} opener={c['opener']} markdown={c['markdown']} kvk_lines={c['kvk_lines']} "
                   f"citations={c['citations']} sources={c['sources']} filter={c['filter']} marker={c['marker']} "
-                  f"policy={reply['policy_reply']}")
+                  f"guardrail={c['guardrail']} policy={reply['policy_reply']}")
             print("--- farmer reply")
             print(reply["reply_text"])
             results.append({
