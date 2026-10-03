@@ -56,12 +56,20 @@
             z-index: 1;
         }
 
+        /* Compact header: logo, name and language on one line, then the tagline, the award and the
+           "how this works" fold. It used to be 316 px tall and pushed the input off a laptop screen. */
         .header {
             background: linear-gradient(135deg, #2D8B4E 0%, #1a5c32 100%);
             color: white;
-            padding: 24px 20px;
-            text-align: center;
+            padding: 16px 20px;
+            text-align: left;
             position: relative;
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr) auto;
+            column-gap: 12px;
+            row-gap: 10px;
+            align-items: center;
+            flex-shrink: 0;
         }
 
         .header::after {
@@ -75,45 +83,50 @@
         }
 
         .logo {
-            width: 48px;
-            height: 48px;
-            margin: 0 auto 12px;
+            grid-column: 1;
+            grid-row: 1;
+            width: 44px;
+            height: 44px;
+            margin: 0;
             background: white;
             border-radius: 12px;
-            padding: 8px;
+            padding: 6px;
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        .logo svg { width: 100%; height: 100%; display: block; }
+        .logo svg, .logo img { width: 100%; height: 100%; display: block; }
 
-        .header h1 { font-size: 26px; margin-bottom: 6px; font-weight: 700; }
-        .header p { font-size: 14px; opacity: 0.95; font-weight: 400; }
+        .header h1 { grid-column: 2; grid-row: 1; font-size: 24px; margin: 0; font-weight: 700; }
+        .header > p { grid-column: 1 / -1; grid-row: 2; font-size: 14px; opacity: 0.95; font-weight: 400; }
 
-        .finalist-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            margin: 10px auto 0;
-            padding: 6px 12px;
-            border-radius: 999px;
+        /* Award line: exact wording, links to AWS's own winners announcement. Wraps to two lines on a phone. */
+        .award-badge {
+            grid-column: 1 / -1;
+            grid-row: 3;
+            display: block;
+            margin: 0;
+            text-align: center;
+            padding: 8px 14px;
+            border-radius: 14px;
             background: rgba(255, 255, 255, 0.14);
             border: 1px solid rgba(255, 255, 255, 0.25);
             color: rgba(255, 255, 255, 0.95);
             text-decoration: none;
-            font-size: 12px;
+            font-size: 13px;
+            line-height: 1.35;
             font-weight: 700;
+            text-wrap: balance;
             backdrop-filter: blur(8px);
         }
-        .finalist-badge:hover { background: rgba(255, 255, 255, 0.20); }
+        .award-badge:hover { background: rgba(255, 255, 255, 0.20); }
 
         .how-it-works {
-            margin-top: 12px;
+            grid-column: 1 / -1;
+            grid-row: 4;
+            margin: 0;
             text-align: left;
-            max-width: 560px;
-            margin-left: auto;
-            margin-right: auto;
             background: rgba(255, 255, 255, 0.14);
             border: 1px solid rgba(255, 255, 255, 0.32);
             border-radius: 14px;
@@ -150,7 +163,7 @@
             opacity: 0.95;
         }
 
-        .language-selector { margin-top: 12px; }
+        .language-selector { grid-column: 3; grid-row: 1; margin: 0; }
         .language-selector select {
             padding: 10px 20px;
             border-radius: 20px;
@@ -269,18 +282,23 @@
         .error-message { background: #ff4444; color: white; padding: 12px; border-radius: 12px; margin: 10px 20px; text-align: center; font-size: 14px; animation: fadeIn 0.3s ease-in; }
         .privacy-notice { font-size: 11px; color: #999; text-align: center; padding: 12px 20px; padding-bottom: calc(20px + env(safe-area-inset-bottom)); background: #f9f9f9; border-top: 1px solid #e0e0e0; flex-shrink: 0; }
 
+        /* Tap targets: 44 px high, 14 px text, so a thumb can hit them on a phone. */
         .sample-question-btn {
-            display: inline-block;
-            padding: 6px 12px;
-            margin: 3px;
+            flex: none;
+            display: inline-flex;
+            align-items: center;
+            min-height: 44px;
+            padding: 0 16px;
             background: linear-gradient(135deg, #f0f8f4 0%, #e8f5ed 100%);
             border: 1px solid #2D8B4E;
-            border-radius: 14px;
-            font-size: 11px;
+            border-radius: 22px;
+            font-family: inherit;
+            font-size: 14px;
             color: #1a5c32;
             cursor: pointer;
             transition: all 0.2s;
             font-weight: 500;
+            white-space: nowrap;
         }
         .sample-question-btn:hover {
             background: linear-gradient(135deg, #2D8B4E 0%, #1a5c32 100%);
@@ -288,13 +306,47 @@
             transform: translateY(-1px);
             box-shadow: 0 2px 8px rgba(45, 139, 78, 0.3);
         }
-        .sample-questions-container { display: flex; flex-wrap: wrap; gap: 3px; }
+        /* One row of questions; on a phone it scrolls sideways instead of taking screen height. */
+        .sample-questions-container { display: flex; flex-wrap: wrap; gap: 8px; }
+        .whatsapp-link {
+            flex: none;
+            display: inline-flex;
+            align-items: center;
+            min-height: 44px;
+            padding: 0 16px;
+            white-space: nowrap;
+            font-size: 14px;
+            color: #1a5c32;
+            text-decoration: none;
+            font-weight: 700;
+            border: 1px solid #2D8B4E;
+            border-radius: 22px;
+            background: #f0f8f4;
+        }
+        .privacy-notice a { display: inline-block; padding: 8px 4px; color: #2D8B4E; text-decoration: underline; font-size: 13px; }
 
+        /* Short laptop windows: a smaller chat area keeps the input on screen. */
+        @media (min-width: 601px) and (max-height: 840px) {
+            .chat-messages { min-height: 140px; }
+        }
+
+        /* Phone layout: no tagline and smaller type, so the chat, the sample questions and the input
+           all show without scrolling on a 390 x 664 screen. */
         @media (max-width: 600px) {
+            .sample-questions-container { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 6px; -webkit-overflow-scrolling: touch; }
             body { padding: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
             .container { height: calc(100dvh - 20px); max-height: calc(100dvh - 20px); border-radius: 18px; }
-            .header h1 { font-size: 22px; }
+            .header { column-gap: 10px; row-gap: 8px; padding: 12px 14px; }
+            .logo { width: 36px; height: 36px; padding: 5px; border-radius: 10px; }
+            .header h1 { font-size: 20px; }
+            .header > p { display: none; }
+            .language-selector select { padding: 8px 10px; font-size: 13px; border-radius: 14px; max-width: 132px; }
+            .award-badge { grid-row: 2; padding: 7px 12px; font-size: 12px; }
+            .how-it-works { grid-row: 3; }
+            .chat-messages { min-height: 120px; padding: 14px; }
             .message-content { max-width: 85%; }
+            .input-area { padding: 12px 14px; }
+            .privacy-notice { padding: 8px 14px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
         }
     </style>
 </head>
@@ -305,16 +357,16 @@
                 <img src="./assets/logo.png" alt="AgriNexus AI logo" width="32" height="32" style="display:block;">
             </div>
             <h1>AgriNexus AI</h1>
-            <p>Your farming advisor — ask about crops, pests, fertilizers, and timing</p>
-            <a class="finalist-badge" href="https://builder.aws.com/content/3C8hBRTcsRuQrHzE3Pq243yhXTF/aideas-finalist-agrinexus-ai" target="_blank" rel="noopener noreferrer">
-                🏆 AWS 10,000 AIdeas — Top 50 Finalist
+            <p>Your farming advisor. Ask about crops, pests, fertilizers and timing.</p>
+            <a class="award-badge" href="https://builder.aws.com/content/3D5gTWIjP2zvKncBZBCs849xRqn/aws-10000-aideas-competition-meet-the-winners" target="_blank" rel="noopener noreferrer">
+                Winner, Innovation Award (APJC), AWS 10,000 AIdeas Competition
             </a>
             <details class="how-it-works">
                 <summary>How this works (web demo)</summary>
                 <div class="how-body">
                     - This is an AI advisor demo with a mock farmer profile (text-only).<br>
-                    - Rate limit: ~5 questions/hour (abuse protection).<br>
-                    - For farming only — not medical/legal advice.
+                    - Rate limit: 5 questions an hour (abuse protection).<br>
+                    - For farming only. Not medical or legal advice.
                 </div>
             </details>
             <div class="language-selector">
@@ -330,22 +382,24 @@
         <div class="chat-messages" id="chatMessages">
             <div class="message bot">
                 <div class="message-content">
-                    Welcome to AgriNexus AI!<br><br>
+                    Welcome to AgriNexus AI!<br>
                     Ask a farming question (text-only web demo).<br>
                     <small style="opacity: 0.8; margin-top: 8px; display: block;">You have 5 free questions per hour</small>
                 </div>
             </div>
         </div>
 
-        <div id="sampleQuestions" style="padding: 10px 20px; background: #fafafa; border-top: 1px solid #e8e8e8; border-bottom: 1px solid #e8e8e8; flex-shrink: 0; max-height: 160px; overflow-y: auto;">
-            <div style="font-size: 11px; color: #666; margin-bottom: 6px; font-weight: 600;">💡 Try these questions:</div>
+        <div id="sampleQuestions" style="padding: 10px 20px; background: #fafafa; border-top: 1px solid #e8e8e8; border-bottom: 1px solid #e8e8e8; flex-shrink: 0;">
+            <div style="font-size: 13px; color: #666; margin-bottom: 8px; font-weight: 600;">💡 Try these questions:</div>
             <div class="sample-questions-container"></div>
             <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #d9e6de; display:flex; align-items:center; justify-content: space-between; gap: 10px;">
-                <div style="font-size: 11px; color:#2d5a3d; line-height:1.3;">
-                    <strong>Full experience:</strong> WhatsApp (voice/photo/nudges)
+                <div style="font-size: 13px; color:#2d5a3d; line-height:1.3;">
+                    <strong>On WhatsApp:</strong> send a crop photo too
                 </div>
-                <a href="https://wa.me/4915120105731" target="_blank" rel="noopener noreferrer" style="white-space:nowrap; font-size: 11px; color:#1a5c32; text-decoration:none; font-weight: 800; border:1px solid #2D8B4E; padding: 6px 10px; border-radius: 999px; background: #f0f8f4;">
-                    💬 Open WhatsApp →
+                <!-- Goes through the landing page: it says what the WhatsApp demo stores and holds the one link
+                     that starts the visitor path ("Hi from re:Invent"). A bare wa.me link starts farmer onboarding. -->
+                <a class="whatsapp-link" href="../try/">
+                    Try it on WhatsApp
                 </a>
             </div>
         </div>
@@ -369,11 +423,12 @@
             <div style="margin-bottom: 8px; color: #666;">
                 🔒 Privacy-friendly demo. No phone number required.
             </div>
-            <div style="font-size: 10px; color: #666; margin-bottom: 8px;">
+            <div style="font-size: 12px; color: #666; margin-bottom: 4px;">
                 Note: This web demo is text-only (RAG queries). Rate limited to 5 questions/hour.
             </div>
-            <div style="font-size: 10px; color: #666;">
-                Feedback? <a href="https://github.com/prasadt1/agrinexus-ai/issues/new" target="_blank" style="color: #2D8B4E; text-decoration: none;">Submit on GitHub</a>
+            <div style="font-size: 13px; color: #666;">
+                <a href="../try/">Privacy and Impressum</a>
+                <a href="https://github.com/prasadt1/agrinexus-ai/issues/new" target="_blank" rel="noopener noreferrer">Feedback on GitHub</a>
             </div>
         </div>
     </div>
@@ -454,12 +509,12 @@
                 const userLabel = NUDGE_DEMO_LABEL[lang] || NUDGE_DEMO_LABEL.en;
                 addMessage(userLabel, false);
                 const msg = {
-                    en: "Nudge demo flow (WhatsApp full tier):\n\n☀️ Weather favorable → 🔔 Spray nudge sent → Farmer replies 'DONE' or 'NOT YET' → If 'NOT YET': T+24h and T+48h reminders → On 'DONE': reminders cancelled instantly.\n\nThis closed-loop runs on WhatsApp only (voice, photo, nudges). Try it there for the full experience.",
-                    hi: "नज डेमो फ्लो (WhatsApp full tier):\n\n☀️ मौसम अनुकूल → 🔔 स्प्रे नज भेजा → किसान 'हो गया' या 'अभी नहीं' बोलता है → 'अभी नहीं' पर: T+24h और T+48h रिमाइंडर → 'हो गया' पर: रिमाइंडर तुरंत बंद।\n\nयह क्लोज्ड-लूप सिर्फ WhatsApp पर चलता है (वॉइस, फोटो, नज)। पूरा अनुभव वहाँ ट्राय करें।",
-                    mr: "नज डेमो फ्लो (WhatsApp full tier):\n\n☀️ हवामान अनुकूल → 🔔 फवारणी नज पाठवला → शेतकरी 'झाला' किंवा 'अजून नाही' म्हणतो → 'अजून नाही' वर: T+24h आणि T+48h रिमाइंडर → 'झाला' वर: रिमाइंडर लगेच बंद।\n\nहा क्लोज्ड-लूप फक्त WhatsApp वर चालतो (व्हॉइस, फोटो, नज). पूर्ण अनुभवासाठी तिथे ट्राय करा.",
-                    te: "నజ్ డెమో ఫ్లో (WhatsApp full tier):\n\n☀️ వాతావరణం అనుకూలం → 🔔 స్ప్రే నజ్ పంపబడింది → రైతు 'అయ్యింది' లేదా 'ఇంకా లేదు' అని చెప్తారు → 'ఇంకా లేదు' అయితే: T+24h మరియు T+48h రిమైండర్లు → 'అయ్యింది' అయితే: రిమైండర్లు వెంటనే ఆపబడతాయి.\n\nఈ క్లోజ్డ్-లూప్ WhatsApp లో మాత్రమే నడుస్తుంది (వాయిస్, ఫోటో, నజ్). పూర్తి అనుభవం కోసం అక్కడ ప్రయత్నించండి."
+                    en: "Nudge demo flow (WhatsApp full tier):\n\n☀️ Weather favorable → 🔔 Spray nudge sent → Farmer replies 'DONE' or 'NOT YET' → If 'NOT YET': T+24h and T+48h reminders → On 'DONE': reminders cancelled instantly.\n\nThis loop runs on WhatsApp for enrolled test numbers. Demo visitors get no reminders.",
+                    hi: "नज डेमो फ्लो (WhatsApp full tier):\n\n☀️ मौसम अनुकूल → 🔔 स्प्रे नज भेजा → किसान 'हो गया' या 'अभी नहीं' बोलता है → 'अभी नहीं' पर: T+24h और T+48h रिमाइंडर → 'हो गया' पर: रिमाइंडर तुरंत बंद।\n\nयह लूप WhatsApp पर नामांकित टेस्ट नंबरों के लिए चलता है। डेमो विज़िटर को रिमाइंडर नहीं मिलते।",
+                    mr: "नज डेमो फ्लो (WhatsApp full tier):\n\n☀️ हवामान अनुकूल → 🔔 फवारणी नज पाठवला → शेतकरी 'झाला' किंवा 'अजून नाही' म्हणतो → 'अजून नाही' वर: T+24h आणि T+48h रिमाइंडर → 'झाला' वर: रिमाइंडर लगेच बंद।\n\nहा लूप WhatsApp वर नोंदणीकृत टेस्ट नंबरांसाठी चालतो. डेमो पाहुण्यांना रिमाइंडर मिळत नाहीत.",
+                    te: "నజ్ డెమో ఫ్లో (WhatsApp full tier):\n\n☀️ వాతావరణం అనుకూలం → 🔔 స్ప్రే నజ్ పంపబడింది → రైతు 'అయ్యింది' లేదా 'ఇంకా లేదు' అని చెప్తారు → 'ఇంకా లేదు' అయితే: T+24h మరియు T+48h రిమైండర్లు → 'అయ్యింది' అయితే: రిమైండర్లు వెంటనే ఆపబడతాయి.\n\nఈ లూప్ WhatsApp లో నమోదైన టెస్ట్ నంబర్లకు నడుస్తుంది. డెమో సందర్శకులకు రిమైండర్లు రావు."
                 }[lang] || "Nudge demo flow: Weather → nudge → DONE/NOT YET → reminders → cancel on DONE.";
-                // Local canned explainer (no KB/API call) — do not show Sources.
+                // Local canned explainer (no KB/API call): do not show Sources.
                 addMessage(msg, true, [], { suppressSources: true });
                 return;
             }
@@ -792,7 +847,9 @@
         
         loadRateLimitState();
         renderSampleQuestions();
-        messageInput.focus();
+        // Focus the input on load only with a mouse or trackpad, and without scrolling. The plain
+        // focus scrolled the page past the header, and on a touch screen it can open the keyboard.
+        if (window.matchMedia('(pointer: fine)').matches) messageInput.focus({ preventScroll: true });
     </script>
 </body>
 </html>

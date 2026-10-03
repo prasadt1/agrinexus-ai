@@ -80,7 +80,7 @@ AgriNexus is a deployed, functional prototype with production-grade observabilit
 | WhatsApp Business number | ✅ Reachable | [wa.me/4915120105731](https://wa.me/4915120105731) |
 | Web demo (public) | ✅ Reachable | [demo.agrinexus-ai.farm](https://demo.agrinexus-ai.farm/web-demo/live-2026-04-13b.html) |
 | Product site (owned landing page) | ✅ Reachable | [agrinexus-ai.farm](https://agrinexus-ai.farm/) |
-| re:Invent visitor landing | ⏳ After site publish | [agrinexus-ai.farm/try](https://agrinexus-ai.farm/try) (`docs/try/` + site twin) |
+| re:Invent visitor landing | ✅ Reachable | [demo.agrinexus-ai.farm/try](https://demo.agrinexus-ai.farm/try) (`docs/try/`; the QR code in the re:Invent video opens it) |
 | Webhook API (Meta verified) | ✅ Reachable | API Gateway with Meta HMAC signature check and per-user rate limit (no WAF; WAF covers web chat `/chat` only) |
 | Health endpoint (liveness) | ✅ Reachable | [health](https://h4bt24ycdl.execute-api.us-east-1.amazonaws.com/dev/health) |
 | Weather API integration | ✅ Reachable | OpenWeatherMap via Secrets Manager |
