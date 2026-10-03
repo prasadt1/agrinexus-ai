@@ -19,6 +19,7 @@ import re
 from typing import Dict, List, Optional, Set, Tuple
 
 from common.district_helplines import KISAN_CALL_CENTRE, REFERRAL_LINES, referral_footer
+from common.source_line import is_source_line, strip_source_lines
 
 METRIC_NAMESPACE = "AgriNexus/Advice"
 METRIC_NAME = "AdviceFilterHit"
@@ -448,6 +449,86 @@ def _has_referral(text: str) -> bool:
     return any(line in text for lines in REFERRAL_LINES.values() for line in lines.values())
 
 
+# The knowledge-base model writes Markdown bold (**text**). WhatsApp bold is *text*,
+# and the web chat shows text as typed, so the markers would show on screen.
+_MD_BOLD_RE = re.compile(r"\*\*(?=\S)([^*\n]+?)(?<=\S)\*\*")
+
+
+def _channel_markup(text: str, channel: str) -> str:
+    if "**" not in text:
+        return text
+    return _MD_BOLD_RE.sub(r"\1" if channel.startswith("web") else r"*\1*", text)
+
+
+# "I cannot recommend specific pesticide names or doses, but here are ..." at the start
+# of an answer to a question that did not ask for a pesticide. English only: the other
+# languages rely on the prompt.
+_REFUSAL_OPENER_RE = re.compile(
+    r"^\s*(?:i|we)\s+"
+    r"(?:cannot|can['\u2019]?t|can\s+not|(?:am|are)\s+(?:unable|not\s+able)\s+to|do\s+not|don['\u2019]?t|will\s+not|won['\u2019]?t)\s+"
+    r"(?:recommend|give|provide|name|suggest|share|advise)\b"
+    r"[^.!?\n]*?\b(?:pesticid|insecticid|fungicid|herbicid|chemical)[^.!?\n]*?"
+    r"(?:[,;]\s*(?:but|however)\b,?\s*|[.!]\s+(?:(?:however|but|instead)\b,?\s*)?)",
+    re.IGNORECASE,
+)
+
+
+def _strip_refusal_opener(text: str) -> str:
+    m = _REFUSAL_OPENER_RE.match(text)
+    if not m:
+        return text
+    rest = text[m.end():].lstrip()
+    if not re.search(r"\w", rest):
+        return text
+    return rest[0].upper() + rest[1:]
+
+
+# A closing sentence from the model that sends the farmer to the KVK for chemical
+# control. The referral footer says the same, so the farmer would read it twice.
+_KVK_MARKERS = tuple(
+    _normalize(w) for w in ("kvk", "krishi vigyan", "कृषि विज्ञान", "कृषी विज्ञान", "కృషి విజ్ఞాన")
+)
+_REFERRAL_TOPIC_LATIN_RE = re.compile(
+    r"(?<![a-z])(?:chemicals?|pesticides?|insecticides?|fungicides?|herbicides?|products?|doses?|dosage)(?![a-z])"
+)
+_REFERRAL_TOPIC_INDIC = tuple(
+    _normalize(w)
+    for w in (
+        "रासायनिक", "रसायन", "कीटनाशक", "कीटकनाशक", "किटकनाशक", "औषध", "दवा",
+        "రసాయన", "పురుగుమందు", "మందు",
+    )
+)
+_REFERRAL_VERB_LATIN_RE = re.compile(
+    r"(?<![a-z])(?:contact|consult|ask|visit|call|reach out to|check with|speak (?:to|with)|talk to)(?![a-z])"
+)
+_REFERRAL_VERB_INDIC = tuple(_normalize(w) for w in ("संपर्क", "सल्ला", "सलाह", "సంప్రదించ"))
+
+
+def _is_model_referral(segment: str) -> bool:
+    norm = _normalize(segment)
+    return (
+        any(k in norm for k in _KVK_MARKERS)
+        and bool(_REFERRAL_TOPIC_LATIN_RE.search(norm) or any(w in norm for w in _REFERRAL_TOPIC_INDIC))
+        and bool(_REFERRAL_VERB_LATIN_RE.search(norm) or any(w in norm for w in _REFERRAL_VERB_INDIC))
+    )
+
+
+def _drop_model_referral(text: str) -> str:
+    """Drop the model's own KVK referral when it is the last sentence before any source line."""
+    lines = text.split("\n")
+    for i in range(len(lines) - 1, -1, -1):
+        line = lines[i]
+        if not line.strip() or is_source_line(line):
+            continue
+        segments = _segments(line)
+        if not segments or not _is_model_referral(segments[-1]):
+            return text
+        lines[i] = "".join(segments[:-1]).rstrip()
+        out = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+        return out if re.search(r"\w", strip_source_lines(out)) else text
+    return text
+
+
 def filter_advice(
     text: str,
     dialect: str,
@@ -455,13 +536,23 @@ def filter_advice(
     kind: str = "answer",
     district: Optional[str] = None,
     add_referral: bool = True,
+    question: Optional[str] = None,
 ) -> str:
     """
     Remove chemical product and dose advice from a farmer-facing message and make
     sure it ends with the KVK referral. kind is "photo" or "answer" (text/voice).
+
+    Also tidies what the model wrote around the advice: Markdown bold becomes the
+    channel's own (WhatsApp *bold*, none on the web chat), the model's own closing
+    KVK referral is dropped when the footer follows, and, when the farmer's question
+    is passed and did not ask about a pesticide, an opening "I cannot recommend
+    pesticides" sentence is dropped.
     """
     if not text:
         return text
+    text = _channel_markup(text, channel)
+    if question is not None and not is_pesticide_question(question):
+        text = _strip_refusal_opener(text)
     hits: List[Tuple[str, Set[str]]] = []
     state = {"after_removal": 0, "orphans": 0}
     lines = text.split("\n")
@@ -485,6 +576,8 @@ def filter_advice(
     if state["orphans"]:
         print(f"Advice filter removed {state['orphans']} repeat step(s) left without their step channel={channel}")
 
+    if add_referral:
+        out = _drop_model_referral(out)
     if add_referral and not _has_referral(out):
         footer = referral_footer(dialect, kind, district)
         if KISAN_CALL_CENTRE in out:

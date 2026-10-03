@@ -23,6 +23,10 @@ _SOURCE_LINE_RE = re.compile(
 )
 
 
+def is_source_line(line: str) -> bool:
+    return bool(_SOURCE_LINE_RE.match(line or ""))
+
+
 def strip_source_lines(text: str) -> str:
     if not text:
         return text
