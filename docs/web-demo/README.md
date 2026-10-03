@@ -6,7 +6,7 @@ Privacy-friendly web chat interface for AgriNexus AI. No phone number required.
 
 - ✅ Text-based queries to Bedrock Knowledge Base
 - ✅ Multi-language support (English, Hindi, Marathi, Telugu)
-- ✅ Rate limiting (10 queries/hour per IP)
+- ✅ Rate limiting (5 queries/hour per IP and per browser)
 - ✅ No data storage (stateless)
 - ✅ Mobile-responsive design
 - ✅ Citation display
