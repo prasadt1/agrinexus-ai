@@ -4,6 +4,19 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 3 October 2026 — text answers: no stray refusal, one KVK line, WhatsApp bold (not deployed)
+
+Found in the live phone test of the visitor path. The sample question "Whitefly on cotton" (sent as "How do I control whitefly on cotton?") got an answer with three defects. `tests/test_answer_tidy.py` holds that answer as the model wrote it.
+
+- **Refusal on a question that asked for no pesticide.** The answer opened with "I cannot recommend specific pesticide names or doses, but here are non-chemical steps you can take:". The prompt asked for that sentence only when the question asks which pesticide or how much; the model applied it anyway. The prompt now says so in both directions ("Only if the question asks ... For any other question, do not say what you cannot recommend"). `filter_advice()` takes the farmer's question and, when it is not a pesticide question (`is_pesticide_question`), drops an opening sentence of that shape. English wordings only; Hindi, Marathi and Telugu rely on the prompt.
+- **Two KVK referral lines.** The prompt told the model to refer the farmer to the KVK for chemical control, and the filter then added its own referral footer. The prompt now tells the model not to write that line. The filter also drops the model's closing sentence when it names the KVK, is about a chemical, pesticide, product or dose, and tells the farmer to contact someone, and only when the footer follows. It looks at the last sentence before any source line and nowhere else. Across the 164 replies stored in `docs/try/replays/`, this removes three sentences, all the Marathi "रासायनिक नियंत्रणासाठी तुमच्या जवळच्या कृषी विज्ञान केंद्राशी संपर्क साधा" at the end of a photo reply; a test pins that.
+- **Markdown bold.** The model wrote `**Monitor early:**`. WhatsApp bold is `*text*`, and the web chat shows text as typed. The filter now turns `**text**` into `*text*` on WhatsApp and into plain text on the web chat, and the prompt asks for plain text.
+- Applies to WhatsApp text and voice answers and to the web chat. Photo replies get the bold and referral rules, not the opener rule. 34 new tests, 31 of which fail against the code before the change. Full suite 1004 passed, 30 skipped.
+- **Not checked.** The prompt changes have not been replayed against Bedrock, so how the model follows them is unknown until the deploy; the filter rules do not depend on it. Voice replies still pass asterisks to Polly, as before.
+- **Seen, not changed.** The same answer said "Spray neem oil twice" and "Do not use pyrethroids or organophosphates before 120 days". Neem as a practice is allowed by design (see the filter's module note). The filter matches named active ingredients, not pesticide classes.
+
+---
+
 ## 3 October 2026 — landing page: pesticide line matches what the bot does
 
 - **The page said "It never names pesticides".** In the live phone test on 3 October, the sample question "Whitefly on cotton" was answered with "Do not use pyrethroids or organophosphates before 120 days". Those are pesticide classes, so the page line was false as written. The line in `docs/try/index.html` now reads: "It is built not to recommend pesticide products or doses. It refers farmers to their local agriculture office."

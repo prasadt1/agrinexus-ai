@@ -406,3 +406,57 @@ def test_web_chat_photo_answer_is_filtered(webchat):
     webchat._decode_image_payload = lambda _raw: ("image/jpeg", "x", b"x")
     webchat.collect_images = lambda _b: ["data:image/jpeg;base64,eA=="]
     _assert_filtered(_post(webchat, {"message": "", "language": "en", "image": "x"}), "photo")
+
+
+TIDY = (
+    "I cannot recommend specific pesticide names or doses, but here are non-chemical steps you can take:\n\n"
+    "**Monitor early:** Install yellow sticky traps.\n\n"
+    "For chemical control options, contact your local KVK (Krishi Vigyan Kendra) for the correct product."
+)
+
+
+def test_whatsapp_text_answer_is_tidied_for_a_plain_question(processor):
+    processor.bedrock_agent.retrieve_and_generate = lambda **_k: {
+        "output": {"text": TIDY}, "citations": [], "sessionId": "s",
+    }
+    _run(processor, "text", {"text": {"body": "How do I control whitefly on cotton?"}})
+    reply = _last_reply(processor)
+    assert reply.startswith("Here are non-chemical steps you can take:\n\n*Monitor early:* Install yellow sticky traps.")
+    assert "**" not in reply and "I cannot recommend" not in reply
+    assert reply.count("KVK") == 1 and "automated answer" in reply
+
+
+def test_whatsapp_text_answer_keeps_the_opener_for_a_pesticide_question(processor):
+    processor.bedrock_agent.retrieve_and_generate = lambda **_k: {
+        "output": {"text": TIDY}, "citations": [], "sessionId": "s",
+    }
+    _run(processor, "text", {"text": {"body": "Which spray for whitefly?"}})
+    assert _last_reply(processor).startswith("I cannot recommend specific pesticide names or doses")
+
+
+def test_web_chat_text_answer_is_tidied_for_a_plain_question(webchat):
+    webchat.query_bedrock = lambda *_a, **_k: {"text": TIDY, "citations": []}
+    reply = _post(webchat, {"message": "How do I control whitefly on cotton?", "language": "en"})
+    assert reply.startswith("Here are non-chemical steps you can take:\n\nMonitor early: Install yellow sticky traps.")
+    assert "*" not in reply and reply.count("KVK") == 1
+
+
+def test_knowledge_base_prompts_ask_for_plain_text_and_one_referral(processor, webchat):
+    seen = {}
+
+    def _rag(**kwargs):
+        seen.update(kwargs)
+        return {"output": {"text": "ok"}, "citations": [], "sessionId": "s"}
+
+    processor.bedrock_agent.retrieve_and_generate = _rag
+    processor.query_bedrock("x", "en")
+    prompts = [_kb_prompt(seen)]
+    seen.clear()
+    webchat.bedrock_agent = types.SimpleNamespace(retrieve_and_generate=_rag)
+    webchat.query_bedrock("x", "en")
+    prompts.append(_kb_prompt(seen))
+    for prompt in prompts:
+        assert "No Markdown" in prompt
+        assert "Do not write a line telling the farmer to contact the KVK" in prompt
+        assert "Only if the question asks which pesticide or spray to use" in prompt
+        assert "For any other question, do not say what you cannot recommend" in prompt
