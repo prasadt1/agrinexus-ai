@@ -162,7 +162,7 @@ AgriNexus is a deployed, functional prototype with production-grade observabilit
 | 🎙️ Voice round-trip (Transcribe + RAG + Polly) | ✅ Prior E2E ~20–34s (allowlisted); not part of 1 Oct 2026 re-verify |
 | 📷 Vision (Claude Vision, structured schema) | ✅ End-to-end (allowlisted; visitors after deploy) |
 | 🔔 Weather-gated nudges + closed loop | ✅ End-to-end, T+24h/T+48h/T+72h (re-checked 1 Oct 2026) |
-| 🎫 re:Invent visitor path (trigger + caps + DELETE) | ⏳ Code ready; needs deploy + sample photo upload |
+| 🎫 re:Invent visitor path (trigger + caps + DELETE) | ⏳ Code ready (3 Oct 2026: the welcome crashed on a visitor's first message; fixed, not deployed); needs deploy + sample photo upload |
 | 🔒 Security (Meta HMAC-SHA256, secrets in Secrets Manager, PII redaction) | ✅ Enforced |
 | 📊 Observability (CloudWatch + X-Ray + custom metrics) | ✅ Enforced |
 
@@ -173,11 +173,11 @@ AgriNexus is a deployed, functional prototype with production-grade observabilit
 | Meta HMAC-SHA256 signature verification | ✅ Always on | No bypass possible |
 | Per-user rate limiting (WhatsApp) | ✅ Active | **25**/hour WhatsApp (`RATE_LIMIT_MESSAGES` in `template.yaml` **Globals**; handler defaults to **10** only if env unset) |
 | Per-IP rate limiting (public web chat) | ✅ Active (fixed 26 Sept 2026) | Keys on `requestContext.identity.sourceIp`. Previously trusted the client-supplied `X-Forwarded-For` header, which could be spoofed to bypass the limit — corrected in [PR #7](https://github.com/prasadt1/agrinexus-ai/pull/7). |
-| PII redaction in logs | ✅ Active (fixed 26–27 Sept 2026) | Phone numbers shown as `491***`. On 26 Sept, 12 log call sites that printed raw numbers were masked; on 27 Sept, the remaining ones were masked too: a processor profile dump, the WhatsApp send-success lines that echoed Meta's response, and voice S3/Transcribe paths. Older logs with full numbers age out under 90-day log retention. |
+| PII redaction in logs | ⏳ Partly active; 3 Oct 2026 fix not deployed | Phone numbers shown as `491***`. On 26 and 27 Sept, the log call sites that printed raw numbers were masked. A review on 3 Oct found what was left: WhatsApp message IDs (base64 that contains the full number), the first ten digits of the number in the Bedrock session lines, six digits in the send lines, the full text of every incoming message, and the first 50 to 120 characters of replies. The 3 Oct change logs a one-way reference instead of the message ID, three digits of the number everywhere, and the length of a text instead of the text; `tests/test_log_privacy.py` scans every log line in `src/`. Older log entries age out under 90-day log retention. |
 | IAM least-privilege | ✅ Enforced | DynamoDB / S3 / Bedrock resource-scoped |
 | Encryption at rest | ✅ Active | DynamoDB default encryption |
 | Encryption in transit | ✅ Active | HTTPS only |
-| Data retention TTL | ✅ Active | Farmer conversations 90d / webhook MSG copies 7d / Nudges 180d / WAMID dedup 24h / **re:Invent visitor profile+MSG: 7d** (`VisitorTtlDays`) |
+| Data retention TTL | ✅ Active | Farmer conversations 90d / webhook MSG copies 7d / Nudges 180d / WAMID dedup 24h / **re:Invent visitor profile+MSG: 7d** (`VisitorTtlDays`). Code ready 3 Oct 2026, not deployed: unfinished farmer sign-up 7d (was kept for good), dead-letter queues 3d (was 14d), dedup rows keyed by a hash with no number. DynamoDB removes an expired row within a few days of its expiry. |
 | No pesticide recommendations | ⏳ Code ready 2 Oct 2026; not deployed | Every advice reply (WhatsApp text, voice, photo; web chat) passes through `common/advice_filter.py`, which drops sentences naming an active ingredient, brand, formulation or dose (Latin, Devanagari and Telugu) and ends the reply with a KVK referral. Each removal emits `AgriNexus/Advice` `AdviceFilterHit`. Requirements REQ-GUARD-008 to 014. |
 | Log retention | ✅ Active (set 27 Sept 2026) | CloudWatch Logs kept 90 days on all Lambda and canary log groups ([`scripts/set-log-retention.sh`](scripts/set-log-retention.sh)); previously never expired |
 
@@ -205,7 +205,7 @@ Pick the web demo or WhatsApp experience.
 
 **Phone format (international):** The `wa.me` link works globally in most regions. If it doesn’t open, save the number as `+49 151 2010 5731` and message “HELP”.
 
-**Data retention (summary):** Conversation rows written by the **processor** use a **90-day** TTL; short-lived **`MSG#*`** rows written by the **webhook** for the response detector use **7 days**; **WAMID** dedup keys use **24 hours**; **nudge** records use **180 days**. `demo_tier: public` limits **nudge follow-up scheduling**, not those TTLs. Details: [docs/testing/E2E-TEST-CHECKLIST.md](docs/testing/E2E-TEST-CHECKLIST.md) (section 6).
+**Data retention (summary):** Conversation rows written by the **processor** use a **90-day** TTL; short-lived **`MSG#*`** rows written by the **webhook** for the response detector use **7 days**; **WAMID** dedup keys use **24 hours**; **nudge** records use **180 days**. `demo_tier: public` limits **nudge follow-up scheduling**, not those TTLs. A finished farmer profile has no TTL and stays until the number sends **DELETE**; re:Invent visitor rows and (after the 3 Oct 2026 change is deployed) unfinished sign-ups expire after **7 days**. Details: [docs/testing/E2E-TEST-CHECKLIST.md](docs/testing/E2E-TEST-CHECKLIST.md) (section 6).
 
 ## Architecture
 

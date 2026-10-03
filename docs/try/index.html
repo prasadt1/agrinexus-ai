@@ -185,7 +185,7 @@ footer p + p{margin-top:.125rem}
       <summary>How the WhatsApp demo works</summary>
       <div class="panel">
         <ol class="steps">
-          <li>Open WhatsApp.<span>“Hi from re:Invent” is already typed for you.</span></li>
+          <li>Open WhatsApp.<span>“Hi from re:Invent” is already typed for you. Send it as it is.</span></li>
           <li>Pick a sample question or ask your own, in English.</li>
           <li>Send <kbd>DELETE</kbd> when you are done.</li>
         </ol>
@@ -214,6 +214,7 @@ footer p + p{margin-top:.125rem}
           <tr><th scope="row">Why</th><td>To reply, and to measure the demo</td></tr>
           <tr><th scope="row">How long</th><td>7 days. Removal can take a few days more.</td></tr>
           <tr><th scope="row">How to delete</th><td>Send <strong>DELETE</strong> in the chat</td></tr>
+          <tr><th scope="row">Logs</th><td>Kept 90 days. No message text, no full phone number.</td></tr>
           <tr><th scope="row">Where</th><td>Amazon Web Services, US East (N. Virginia)</td></tr>
           <tr><th scope="row">Who else sees it</th><td>Meta carries WhatsApp messages and keeps its own copy</td></tr>
         </table>
@@ -240,6 +241,9 @@ footer p + p{margin-top:.125rem}
           <li>the answers it sends you</li>
           <li>a count of how many answers you received today</li>
         </ul>
+        <p>The demo also writes technical logs: the time, the type and length of each message, what the photo check
+          found, and the first three digits of your number. The logs hold no message text, no photo and no full
+          phone number.</p>
         <p>In the web demo, there is no phone number and your questions are not saved. To limit use, the demo keeps a
           scrambled form of your IP address and of a random ID for one hour. Your browser keeps that random ID.</p>
 
@@ -254,6 +258,10 @@ footer p + p{margin-top:.125rem}
         <h3>How long data is kept</h3>
         <p>WhatsApp demo records expire 7 days after they are written. Amazon's storage then removes them, usually
           within a few days. To delete them at once, send DELETE in the chat.</p>
+        <p>Technical logs are kept for 90 days.</p>
+        <p>If your first message does not contain “re:Invent”, the demo starts its farmer sign-up instead. A sign-up
+          you do not finish expires after 7 days. If you finish it, your profile stays until you send DELETE, and
+          your messages are kept for 90 days.</p>
 
         <h3>Who receives the data</h3>
         <ul>
