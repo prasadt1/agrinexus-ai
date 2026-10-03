@@ -4,6 +4,19 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 3 October 2026 — text answers: no chemical class names, shorter answers, text replay (not deployed)
+
+From the second live reply to the visitor sample question "Whitefly on cotton" (3 October, after the tidy rules below were deployed).
+
+- **A sentence naming a chemical class got through.** "Do not use pyrethroid sprays before 120 days or any insecticide mixtures at any time" names no product, so the filter kept it. A class still tells the farmer which kind of chemical to use or avoid, and that choice belongs to the KVK. `classify()` has a new kind, `class`: pyrethroids, organophosphates, organochlorines, neonicotinoids, carbamates, diamides, triazoles, strobilurins, benzimidazoles, avermectins and sulfonylureas in Latin script, and the first four of those stems in Devanagari. Telugu is not covered. A sentence that names one is removed like any other chemical sentence, and the metric carries `Kind=class`. Both knowledge-base prompts now list the chemical class next to product and active ingredient, "and not as something to avoid either". The photo prompts are unchanged; the filter covers photo replies. REQ-GUARD-008 and REQ-GUARD-010 amended; the requirement count is unchanged.
+- **Answers ran to five paragraphs.** The prompt asks for two to three short sentences and the model wrote about 150 words. Both prompts now add: "Keep the whole answer under 100 words. If the Context lists many steps, give the three or four that matter most." Nothing in code cuts an answer short.
+- **`scripts/text-replay.py`.** Until now a prompt change could only be checked by deploying it and sending a WhatsApp message. The script runs the five visitor sample questions and four control questions (a pesticide question, an off-topic question, one Marathi and one Hindi question) through the text path of this checkout against real Bedrock, and prints the farmer's reply with word count, sources, filter matches and marker handling. It reads the knowledge base, guardrail and model from the live processor function. A test checks that it takes the same steps as the handler.
+- 19 new tests; full suite 1023 passed, 30 skipped. Across the 164 replies stored in `docs/try/replays/`, the class rule removes nothing; a test pins that.
+- **Not checked.** The prompt changes and the replay script have not run against Bedrock. The script was exercised with stubbed AWS clients only.
+- **Seen, not changed.** Text answers carry no source line. Bedrock returns citations only when the prompt template contains `$output_format_instructions$` (AWS: "Without this placeholder, the response won't contain citations"), and neither prompt has it; ADR 0005 records the empty `retrievedReferences` without this cause. That change is in a separate pull request because it alters how the model formats every answer. REQ-GUARD-014 says no quantity is stated for traps, and the live reply said "yellow sticky traps at 20-40 per acre"; the filter treats a count of traps as allowed.
+
+---
+
 ## 3 October 2026 — text answers: no stray refusal, one KVK line, WhatsApp bold (deployed 3 October 2026)
 
 Found in the live phone test of the visitor path. The sample question "Whitefly on cotton" (sent as "How do I control whitefly on cotton?") got an answer with three defects. `tests/test_answer_tidy.py` holds that answer as the model wrote it.

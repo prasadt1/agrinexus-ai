@@ -460,3 +460,55 @@ def test_knowledge_base_prompts_ask_for_plain_text_and_one_referral(processor, w
         assert "Do not write a line telling the farmer to contact the KVK" in prompt
         assert "Only if the question asks which pesticide or spray to use" in prompt
         assert "For any other question, do not say what you cannot recommend" in prompt
+
+
+def test_whatsapp_text_answer_loses_a_sentence_naming_a_class(processor):
+    processor.bedrock_agent.retrieve_and_generate = lambda **_k: {
+        "output": {"text": "Install yellow sticky traps. Do not use pyrethroid sprays before 120 days."},
+        "citations": [], "sessionId": "s",
+    }
+    _run(processor, "text", {"text": {"body": "How do I control whitefly on cotton?"}})
+    reply = _last_reply(processor)
+    assert reply.startswith("Install yellow sticky traps.") and "pyrethroid" not in reply
+
+
+def test_text_replay_script_takes_the_same_steps_as_the_text_path(processor):
+    spec = importlib.util.spec_from_file_location("text_replay", REPO / "scripts" / "text-replay.py")
+    replay = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(replay)
+    question = "How do I control whitefly on cotton?"
+    result = {
+        "text": TIDY,
+        "citations": [{"retrievedReferences": [{"location": {"s3Location": {"uri": "s3://kb/cotton-ipm.pdf"}}}]}],
+    }
+    processor.bedrock_agent.retrieve_and_generate = lambda **_k: {
+        "output": {"text": TIDY}, "citations": result["citations"], "sessionId": "s",
+    }
+    _run(processor, "text", {"text": {"body": question}})
+    out = replay.farmer_reply(processor, question, "en", result)
+    assert out["reply_text"] == _last_reply(processor)
+    assert out["source_labels"] == ["cotton-ipm.pdf"] and "Source: cotton-ipm.pdf" in out["reply_text"]
+    c = replay.checks(TIDY, out, result)
+    assert c["opener"] and c["markdown"] and c["kvk_lines"] == 1 and c["citations"] == 1
+
+
+# Keep a test that uses the webchat fixture last: it drops the processor fixture's
+# stand-ins for common.* from sys.modules, which later test files would otherwise import.
+def test_knowledge_base_prompts_name_classes_and_cap_the_length(processor, webchat):
+    seen = {}
+
+    def _rag(**kwargs):
+        seen.update(kwargs)
+        return {"output": {"text": "ok"}, "citations": [], "sessionId": "s"}
+
+    processor.bedrock_agent.retrieve_and_generate = _rag
+    processor.query_bedrock("x", "en")
+    prompts = [_kb_prompt(seen)]
+    seen.clear()
+    webchat.bedrock_agent = types.SimpleNamespace(retrieve_and_generate=_rag)
+    webchat.query_bedrock("x", "en")
+    prompts.append(_kb_prompt(seen))
+    for prompt in prompts:
+        assert "chemical class (for example pyrethroids or organophosphates)" in prompt
+        assert "not as something to avoid either" in prompt
+        assert "Keep the whole answer under 100 words" in prompt

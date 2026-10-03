@@ -54,7 +54,7 @@ class TestLiveWhiteflyAnswer:
         assert out.startswith("Here are non-chemical steps you can take:\n\n*Start with cultural practices:* Sow cotton")
         assert "I cannot recommend" not in out
         assert "**" not in out
-        assert "*Monitor early:* Install" in out and "*Avoid these mistakes:* Do not" in out
+        assert "*Monitor early:* Install" in out and "*Avoid these mistakes:* Excessive nitrogen" in out
         assert MODEL_REFERRAL not in out
         assert out.count("KVK") == 1 and FOOTER_EN in out
         assert out.rstrip().endswith("1800-180-1551")
@@ -200,3 +200,66 @@ class TestMarkup:
         text = "**Steps:** Remove affected leaves. Spray profenofos 50% EC at 2 ml per litre of water."
         out = af.filter_advice(text, "en", "whatsapp_text", add_referral=False)
         assert out == "*Steps:* Remove affected leaves."
+
+
+class TestChemicalClass:
+    # Second live reply to the same sample question, 3 October 2026, after the tidy rules.
+    LIVE = (
+        "Apply neem oil spray twice during the first 60 days after sowing. Avoid excessive urea during early "
+        "growth as it attracts whiteflies.\n\n"
+        "Do not use pyrethroid sprays before 120 days or any insecticide mixtures at any time - these actually "
+        "make whitefly problems worse by killing their natural enemies."
+    )
+
+    def test_live_sentence_naming_a_class_is_removed(self):
+        out = _whatsapp(self.LIVE)
+        assert "pyrethroid" not in out
+        assert out.startswith(
+            "Apply neem oil spray twice during the first 60 days after sowing. Avoid excessive urea during early "
+            "growth as it attracts whiteflies.\n\n" + FOOTER_EN
+        )
+
+    def test_first_live_reply_keeps_its_label_and_the_other_sentence(self):
+        out = _whatsapp(LIVE_WHITEFLY)
+        assert "pyrethroids" not in out and "organophosphates" not in out
+        assert "*Avoid these mistakes:* Excessive nitrogen fertilizer also attracts whitefly." in out
+
+    @pytest.mark.parametrize(
+        "sentence",
+        [
+            "Avoid synthetic pyrethroids early in the season.",
+            "Organophosphates kill natural enemies.",
+            "Rotate with an organophosphorus insecticide.",
+            "Neonicotinoids are not advised during flowering.",
+            "Use a carbamate only as a last resort.",
+            "Triazole fungicides work on rust.",
+            "पायरेथ्रॉइड गटातील कीटकनाशके टाळा.",
+            "ऑर्गनोफॉस्फेट कीटनाशक का प्रयोग न करें।",
+        ],
+    )
+    def test_sentences_naming_a_class(self, sentence):
+        assert "class" in af.classify(sentence)
+        out = _whatsapp("Remove affected leaves. " + sentence, add_referral=False)
+        assert out.strip() in ("Remove affected leaves.", "Remove affected leaves।")
+
+    @pytest.mark.parametrize(
+        "sentence",
+        [
+            "Never mix insecticides.",
+            "Whiteflies become resistant when the same spray is repeated.",
+            "Classify the damage before acting.",
+            "Use organic manure and compost.",
+            "Carbon-rich mulch keeps moisture in the soil.",
+        ],
+    )
+    def test_ordinary_sentences_are_not_classes(self, sentence):
+        assert "class" not in af.classify(sentence)
+
+    def test_replays_lose_nothing_to_the_class_rule(self):
+        for path in sorted(glob.glob(os.path.join(REPLAY_DIR, "*.json"))):
+            with open(path, encoding="utf-8") as f:
+                for r in json.load(f)["results"]:
+                    for key in ("recommendations", "reply_text"):
+                        for line in (r.get(key) or "").split("\n"):
+                            for seg in af._segments(line):
+                                assert af.classify(seg) != {"class"}, seg
