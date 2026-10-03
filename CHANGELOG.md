@@ -4,6 +4,13 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 3 October 2026 — landing page: pesticide line matches what the bot does
+
+- **The page said "It never names pesticides".** In the live phone test on 3 October, the sample question "Whitefly on cotton" was answered with "Do not use pyrethroids or organophosphates before 120 days". Those are pesticide classes, so the page line was false as written. The line in `docs/try/index.html` now reads: "It is built not to recommend pesticide products or doses. It refers farmers to their local agriculture office."
+- Page text only. No bot behavior changes and no deploy is needed. The same answer showed three defects that are still open: the refusal opener on a question that asked for no product, two KVK referral lines, and Markdown bold in a WhatsApp reply.
+
+---
+
 ## 3 October 2026 — re:Invent visitor path: first message, data promises, logs (not deployed)
 
 Found while checking the new landing page (`docs/try/`) against the code. The page tells a visitor: records expire after 7 days, DELETE erases them, no reminders. Each item below has a test that failed before the fix.
