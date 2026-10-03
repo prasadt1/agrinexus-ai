@@ -4,6 +4,18 @@
 **Status:** Superseded in part on 2026-10-02 (generic attribution removed; see Amendment)  
 **Deciders:** Development Team  
 
+## Amendment (2026-10-03)
+
+The cause of the empty `retrievedReferences` is the prompt template, not the API. AWS
+documents the `$output_format_instructions$` placeholder as required and says: "Without
+this placeholder, the response won't contain citations." Both knowledge-base prompts
+(processor and web chat) left it out. They now carry it after `$search_results$`, and
+the prompts no longer ask the model to write or withhold its own source line beyond
+"do not write a line that begins with Source:". With citations returned, the existing
+code names the retrieved documents by file name (WhatsApp source line, web chat
+`citations`). No separate Retrieve call is needed. Not verified against Bedrock at the
+time of writing: run `scripts/text-replay.py` and read the `sources` it prints.
+
 ## Amendment (2026-10-02)
 
 The generic "FAO/ICAR Agricultural Guidelines" line is no longer shown. Because

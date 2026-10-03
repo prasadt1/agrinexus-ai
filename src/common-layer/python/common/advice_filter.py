@@ -525,6 +525,20 @@ _REFERRAL_VERB_INDIC = tuple(
 )
 
 
+# The system's own source line lists retrieved file names, some of which carry a hash
+# ("soybean-04-855fe8ec.pdf") that reads as a formulation code ("8ec"). Such a line is
+# left alone; a source line with anything other than file names is filtered as usual.
+_FILE_NAME_RE = re.compile(r"[\w.\-]+\.(?:pdf|txt|md|docx?|html?|csv|json)", re.IGNORECASE)
+
+
+def _is_file_source_line(line: str) -> bool:
+    if not is_source_line(line):
+        return False
+    names = line.split(":", 1)[-1].replace("…", "").split(",")
+    names = [n.strip() for n in names if n.strip()]
+    return bool(names) and all(_FILE_NAME_RE.fullmatch(n) for n in names)
+
+
 def names_kvk(text: str) -> bool:
     norm = _normalize(text)
     return any(k in norm for k in _KVK_MARKERS)
@@ -582,7 +596,7 @@ def filter_advice(
     hits: List[Tuple[str, Set[str]]] = []
     state = {"after_removal": 0, "orphans": 0}
     lines = text.split("\n")
-    parsed = [_split_line(line, hits, state) for line in lines]
+    parsed = [None if _is_file_source_line(line) else _split_line(line, hits, state) for line in lines]
     counter = [0, 0]
     out_lines = []
     for line, p in zip(lines, parsed):

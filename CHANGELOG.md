@@ -4,6 +4,19 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 3 October 2026 — text answers: source line from Bedrock citations (not deployed)
+
+- **Text answers named no source.** Two live replies on 3 October carried no source line. The code adds one only from the document names in Bedrock's citations, and those have been empty since April (ADR 0005). Cause: both knowledge-base prompts are custom templates without `$output_format_instructions$`. AWS lists that placeholder as required and says: "Without this placeholder, the response won't contain citations."
+- **Change.** Both prompts carry `$output_format_instructions$` after `$search_results$`. The processor prompt's "DO NOT add any source citation" and the web chat prompt's "End with exactly ONE final line ... Source:" are replaced by one rule: no line beginning with "Source:" in the answer, cite only as the output format instructions ask. Code is unchanged: `source_labels_from_citations()` and the web chat already turn returned citations into document file names. ADR 0005 amended.
+- **Risk.** The placeholder makes Bedrock add its own formatting instructions to the prompt, so it changes how the model writes every text answer. Paragraph breaks, length, and the `NO_KB_ANSWER` / `NOT_FARMING` markers may behave differently. None of that has been run against Bedrock. The source line will show S3 file names as they are stored; whether those names read well to a farmer is unknown.
+- **Before merging:** check out this branch and run `python3 scripts/text-replay.py`. Expect `sources` to name at least one document on the seven farming answers, `marker=True` on the off-topic question, and replies that still read as plain short text. If any of that fails, do not deploy this change.
+- **Replay against Bedrock, 3 October, 22:15 CEST** (this branch). All seven farming answers came back with document names (two each at most), the off-topic question got the fixed refusal through the guardrail, and answers stayed plain text at 43 to 106 words. Two findings:
+  - The advice filter removed the source line from two answers. A hashed file name, `soybean-04-855fe8ec.pdf`, contains "8ec", which the filter reads as a formulation code. A source line that lists only file names is now left alone; one with anything else in it is filtered as before.
+  - Most retrieved files carry generated names (`cotton-08-e75ba3c0.pdf`), so the source line tells a farmer little. Only `icar-cicr-pest-disease-advisory-2024.pdf` reads as a document title. Not changed here.
+- 5 new tests on the prompt, the send path and the source line; full suite 1031 passed, 30 skipped.
+
+---
+
 ## 3 October 2026 — text answers: no chemical class names, shorter answers, text replay (not deployed)
 
 From the second live reply to the visitor sample question "Whitefly on cotton" (3 October, after the tidy rules below were deployed).
