@@ -24,6 +24,7 @@ from common.guardrail_reply import (
 )
 from common.advice_filter import filter_advice, is_pesticide_question, pesticide_policy
 from common.source_line import strip_source_lines
+from common.source_labels import source_labels
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -746,17 +747,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         )
 
         # Format citations
-        citations = []
-        for citation in ([] if policy_reply else result.get('citations', [])):
-            retrieved_refs = citation.get('retrievedReferences', [])
-            for ref in retrieved_refs:
-                location = ref.get('location', {})
-                s3_location = location.get('s3Location', {})
-                uri = s3_location.get('uri', '')
-                if uri:
-                    # Extract filename from S3 URI
-                    filename = uri.split('/')[-1]
-                    citations.append(filename)
+        # Document titles from metadata, else file names (common.source_labels).
+        citations = [] if policy_reply else source_labels(result.get('citations', []))
 
         # Return response
         return {

@@ -51,7 +51,7 @@ SAMPLE_QUESTIONS = [
     ("vq_yellowing", "Yellow wheat leaves", "Why are my wheat leaves yellowing?"),
     ("vq_spray", "Spraying after rain", "When is it safe to spray after rain?"),
     ("vq_bollworm", "Bollworm on cotton", "How do I manage bollworm on cotton?"),
-    ("vq_irrigation", "Irrigating soybean", "How often should I irrigate soybean?"),
+    ("vq_irrigation", "Irrigating soybean", "When does soybean need irrigation?"),
 ]
 
 SAMPLE_PHOTO_ID = "vq_sample_photo"
