@@ -283,3 +283,22 @@ class TestChemicalClass:
                         for line in (r.get(key) or "").split("\n"):
                             for seg in af._segments(line):
                                 assert af.classify(seg) != {"class"}, seg
+
+
+class TestSourceLine:
+    # scripts/text-replay.py with the citation placeholder, 3 October 2026: the filter took
+    # "855fe8ec" in a file name for a formulation code and removed the whole source line.
+    def test_hashed_file_names_survive(self):
+        text = "Wait 3 to 4 hours after rain.\n\nSource: cotton-03-c43ce84f.pdf, soybean-04-855fe8ec.pdf"
+        out = _whatsapp(text, question="When is it safe to spray after rain?")
+        assert "Source: cotton-03-c43ce84f.pdf, soybean-04-855fe8ec.pdf" in out
+
+    def test_devanagari_label_and_truncated_list(self):
+        text = "सापळे लावा.\n\nस्त्रोत: soybean-04-855fe8ec.pdf, a.pdf, b.pdf, c.pdf, d.pdf …"
+        out = af.filter_advice(text, "mr", "whatsapp_text")
+        assert "स्त्रोत: soybean-04-855fe8ec.pdf, a.pdf, b.pdf, c.pdf, d.pdf …" in out
+
+    def test_a_source_line_with_advice_in_it_is_still_filtered(self):
+        text = "Install traps.\n\nSource: spray imidacloprid 17.8 SL at 0.3 ml per litre"
+        out = _whatsapp(text, add_referral=False)
+        assert "imidacloprid" not in out and "0.3 ml" not in out
