@@ -442,7 +442,7 @@ RESPONSE STYLE (when you DO have relevant context):
 - Avoid long paragraphs, dense lists, and copying long passages from the context.
 - Keep the whole answer under 100 words. If the Context lists many steps, give the three or four that matter most.
 - Plain text only. No Markdown: no asterisks for bold and no # headings.
-- ONLY if you answered the question using the Context: End with exactly ONE final line for traceability: Look at the search_results metadata and extract the actual document name or source title. Write a single compact line starting with "Source:" (or "स्रोत:" in Hindi, "स्त्रोत:" in Marathi, "మూలం:" in Telugu) followed by the actual document name from the metadata (e.g., "Source: FAO Cotton IPM Guide" or "स्रोत: ICAR कीट प्रबंधन सलाह"). Do NOT just write "Source: 1" or "स्रोत: 1".
+- Do not write a line that begins with "Source:" (or स्रोत:, स्त्रोत:, మూలం:) in your answer. The system adds the source line from the documents you cite. Cite the search results only in the way the output format instructions at the end of this prompt ask for.
 
 CRITICAL: If you respond NO_KB_ANSWER OR NOT_FARMING, DO NOT ADD ANY SOURCE CITATION. NO "स्रोत:", NO "Source:", NOTHING.
 
@@ -458,6 +458,8 @@ IMPORTANT RESTRICTIONS:
 Question: $query$
 
 Context: $search_results$
+
+$output_format_instructions$
 
 REMEMBER: If the Context above does not contain information to answer the Question, you MUST respond with exactly NO_KB_ANSWER. DO NOT make up answers.'''
         }

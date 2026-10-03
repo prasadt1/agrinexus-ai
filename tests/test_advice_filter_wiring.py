@@ -492,6 +492,41 @@ def test_text_replay_script_takes_the_same_steps_as_the_text_path(processor):
     assert c["opener"] and c["markdown"] and c["kvk_lines"] == 1 and c["citations"] == 1
 
 
+def test_knowledge_base_prompts_carry_the_citation_placeholder(processor, webchat):
+    """Bedrock returns citations only when the template has $output_format_instructions$."""
+    seen = {}
+
+    def _rag(**kwargs):
+        seen.update(kwargs)
+        return {"output": {"text": "ok"}, "citations": [], "sessionId": "s"}
+
+    processor.bedrock_agent.retrieve_and_generate = _rag
+    processor.query_bedrock("x", "en")
+    prompts = [_kb_prompt(seen)]
+    seen.clear()
+    webchat.bedrock_agent = types.SimpleNamespace(retrieve_and_generate=_rag)
+    webchat.query_bedrock("x", "en")
+    prompts.append(_kb_prompt(seen))
+    for prompt in prompts:
+        assert prompt.count("$output_format_instructions$") == 1
+        assert prompt.index("$search_results$") < prompt.index("$output_format_instructions$")
+        assert 'Do not write a line that begins with "Source:"' in prompt
+        assert "End with exactly ONE final line" not in prompt
+        assert "DO NOT add any source citation or reference line" not in prompt
+
+
+def test_whatsapp_text_answer_names_the_cited_document(processor):
+    processor.bedrock_agent.retrieve_and_generate = lambda **_k: {
+        "output": {"text": "Install yellow sticky traps."},
+        "citations": [{"retrievedReferences": [{"location": {"s3Location": {"uri": "s3://kb/docs/cotton-ipm-guide.pdf"}}}]}],
+        "sessionId": "s",
+    }
+    _run(processor, "text", {"text": {"body": "How do I control whitefly on cotton?"}})
+    reply = _last_reply(processor)
+    assert "Install yellow sticky traps.\n\nSource: cotton-ipm-guide.pdf\n\n" in reply
+    assert reply.rstrip().endswith("1800-180-1551")
+
+
 # Keep a test that uses the webchat fixture last: it drops the processor fixture's
 # stand-ins for common.* from sys.modules, which later test files would otherwise import.
 def test_knowledge_base_prompts_name_classes_and_cap_the_length(processor, webchat):

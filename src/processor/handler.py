@@ -1001,7 +1001,7 @@ RESPONSE STYLE (when you DO have relevant context):
 - Avoid long paragraphs, dense lists, and copying long passages from the context.
 - Keep the whole answer under 100 words. If the Context lists many steps, give the three or four that matter most.
 - Plain text only. No Markdown: no asterisks for bold and no # headings.
-- DO NOT add any source citation or reference line at the end. The system will add it automatically.
+- Do not write a line that begins with "Source:" (or स्रोत:, स्त्रोत:, మూలం:) in your answer. The system adds the source line from the documents you cite. Cite the search results only in the way the output format instructions at the end of this prompt ask for.
 - NEVER end with a "source" line that lists only numbers or citation indices (e.g. comma-separated digits like 3, 4, 5). No Devanagari or English label before such numbers.
 
 CRITICAL: If you respond NO_KB_ANSWER OR NOT_FARMING, DO NOT ADD ANY SOURCE CITATION. NO "स्रोत:", NO "Source:", NOTHING.
@@ -1017,6 +1017,8 @@ IMPORTANT RESTRICTIONS:
 Question: $query$
 
 Context: $search_results$
+
+$output_format_instructions$
 
 REMEMBER: If the Context above does not contain information to answer the Question, you MUST respond with exactly NO_KB_ANSWER. DO NOT make up answers.'''
         }
