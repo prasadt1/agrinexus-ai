@@ -80,15 +80,24 @@ def webchat(monkeypatch):
 
         def update_item(self, **kwargs):
             key = (kwargs["Key"]["PK"], kwargs["Key"]["SK"])
-            item = store.setdefault(key, dict(kwargs["Key"]))
-            # Minimal SET #count = #count + :inc support
             expr = kwargs.get("UpdateExpression", "")
             vals = kwargs.get("ExpressionAttributeValues", {})
-            if "#count = #count + :inc" in expr.replace(" ", "") or "#count = #count + :inc" in expr:
-                item["count"] = int(item.get("count", 0)) + int(vals[":inc"])
-                item["ttl"] = item.get("ttl") or vals.get(":now", 0)
+            if expr.startswith("ADD #count :one"):
+                # Daily counter: check the condition, then add (as DynamoDB does).
+                from botocore.exceptions import ClientError
+                item = store.get(key) or dict(kwargs["Key"])
+                if "count" in item and int(item["count"]) >= vals[":limit"]:
+                    raise ClientError(
+                        {"Error": {"Code": "ConditionalCheckFailedException", "Message": "cap"}},
+                        "UpdateItem",
+                    )
+                item["count"] = int(item.get("count", 0)) + 1
+                item["ttl"] = vals[":ttl"]
+                store[key] = item
+                return {"Attributes": dict(item)}
+            item = store.setdefault(key, dict(kwargs["Key"]))
             from botocore.exceptions import ClientError
-            # Honor ConditionExpression count < limit
+            # Honor ConditionExpression count < limit, checked before the update as DynamoDB does
             names = kwargs.get("ExpressionAttributeNames", {})
             if "ConditionExpression" in kwargs:
                 limit = vals.get(":limit")
@@ -105,6 +114,10 @@ def webchat(monkeypatch):
                         {"Error": {"Code": "ConditionalCheckFailedException", "Message": "ttl"}},
                         "UpdateItem",
                     )
+            # Minimal SET #count = #count + :inc support
+            if "#count = #count + :inc" in expr:
+                item["count"] = int(item.get("count", 0)) + int(vals[":inc"])
+                item["ttl"] = item.get("ttl") or vals.get(":now", 0)
             return {"Attributes": dict(item)}
 
     mock_boto3 = types.ModuleType("boto3")
@@ -205,6 +218,53 @@ class TestWebChatRateLimitSourceIp:
             )
             last = webchat.lambda_handler(event, None)
         assert last["statusCode"] == 429
+
+    def test_browser_limit_and_ip_limit_are_separate(self, webchat, monkeypatch):
+        monkeypatch.setattr(webchat, "RATE_LIMIT", 2)
+        monkeypatch.setattr(webchat, "IP_RATE_LIMIT", 5)
+        ip = "198.51.100.7"  # one venue network
+        browsers = [f"browser-{n:02d}-abcdefghijkl" for n in range(4)]
+        codes = []
+        for cid in browsers:
+            for _ in range(2):
+                codes.append(webchat.lambda_handler(_chat_event(ip, client_id=cid), None)["statusCode"])
+        # 8 attempts behind one IP: the IP allows 5, each browser 2.
+        assert codes == [200, 200, 200, 200, 200, 429, 429, 429]
+
+    def test_one_browser_stops_at_its_own_limit(self, webchat, monkeypatch):
+        monkeypatch.setattr(webchat, "RATE_LIMIT", 2)
+        monkeypatch.setattr(webchat, "IP_RATE_LIMIT", 100)
+        cid = "browser-solo-abcdefghijkl"
+        codes = [webchat.lambda_handler(_chat_event("203.0.113.20", client_id=cid), None)["statusCode"]
+                 for _ in range(3)]
+        assert codes == [200, 200, 429]
+        other = webchat.lambda_handler(_chat_event("203.0.113.20", client_id="browser-next-abcdefghijkl"), None)
+        assert other["statusCode"] == 200  # someone else on the same network still gets answers
+
+    def test_daily_cap_refuses_without_a_model_call_or_rate_counting(self, webchat, monkeypatch):
+        monkeypatch.setattr(webchat, "DAILY_GLOBAL_CAP", 2)
+        calls = []
+        real = webchat.query_bedrock
+        monkeypatch.setattr(webchat, "query_bedrock", lambda *a, **k: calls.append(1) or real(*a, **k))
+        for n in range(2):
+            ok = webchat.lambda_handler(_chat_event(f"192.0.2.{n}", client_id=f"browser-cap-{n}-abcdefgh"), None)
+            assert ok["statusCode"] == 200
+        refused = webchat.lambda_handler(_chat_event("192.0.2.9", client_id="browser-cap-9-abcdefgh"), None)
+        body = json.loads(refused["body"])
+        assert refused["statusCode"] == 429 and body["daily_cap"] is True
+        assert body["error"] == webchat.DAILY_CAP_MSG
+        assert body["reset_at"] % 86400 == 0  # next UTC midnight
+        assert len(calls) == 2
+        # the refused visitor's hourly counters did not move
+        assert not any("RATE_LIMIT#" in pk and webchat.hashlib.sha256(b"IP#192.0.2.9").hexdigest()[:16] in pk
+                       for pk, _sk in webchat._rate_store)
+
+    def test_answers_are_counted_for_the_volume_alarm(self, webchat, monkeypatch):
+        sent = []
+        monkeypatch.setattr(webchat, "cloudwatch", types.SimpleNamespace(
+            put_metric_data=lambda **kw: sent.append((kw["Namespace"], kw["MetricData"][0]["MetricName"]))))
+        assert webchat.lambda_handler(_chat_event("192.0.2.50"), None)["statusCode"] == 200
+        assert sent == [("AgriNexus/Visitor", "web_question_answered")]
 
     def test_get_client_ip_ignores_xff(self, webchat):
         event = {

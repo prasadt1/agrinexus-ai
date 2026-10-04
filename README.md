@@ -92,7 +92,7 @@ AgriNexus is a deployed, functional prototype with production-grade observabilit
 | Line coverage (pytest-cov) | **53%** — re-measured 26 Sept 2026 after model-ID test edits (`pytest --cov=src`); the previous "80%" figure measured lines-of-test-code ÷ lines-of-source, not executed-line coverage. See [metrics](docs/IMPLEMENTATION-QUALITY-METRICS.md). |
 | Infrastructure-as-Code resources (SAM) | **34** ([template.yaml](template.yaml)) |
 | Architecture Decision Records (ADRs) | **10** ([docs/adr/](docs/adr/)) |
-| Active EARS requirements | **168** ([docs/requirements.md](docs/requirements.md); `python3 scripts/count_requirements.py`) |
+| Active EARS requirements | **173** ([docs/requirements.md](docs/requirements.md); `python3 scripts/count_requirements.py`) |
 | Lambda functions deployed | **11** |
 | CI/CD workflows | **2** ([ci.yml](.github/workflows/ci.yml) + [aws-smoke.yml](.github/workflows/aws-smoke.yml)) |
 | Lines of Python | **~6,000** across 11 services |
@@ -199,7 +199,7 @@ Pick the web demo or WhatsApp experience.
 | **Includes:** Text Q&A (RAG), optional image | **Includes:** Onboarding + text (public); voice/photo/nudges (allowlisted) |
 | **Best for:** Instant tryout in a browser | **Best for:** Full channel UX (buttons, voice, nudges) |
 | **Privacy:** No login; anonymous `client_id` in browser storage for rate limits | **Privacy:** WhatsApp number required |
-| **Limits:** ~5 questions/hour per IP + client; API Gateway + WAF caps | **Limits:** Rich features are allowlisted |
+| **Limits:** 20 questions/hour per browser, 300/hour per IP, 2,000 answers/day overall; API Gateway + WAF caps | **Limits:** Rich features are allowlisted |
 
 **WhatsApp access:** Text is open; voice/photo/nudges are available via the [demo request template](https://github.com/prasadt1/agrinexus-ai/issues/new?template=demo-request.md).
 
@@ -577,14 +577,14 @@ def test_done_response_marks_complete():
     assert get_scheduled_reminders() == []
 ```
 
-See [docs/requirements.md](docs/requirements.md) for the complete EARS specification (168 active requirements covering all features; 2 more are kept as retired or folded).
+See [docs/requirements.md](docs/requirements.md) for the complete EARS specification (173 active requirements covering all features; 2 more are kept as retired or folded).
 
 ## Development Workflow: Kiro AI
 
 This project was developed using **Kiro AI**, which enabled requirements-driven development from EARS specs through to deployed Lambda functions. Kiro's steering documents (`.kiro/specs/`) defined feature specs, implementation plans, and acceptance criteria—keeping requirements, code, and tests traceable throughout the 4-week build.
 
 **Key metrics:**
-- 168 active EARS requirements in [docs/requirements.md](docs/requirements.md)
+- 173 active EARS requirements in [docs/requirements.md](docs/requirements.md)
 - ~6,000 lines of Python across 11 Lambda functions
 - Full test coverage: voice, vision, RAG, nudges
 
@@ -655,7 +655,7 @@ The timing and follow-through problems smallholder farmers face inspired this wo
 
 ### For evaluators
 - [Architecture](docs/architecture.md) — full system design
-- [Requirements (EARS)](docs/requirements.md) — 168 active requirements specification
+- [Requirements (EARS)](docs/requirements.md) — 173 active requirements specification
 - [Implementation Quality Metrics](docs/IMPLEMENTATION-QUALITY-METRICS.md) — test coverage, code quality, traceability
 - [Cost & FinOps](docs/finops-public.md) — cost modeling and FinOps breakdown
 - [Competitive Evidence Notes](docs/competitive-evidence-notes.md) — competitive landscape analysis

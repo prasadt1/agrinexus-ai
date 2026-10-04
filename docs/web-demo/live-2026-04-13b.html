@@ -365,7 +365,7 @@
                 <summary>How this works (web demo)</summary>
                 <div class="how-body">
                     - This is an AI advisor demo with a mock farmer profile (text-only).<br>
-                    - Rate limit: 5 questions an hour (abuse protection).<br>
+                    - Limit: 20 questions an hour (abuse protection).<br>
                     - For farming only. Not medical or legal advice.
                 </div>
             </details>
@@ -416,7 +416,7 @@
                 </div>
                 <button class="send-btn" id="sendButton">Send</button>
             </div>
-            <div class="rate-limit-info" id="rateLimitInfo">5 questions remaining this hour</div>
+            <div class="rate-limit-info" id="rateLimitInfo">20 questions remaining this hour</div>
         </div>
 
         <div class="privacy-notice">
@@ -424,7 +424,7 @@
                 🔒 Privacy-friendly demo. No phone number required.
             </div>
             <div style="font-size: 12px; color: #666; margin-bottom: 4px;">
-                Note: This web demo is text-only (RAG queries). Rate limited to 5 questions/hour.
+                Note: This web demo is text-only (RAG queries). Limited to 20 questions an hour.
             </div>
             <div style="font-size: 13px; color: #666;">
                 <a href="../try/">Privacy and Impressum</a>
@@ -437,8 +437,9 @@
         // Configuration
         const API_URL = 'https://h4bt24ycdl.execute-api.us-east-1.amazonaws.com/dev/chat';
 
-        // 3 “try this” buttons to reduce blank-page friction.
-        // Two are real RAG questions; one explains the nudge flow (no KB call).
+        // “Try this” buttons to reduce blank-page friction. English uses the same five
+        // questions as the WhatsApp visitor list (common/visitor.py SAMPLE_QUESTIONS); the
+        // last button explains the nudge flow (no KB call).
         const NUDGE_DEMO_SENTINEL = "__NUDGE_DEMO__";
         const NUDGE_DEMO_LABEL = {
             en: "🔔 Show nudge demo flow",
@@ -448,8 +449,11 @@
         };
         const SAMPLE_QUESTIONS = {
             en: [
-                "Why are my wheat leaves turning yellow?",
-                "Best time to spray cotton?",
+                "How do I control whitefly on cotton?",
+                "Why are my wheat leaves yellowing?",
+                "When is it safe to spray after rain?",
+                "How do I manage bollworm on cotton?",
+                "When does soybean need irrigation?",
                 NUDGE_DEMO_SENTINEL
             ],
             hi: [
@@ -475,7 +479,7 @@
         const languageSelect = document.getElementById('language');
         const rateLimitInfo = document.getElementById('rateLimitInfo');
         let isProcessing = false;
-        let remainingQueries = 5;
+        let remainingQueries = 20;
         const STORAGE_KEY = 'agrinexus_web_demo_v1';
 
         function getOrCreateClientId() {
@@ -737,7 +741,10 @@
                     const resetAt = Number(state.resetAtSeconds || 0) * 1000;
                     if (resetAt > Date.now()) {
                         const mins = Math.max(1, Math.ceil((resetAt - Date.now()) / 60000));
-                        resetMsg = `⏳ Rate limit reached. Resets in ~${mins} minute${mins !== 1 ? 's' : ''}.`;
+                        const hours = Math.round(mins / 60);
+                        resetMsg = mins > 90
+                            ? `⏳ Limit reached. Resets in ~${hours} hours.`
+                            : `⏳ Rate limit reached. Resets in ~${mins} minute${mins !== 1 ? 's' : ''}.`;
                     }
                 } catch { /* ignore */ }
                 rateLimitInfo.textContent = resetMsg;
@@ -803,13 +810,18 @@
 
                 if (response.status === 429) {
                     let resetAt = null;
+                    let dailyCap = false;
+                    let capMessage = '';
                     try {
                         const data = await response.json();
                         if (data && data.reset_at) resetAt = Number(data.reset_at);
+                        if (data && data.daily_cap) { dailyCap = true; capMessage = data.error || ''; }
                     } catch {
                         // ignore
                     }
-                    showError('Rate limit exceeded. Please try again later.');
+                    showError(dailyCap
+                        ? (capMessage || "The web demo has reached today's limit. Please try again tomorrow.")
+                        : 'Rate limit exceeded. Please try again later.');
                     updateRateLimit(0);
                     if (resetAt) persistLockout(resetAt);
                     return;

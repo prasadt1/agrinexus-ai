@@ -328,8 +328,9 @@ def webchat(monkeypatch):
     spec.loader.exec_module(mod)
     sys.path.remove(layer)
     allowed = {"allowed": True, "remaining": 4, "reset_at": 0, "current_count": 1}
-    mod._peek_rate_limit = lambda _i: allowed
-    mod.check_rate_limit = lambda _i: allowed
+    mod._peek_rate_limit = lambda _i, _limit=None: allowed
+    mod.check_rate_limit = lambda _i, _limit=None: allowed
+    mod.try_consume_web_daily_answer = lambda: True
     return mod
 
 

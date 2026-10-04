@@ -594,6 +594,19 @@ class TestWholePipelineAfterDelete:
 
         return send
 
+    def test_visitor_voice_note_gets_the_plain_reply_and_no_voice_pipeline(self, bot, pipeline):
+        pipeline({"type": "text", "text": {"body": "Hi from re:Invent"}})
+        pipeline({"type": "audio", "audio": {"id": "media-2"}})
+        assert bot.texts()[-1] == bot.mod.visitor_mod.VISITOR_VOICE_OFF_MSG
+        assert "ack" not in bot.texts()          # the voice-received ack is never sent
+        assert bot.bedrock_calls == []
+
+    def test_voice_note_from_a_number_without_a_profile_keeps_the_allowlist_reply(self, bot, pipeline):
+        pipeline({"type": "audio", "audio": {"id": "media-2"}})
+        (reply,) = bot.texts()                   # unchanged: the farmer gate message, Hindi by default
+        assert reply.startswith("अभी वॉइस सुविधा बंद है")
+        assert reply != bot.mod.visitor_mod.VISITOR_VOICE_OFF_MSG
+
     def test_nothing_in_the_table_holds_the_number_after_delete(self, bot, pipeline):
         pipeline({"type": "text", "text": {"body": "Hi from re:Invent"}})
         pipeline({"type": "text", "text": {"body": "Why are my soybean leaves turning yellow?"}})
@@ -601,7 +614,8 @@ class TestWholePipelineAfterDelete:
         pipeline({"type": "audio", "audio": {"id": "media-2"}})   # refused: voice is off for visitors
         pipeline({"type": "text", "text": {"body": "done"}})      # a nudge keyword, handled by the detector
         assert len(bot.lists) == 1 and len(bot.bedrock_calls) == 1
-        assert any("Voice is not enabled in the public demo" in t for t in bot.texts())
+        assert bot.mod.visitor_mod.VISITOR_VOICE_OFF_MSG in bot.texts()
+        assert not any("allowlist" in t for t in bot.texts())
         assert bot.table.holding()
 
         pipeline({"type": "text", "text": {"body": "DELETE"}})
