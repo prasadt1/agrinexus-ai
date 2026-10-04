@@ -1440,20 +1440,23 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             
             # "Can I spray today / tomorrow?" is answered from live weather for the farmer's
             # district with the nudge's own rule, not from the knowledge base (REQ-SPRAY-001..003).
-            # Visitors and unknown districts fall through to the knowledge base.
+            # Without a known district (visitors, other districts) the reply states the rule.
             location = (profile.get("district") or profile.get("location")) if profile else None
             timing_day = spray_timing_day(text) if spray_question_kind(text) == "timing" else None
-            if timing_day and spray_timing.district_known(location):
+            if timing_day:
+                known = spray_timing.district_known(location)
                 reply_text = filter_advice(
-                    spray_timing.answer_spray_timing(location, dialect, timing_day),
+                    spray_timing.answer_spray_timing(location, dialect, timing_day) if known
+                    else spray_timing.general_rule_reply(dialect),
                     dialect,
                     "whatsapp_voice" if voice_source in ("voice", "voice_test") else "whatsapp_text",
                     kind="answer",
                     district=location,
                     question=text,
                 )
-                save_message(from_number, wamid, message, reply_text, "spray_timing_weather", ttl_days=_msg_ttl_days(profile))
-                print(f"Spray timing answered from weather: district={location} day={timing_day}")
+                save_message(from_number, wamid, message, reply_text,
+                             "spray_timing_weather" if known else "spray_timing_rule", ttl_days=_msg_ttl_days(profile))
+                print(f"Spray timing answered: {'weather' if known else 'rule'} day={timing_day}")
                 send_voice = (approved and dialect in ['hi', 'mr', 'en'] and
                               (voice_source in ('voice', 'voice_test') or profile.get('voicePreference', False)))
                 send_whatsapp_message(from_number, reply_text)
@@ -1461,6 +1464,8 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                     audio_url = text_to_speech(truncate_for_voice(reply_text), dialect, from_number)
                     if audio_url:
                         send_whatsapp_message(from_number, '', audio_url=audio_url)
+                if is_visitor:
+                    visitor_mod.emit_visitor_metric(cloudwatch, "visitor_question_answered")
                 continue
 
             # Every question is answered on its own, typed or spoken. The phone number used to

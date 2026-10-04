@@ -266,6 +266,21 @@ class TestWebChatRateLimitSourceIp:
         assert webchat.lambda_handler(_chat_event("192.0.2.50"), None)["statusCode"] == 200
         assert sent == [("AgriNexus/Visitor", "web_question_answered")]
 
+    def test_spray_timing_question_gets_the_rule_without_a_model_call(self, webchat, monkeypatch):
+        calls = []
+        monkeypatch.setattr(webchat, "query_bedrock", lambda *a, **k: calls.append(1) or {"text": "x", "citations": []})
+        resp = webchat.lambda_handler(_chat_event("192.0.2.77", message="Can I spray today?"), None)
+        body = json.loads(resp["body"])
+        assert resp["statusCode"] == 200
+        assert body["reply"].startswith("I can't see the weather where you are.")
+        assert body["citations"] == [] and calls == []
+
+    def test_general_spray_question_still_reaches_the_knowledge_base(self, webchat, monkeypatch):
+        calls = []
+        monkeypatch.setattr(webchat, "query_bedrock", lambda *a, **k: calls.append(1) or {"text": "Wait until leaves are dry.", "citations": []})
+        webchat.lambda_handler(_chat_event("192.0.2.78", message="When is it safe to spray after rain?"), None)
+        assert calls == [1]
+
     def test_get_client_ip_ignores_xff(self, webchat):
         event = {
             "headers": {"X-Forwarded-For": "8.8.8.8"},

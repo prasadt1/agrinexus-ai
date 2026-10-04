@@ -4,6 +4,14 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 4 October 2026 — spray-timing for visitors and the web demo: the rule, not a refusal (not deployed)
+
+- **Non-answer for visitors.** The 15:44 replay asked "Can I spray today?" with no district, which is what a re:Invent visitor or a web demo user sends: "I don't have information about this in my knowledge base. Please contact your nearest KVK...". Better than the pesticide-policy reply it got before #27, but still no answer, and spray timing is what the video invites people to ask.
+- **Change.** When the district is unknown (visitors, web demo, districts without coordinates), a question about spraying now, today or tomorrow gets a fixed reply in four languages: the system cannot see their weather; spray only when wind is under 10 km/h and no rain is expected for 3 to 4 hours; early morning or evening is best. No Bedrock call. WhatsApp saves it as `spray_timing_rule`; the web demo returns it with no citations. Farmers in Latur, Jalna and Nagpur keep the live-weather answer; general questions ("when is it safe to spray after rain?") still go to the knowledge base. `text-replay.py` mirrors this path. REQ-SPRAY-003 amended.
+- **Also:** visitor spray-timing answers now count in `visitor_question_answered`; the visitor cap fallbacks for an unreadable setting now match the new defaults (30 per number, 2,000 a day) instead of the old 10 and 300. 9 new tests; full suite 1147 passed, 30 skipped.
+
+---
+
 ## 4 October 2026 — advice filter: a removal no longer changes numbers or leaves "do this" behind (not deployed)
 
 - **A fertilizer grade was corrupted.** Live voice reply on 4 October to "सफेद मक्खी के लिए कौन सी दवा छिड़कें?": the model wrote potassium nitrate "(NPK 13:0:45)"; the farmer saw "(NPK 13:0:1)". When the filter removes a sentence it renumbers list items in that line, and its list-number pattern also matched "45)" after the colon. Reproduced with the filter alone. A list number now must not follow a digit and a colon (ratios, times) and must not close a bracket that is still open ("(about 45) days").
