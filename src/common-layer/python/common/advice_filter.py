@@ -275,9 +275,23 @@ _WATER = tuple(
     for w in ("water", "irrigat", "पाणी", "पाण्य", "पानी", "सिंचन", "सिंचाई", "నీరు", "నీటి", "నీళ్ళు")
 )
 
-_ABBREVIATIONS = tuple(_normalize(a) for a in ("मि", "ली", "ग्रा", "कि", "मि.ली", "कि.ग्रा", "డా", "మి", "e.g", "i.e", "approx", "dr", "no"))
+_ABBREVIATIONS = tuple(_normalize(a) for a in ("मि", "ली", "ग्रा", "कि", "मि.ली", "कि.ग्रा", "డా", "మి", "లీ", "మి.లీ", "గ్రా", "కి.గ్రా", "e.g", "i.e", "approx", "dr", "no"))
 _ENUM_RE = re.compile(r"(?:^|(?<=[\s,;:]))(\(?)([0-9०-९౦-౯]{1,2})([).])(?=\s)")
 _LABEL_RE = re.compile(r"^\s*\*[^*\n]+\*\s*")
+
+
+def _is_list_number(before: str, m: "re.Match") -> bool:
+    """
+    True when an _ENUM_RE match is a list number ("2)", "(3)", "4."), given the text before it.
+    Not a list number: the last part of a ratio or time ("NPK 13:0:45)", "10:30)"), or a number
+    that closes a bracket opened earlier ("(about 45) days"). Renumbering those changed
+    "13:0:45" to "13:0:1" in a live reply on 4 Oct 2026.
+    """
+    if before.endswith(":") and before[-2:-1].isdigit():
+        return False
+    if not m.group(1) and m.group(3) == ")" and before.rfind("(") > before.rfind(")"):
+        return False  # the nearest bracket before it is still open
+    return True
 
 # A step that only says to do it again refers to the step before it; when that step
 # was removed, the repeat is dropped too. Repeating a check or inspection stands alone.
@@ -293,6 +307,28 @@ _MONITOR = tuple(
         "तपास", "जांच", "जाँच", "निरीक्षण", "देखें", "पाहणी", "పరిశీల", "తనిఖీ", "గమనించ",
     )
 )
+
+
+# A sentence that only points back at the step before it ("do this when...", "यह तब करें
+# जब...") is meaningless once that step was removed, so it is dropped with it. Only phrases
+# about doing or applying "this" are listed: "यह कीट..." ("this pest...") stands alone.
+_BACKREF_START = tuple(
+    _normalize(w)
+    for w in (
+        "do this", "do it ", "do so", "this should be", "this must be", "this is to be", "apply this",
+        "apply it", "use this", "use it ", "spray this", "spray it", "only do this", "only then",
+        "यह तब", "ऐसा तब", "इसे तब", "यह छिड़काव", "यह छिडकाव", "इसका छिड़काव", "इसका छिडकाव", "इसे छिड़",
+        "इसे छिड", "यह स्प्रे", "इसका स्प्रे", "ऐसा करें", "यह करें", "इसे करें", "तभी करें",
+        "हे तेव्हा", "ते तेव्हा", "हे करा", "ते करा", "असे करा", "ही फवारणी", "हे फवार", "याची फवारणी",
+        "तेव्हाच करा",
+        "ఇది అప్పుడు", "ఇలా చేయ", "దీనిని", "దీన్ని", "ఈ పిచికారీ", "ఈ స్ప్రే", "అప్పుడే చేయ",
+    )
+)
+
+
+def _is_orphan_backref(segment: str) -> bool:
+    norm = _normalize(segment).strip().lstrip("-•*·– ")
+    return any(norm.startswith(w) for w in _BACKREF_START)
 
 
 def _is_orphan_repeat(segment: str) -> bool:
@@ -347,7 +383,8 @@ def _segments(text: str) -> List[str]:
                 continue
         cuts.add(m.end())
     for m in _ENUM_RE.finditer(text):
-        cuts.add(m.start())
+        if _is_list_number(text[: m.start()], m):
+            cuts.add(m.start())
     ordered = sorted(cuts)
     return [text[a:b] for a, b in zip(ordered, ordered[1:]) if text[a:b]]
 
@@ -360,6 +397,8 @@ def _renumber(parts: List[str], counter: List[int]) -> List[str]:
     out = []
     for p in parts:
         m = _ENUM_RE.match(p)
+        if m and not _is_list_number("".join(out), m):
+            m = None
         if not m and p.strip().endswith(":"):
             counter[:] = [0, 0]
         if m:
@@ -390,7 +429,7 @@ def _split_line(line: str, hits: List[Tuple[str, Set[str]]], state: Dict[str, in
     segments = _segments(body)
     for seg in segments:
         kinds = classify(seg)
-        orphan = not kinds and state["after_removal"] and _is_orphan_repeat(seg)
+        orphan = not kinds and state["after_removal"] and (_is_orphan_repeat(seg) or _is_orphan_backref(seg))
         if kinds or orphan:
             if kinds:
                 hits.append((seg.strip(), kinds))
@@ -398,6 +437,8 @@ def _split_line(line: str, hits: List[Tuple[str, Set[str]]], state: Dict[str, in
                 state["orphans"] += 1
             state["after_removal"] = 1
             end = re.search(r"[।.?!॥]$", seg.strip())
+            while kept and not kept[-1].strip():
+                kept.pop()  # the gap between two segments; punctuation belongs on the sentence before it
             if end and kept:
                 prev = re.sub(r"[\s,;:]+$", "", kept[-1])
                 if not re.search(r"[।.?!॥]$", prev):
