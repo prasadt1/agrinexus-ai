@@ -185,8 +185,19 @@ def test_reply_branches_english():
     assert "raining now, do not spray" in r("today", WET)
     assert "tomorrow morning is likely to be favorable" in r("tomorrow", TOK)
     assert "rain is likely tomorrow morning (60% chance)" in r("tomorrow", TRAIN)
-    assert "wind tomorrow morning is likely to be strong (about 12.0 km/h)" in r("tomorrow", TWIND)
+    assert "wind tomorrow morning is likely to be too high for spraying (about 12.0 km/h; it should be under 10 km/h)" in r("tomorrow", TWIND)
     assert "not available right now" in r("today", None)
+
+
+@pytest.mark.parametrize("dialect", ["hi", "mr", "te", "en"])
+def test_a_wind_verdict_states_the_limit_and_does_not_overstate(dialect):
+    """10.4 km/h is just over the limit, not "strong wind": every wind reply states the 10 km/h limit."""
+    near = {"wind_kmh": 10.4, "rain_mm": 0, "rain_probability": 0.0, "favorable": False}
+    for day in ("today", "tomorrow"):
+        text = spray_timing.spray_timing_reply("Latur", dialect, day, near)
+        assert "10.4 km/h" in text and "10 km/h" in text.replace("10.4 km/h", "")
+    assert "तेज़" not in spray_timing.spray_timing_reply("Latur", "hi", "tomorrow", near)
+    assert "strong" not in spray_timing.spray_timing_reply("Latur", "en", "tomorrow", near)
 
 
 def test_reply_hindi_matches_the_nudge_wording():

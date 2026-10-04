@@ -88,7 +88,7 @@ def _ask(mod, text, source=None):
 
 def test_the_live_question_of_4_october_is_answered_from_weather(farmer):
     reply = _ask(farmer, "क्या कल लाटूर में स्प्रे करने का सही समय है?")
-    assert reply.startswith("Latur: कल सुबह हवा तेज़ रहने की संभावना है (लगभग 13.0 km/h)")
+    assert reply.startswith("Latur: कल सुबह हवा स्प्रे के लिए ज़्यादा रहने की संभावना है (लगभग 13.0 km/h; 10 km/h से कम होनी चाहिए)")
     assert "कीटनाशक के नाम या मात्रा नहीं बता सकता" not in reply   # no pesticide-policy reply
     assert "KVK" in reply                                           # standard footer
     assert farmer._calls == []                                      # no Bedrock call
