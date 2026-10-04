@@ -602,6 +602,10 @@ Resources:
           VISITOR_SAMPLE_IMAGE_BUCKET: !Ref TempAudioBucket
           VISITOR_SAMPLE_IMAGE_KEY: visitor-samples/crop-leaf.jpg
           VISITOR_SAMPLE_IMAGE_CROP: !Ref VisitorSampleImageCrop
+          # Spray-timing answers read the same weather as the nudge poller (REQ-SPRAY-001)
+          WEATHER_API_KEY_SECRET: agrinexus/weather/api-key
+          WEATHER_API_BASE: "https://api.openweathermap.org/data/2.5/weather"
+          WEATHER_FORECAST_BASE: "https://api.openweathermap.org/data/2.5/forecast"
       Policies:
         - CloudWatchPutMetricPolicy: {}
         - DynamoDBCrudPolicy:
@@ -650,6 +654,7 @@ Resources:
               Resource:
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus/whatsapp/*
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus-whatsapp-*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus/weather/api-key-*
       Events:
         SQSEvent:
           Type: SQS
@@ -691,6 +696,10 @@ Resources:
           VISITOR_SAMPLE_IMAGE_BUCKET: !Ref TempAudioBucket
           VISITOR_SAMPLE_IMAGE_KEY: visitor-samples/crop-leaf.jpg
           VISITOR_SAMPLE_IMAGE_CROP: !Ref VisitorSampleImageCrop
+          # Spray-timing answers read the same weather as the nudge poller (REQ-SPRAY-001)
+          WEATHER_API_KEY_SECRET: agrinexus/weather/api-key
+          WEATHER_API_BASE: "https://api.openweathermap.org/data/2.5/weather"
+          WEATHER_FORECAST_BASE: "https://api.openweathermap.org/data/2.5/forecast"
       Policies:
         - CloudWatchPutMetricPolicy: {}
         - DynamoDBCrudPolicy:
@@ -739,6 +748,7 @@ Resources:
               Resource:
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus/whatsapp/*
                 - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus-whatsapp-*
+                - !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:agrinexus/weather/api-key-*
       Events:
         SQSEvent:
           Type: SQS
