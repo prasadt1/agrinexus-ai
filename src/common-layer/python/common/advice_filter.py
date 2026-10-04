@@ -454,9 +454,87 @@ PESTICIDE_POLICY = {
 }
 
 
-def is_pesticide_question(text: str) -> bool:
+# A spray question is about a product ("which spray, how much") or about timing ("is now a
+# good time to spray"). The nudge itself tells farmers when the weather suits spraying, so a
+# timing question must never get the pesticide-policy reply. Words below are normalized stems.
+_SPRAY_WORDS = tuple(_normalize(w) for w in (
+    "spray", "spraying", "फवार", "छिडक", "छिड़क", "स्प्रे", "పిచికారీ", "స్ప్రే",
+))
+_PRODUCT_WORDS = tuple(_normalize(w) for w in (
+    # which / what product, how much, dose, name, brand
+    "which", "what pesticide", "what insecticide", "what fungicide", "what herbicide", "what chemical",
+    "what spray", "what should i spray", "what to spray", "what can i spray", "how much", "how many ml",
+    "dose", "dosage", "quantity", "per litre", "per liter", "per acre", "per hectare", "name of", "brand",
+    "recommend a", "suggest a", "best pesticide", "best insecticide", "best spray",
+    "कौन सा", "कौन सी", "कौनसा", "कौनसी", "कौन से", "किस", "कितना", "कितनी", "कितने", "मात्रा", "नाम", "कौन",
+    "कोणते", "कोणती", "कोणता", "कोणत्या", "किती", "प्रमाण", "नाव", "कुठले", "कुठली",
+    "ఏ ", "ఏది", "ఎంత", "మోతాదు", "పేరు", "ఏ మందు", "ఏ పురుగుమందు",
+))
+_TIMING_WORDS = tuple(_normalize(w) for w in (
+    "when", "right time", "good time", "best time", "safe to spray", "safe time", "weather", "today",
+    "tomorrow", "tonight", "now", "this morning", "this evening", "this week",
+    "कब", "समय", "सही वक्त", "आज", "कल", "अभी", "अब", "मौसम", "सुबह", "शाम",
+    "केव्हा", "कधी", "वेळ", "आज", "उद्या", "आता", "हवामान", "सकाळी", "संध्याकाळी",
+    "ఎప్పుడు", "సమయం", "ఈరోజు", "ఈ రోజు", "రేపు", "ఇప్పుడు", "వాతావరణం", "ఉదయం", "సాయంత్రం",
+))
+# Near-term references that make a timing question answerable from the weather, by day.
+_TODAY_WORDS = tuple(_normalize(w) for w in (
+    "today", "tonight", "now", "right now", "this morning", "this evening", "this afternoon",
+    "आज", "अभी", "अब", "आता", "ఈరోజు", "ఈ రోజు", "ఇప్పుడు", "ఇవాళ",
+))
+_TOMORROW_WORDS = tuple(_normalize(w) for w in (
+    "tomorrow", "कल", "उद्या", "రేపు",
+))
+_TIME_ONLY_WORDS = tuple(_normalize(w) for w in (
+    # "is it the right time to spray?" with no day named: read as now
+    "right time", "good time", "सही समय", "अच्छा समय", "सही वक्त", "योग्य वेळ", "चांगली वेळ",
+    "సరైన సమయం", "మంచి సమయం",
+))
+_WHEN_WORDS = tuple(_normalize(w) for w in (
+    # a general "when should I spray?" is agronomy for the knowledge base, not a weather check
+    "when", "कब", "केव्हा", "कधी", "ఎప్పుడు",
+))
+
+
+def spray_question_kind(text: str) -> Optional[str]:
+    """
+    "product": asks which pesticide or spray to use, or how much.
+    "timing":  asks when, or whether now, today or tomorrow is a good time to spray.
+    None:      not a spray or pesticide question.
+    A question that names a product and a time ("which spray tomorrow?") is "product".
+    """
     t = _normalize(text or "")
-    return any(w in t for w in _PESTICIDE_QUESTION)
+    if not any(w in t for w in _PESTICIDE_QUESTION):
+        return None
+    if any(w in t for w in _PRODUCT_WORDS):
+        return "product"
+    if any(w in t for w in _TIMING_WORDS):
+        return "timing"
+    return "product"
+
+
+def spray_timing_day(text: str) -> Optional[str]:
+    """
+    For a timing question: "today" or "tomorrow" when the farmer names a day (or asks about
+    now), None for a general question ("when should I spray after rain?") that the knowledge
+    base answers. Only meaningful when spray_question_kind() is "timing" and the question
+    mentions spraying.
+    """
+    t = _normalize(text or "")
+    if not any(w in t for w in _SPRAY_WORDS):
+        return None
+    if any(w in t for w in _TOMORROW_WORDS):
+        return "tomorrow"
+    if any(w in t for w in _TODAY_WORDS):
+        return "today"
+    if any(w in t for w in _TIME_ONLY_WORDS) and not any(w in t for w in _WHEN_WORDS):
+        return "today"
+    return None
+
+
+def is_pesticide_question(text: str) -> bool:
+    """True for a question about which pesticide or spray to use, or how much; not for timing."""
+    return spray_question_kind(text) == "product"
 
 
 def pesticide_policy(dialect: str) -> str:

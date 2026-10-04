@@ -26,6 +26,7 @@ def _install_common_stubs(sent_messages):
     advice_mod = importlib.import_module("common.advice_filter")
     source_line_mod = importlib.import_module("common.source_line")
     source_labels_mod = importlib.import_module("common.source_labels")
+    spray_timing_mod = importlib.import_module("common.spray_timing")
     advice_mod._cloudwatch = types.SimpleNamespace(put_metric_data=lambda **kw: None)
 
     common_pkg = types.ModuleType("common")
@@ -67,6 +68,7 @@ def _install_common_stubs(sent_messages):
     sys.modules["common.advice_filter"] = advice_mod
     sys.modules["common.source_line"] = source_line_mod
     sys.modules["common.source_labels"] = source_labels_mod
+    sys.modules["common.spray_timing"] = spray_timing_mod
     common_pkg.redact = redact_mod
     common_pkg.nudge_keywords = nk_mod
     common_pkg.whatsapp = whatsapp

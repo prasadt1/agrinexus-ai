@@ -20,7 +20,8 @@ import analyzer
 from common.whatsapp import send_whatsapp_message, send_whatsapp_list, send_whatsapp_image
 from common.whatsapp import send_whatsapp_buttons as _send_whatsapp_buttons
 from common.district_helplines import maybe_append_helpline_footer
-from common.advice_filter import filter_advice, is_pesticide_question, pesticide_policy
+from common.advice_filter import filter_advice, is_pesticide_question, pesticide_policy, spray_question_kind, spray_timing_day
+from common import spray_timing
 from common.source_line import strip_source_lines
 from common.source_labels import source_labels, source_line as format_source_line
 from common.allowlist import is_approved_user, allowlist_expiry_hint
@@ -1437,6 +1438,31 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
                 }
                 send_whatsapp_message(from_number, ack_messages.get(dialect, ack_messages['hi']))
             
+            # "Can I spray today / tomorrow?" is answered from live weather for the farmer's
+            # district with the nudge's own rule, not from the knowledge base (REQ-SPRAY-001..003).
+            # Visitors and unknown districts fall through to the knowledge base.
+            location = (profile.get("district") or profile.get("location")) if profile else None
+            timing_day = spray_timing_day(text) if spray_question_kind(text) == "timing" else None
+            if timing_day and spray_timing.district_known(location):
+                reply_text = filter_advice(
+                    spray_timing.answer_spray_timing(location, dialect, timing_day),
+                    dialect,
+                    "whatsapp_voice" if voice_source in ("voice", "voice_test") else "whatsapp_text",
+                    kind="answer",
+                    district=location,
+                    question=text,
+                )
+                save_message(from_number, wamid, message, reply_text, "spray_timing_weather", ttl_days=_msg_ttl_days(profile))
+                print(f"Spray timing answered from weather: district={location} day={timing_day}")
+                send_voice = (approved and dialect in ['hi', 'mr', 'en'] and
+                              (voice_source in ('voice', 'voice_test') or profile.get('voicePreference', False)))
+                send_whatsapp_message(from_number, reply_text)
+                if send_voice:
+                    audio_url = text_to_speech(truncate_for_voice(reply_text), dialect, from_number)
+                    if audio_url:
+                        send_whatsapp_message(from_number, '', audio_url=audio_url)
+                continue
+
             # Every question is answered on its own, typed or spoken. The phone number used to
             # be passed as the Bedrock session ID here. Bedrock issues session IDs itself and
             # rejects one chosen by the caller, so that only added a failed first call to every
@@ -1469,7 +1495,6 @@ Full access (voice/photo/nudges): GitHub request → {request_url}'''
             if not policy_reply and not is_rag_refusal_response(response_text):
                 cited = format_source_line(source_labels_from_citations(result.get("citations")), dialect)
 
-            location = (profile.get("district") or profile.get("location")) if profile else None
             response_text = filter_advice(
                 response_text,
                 dialect,

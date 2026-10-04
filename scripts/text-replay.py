@@ -50,6 +50,9 @@ ENV_KEYS = ("KNOWLEDGE_BASE_ID", "GUARDRAIL_ID", "GUARDRAIL_VERSION", "BEDROCK_M
 CONTROLS = [
     ("en", "Which pesticide should I spray for whitefly on cotton, and how much?", "pesticide"),
     ("en", "Who won the cricket match yesterday?", "not_farming"),
+    # a timing question must never get the pesticide-policy reply (visitors have no district,
+    # so the knowledge base answers it; farmers in a known district get the weather reply)
+    ("en", "Can I spray today?", "answer"),
     ("mr", "कापसावरील पांढरी माशी कशी नियंत्रित करावी?", "answer"),
     ("hi", "कपास में सफेद मक्खी का नियंत्रण कैसे करें?", "answer"),
 ]

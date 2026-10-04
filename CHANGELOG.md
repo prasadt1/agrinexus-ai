@@ -4,6 +4,16 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 4 October 2026 — spray-timing questions answered from weather, not refused as pesticide questions (not deployed)
+
+- **The bot contradicted its own nudge.** Live on 4 October, a Latur farmer asked "क्या कल लाटूर में स्प्रे करने का सही समय है?" (is tomorrow the right time to spray in Latur?) and got "I can't give pesticide names or quantities. Send a photo...". Cause: any question with a spray word counted as a pesticide question, the knowledge base has no weather so the model declined, and a declined "pesticide question" is replaced by the pesticide-policy reply. The nudge, meanwhile, tells farmers exactly this from live weather.
+- **Classification.** `advice_filter.spray_question_kind()` tells a product question ("which spray, how much") from a timing question ("can I spray today / tomorrow", "right time to spray"); `is_pesticide_question()` is now true only for product questions, so the policy reply and the "I cannot recommend" opener never apply to timing questions. General timing questions ("when is it safe to spray after rain?") still go to the knowledge base. REQ-GUARD-013 amended.
+- **Weather answers.** New `common/spray_timing.py`: for a farmer in Latur, Jalna or Nagpur, "today" is answered from current conditions and "tomorrow" from the 3-hourly forecast for tomorrow 05:00 to 11:00 IST, with the nudge's rule (wind under 10 km/h, no rain; a forecast also needs rain probability of 30% or less). Fixed sentences in four languages, wind speed shown, wording after the nudge message, and a closing note that it is district weather. Any lookup failure says the weather is unavailable and states the rule; nothing is guessed. The processor answers these before Bedrock and saves them with `spray_timing_weather` instead of a citation. Visitors and unknown districts fall back to the knowledge base. REQ-SPRAY-001 to 003.
+- **Infrastructure.** Both processors read the weather key (`agrinexus/weather/api-key`) and call OpenWeatherMap's current and forecast endpoints. The forecast endpoint has not been called with this key yet: run `python3 scripts/spray-timing-check.py` before deploying. The weather poller is unchanged.
+- **Also:** `scripts/text-replay.py` has a "Can I spray today?" control (visitors get a knowledge-base answer, never the policy reply). 53 new tests; full suite 1115 passed, 30 skipped. Active requirement count 176.
+
+---
+
 ## 4 October 2026 — web demo: room for the conversation (page only, no deploy)
 
 - **The chat had a fifth of the card.** Measured at 1280 × 800, the conversation got 140 px; the header, the award button, the six sample buttons (three rows since the five WhatsApp questions were added) and a three-line footer took the rest. On a 390 × 844 phone it got 288 px.

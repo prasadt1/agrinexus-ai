@@ -125,7 +125,7 @@ The product identifies the pest or problem and gives non-chemical steps. It does
 
 **REQ-GUARD-012**: The system shall end every advice message with a line in the farmer's language stating that the answer is automated and can be wrong and directing the farmer to the nearest KVK for the pesticide and quantity, and shall carry any contact details in that same footer rather than adding a second one.
 
-**REQ-GUARD-013**: When a farmer asks which pesticide to use or how much, the system shall reply with the identification and non-chemical steps it can give plus the KVK referral, and shall not name a product.
+**REQ-GUARD-013** (amended 4 Oct 2026): When a farmer asks which pesticide or spray to use, or how much, the system shall reply with the identification and non-chemical steps it can give plus the KVK referral, and shall not name a product. A question about when to spray (today, tomorrow, the right time, after rain) is not a product question and shall never receive the pesticide-policy reply; near-term timing questions are answered from weather (REQ-SPRAY-001 to 003), general ones from the knowledge base.
 
 **REQ-GUARD-014**: The system may name neem, yellow sticky traps and pheromone traps as practices, and shall not state a quantity or dilution for them.
 
@@ -170,6 +170,12 @@ The product identifies the pest or problem and gives non-chemical steps. It does
 **REQ-NUDGE-010**: If no response is received within 72 hours, then the system shall mark the nudge as "no_response" and log for analytics.
 
 **REQ-NUDGE-011**: When a weather nudge is due outside the send window of 06:00 to 19:00 Asia/Kolkata (stack parameters `NudgeSendWindowStartHour` and `NudgeSendWindowEndHour`; an unreadable or invalid window sends nothing), the system shall skip that farmer and emit a `NudgesDeferred` metric; the next 6-hourly poll inside the window sends it. If the farmer's last DONE or EXPIRED nudge for the same activity closed within `NUDGE_COOLDOWN_DAYS` (default 7 days; close time is `completedAt` or `expiredAt`, else creation + 72 hours; an unreadable close time blocks), then the system shall not send a new nudge for that activity. Only an invocation with `"force": true` (the demo script) bypasses the window and the cooldown; consent, allowlist and open-nudge gates still apply. Reminders are not affected.
+
+**REQ-SPRAY-001**: When a farmer with a profile in a district the system has coordinates for asks whether now or today is a good time to spray, the system shall answer from the district's current weather using the nudge rule (wind under 10 km/h and no rain), in fixed sentences in the farmer's language, with the wind speed shown, without calling the knowledge base, and shall append the standard referral footer. The wording follows the nudge message.
+
+**REQ-SPRAY-002**: When such a farmer asks whether tomorrow is a good time to spray, the system shall answer from the 3-hourly forecast for tomorrow's early morning in India (slots between 05:00 and 11:00 Asia/Kolkata) and shall call it favorable only if every slot has wind under 10 km/h, no rain volume and a rain probability of 30% or less; otherwise it shall name the reason (wind or rain) and advise checking again in the morning.
+
+**REQ-SPRAY-003**: If the weather lookup fails for any reason (no key, request error, unusable response, no forecast slots), the system shall say the weather is not available and state the rule for the farmer to check, and shall not guess. Every spray-timing reply shall end with a note that it is the district weather and the farmer should also look at their own field. Visitors and farmers in a district without coordinates receive the knowledge-base answer instead.
 
 ### 2.7 WhatsApp Integration (Tier 1 - Full Depth)
 
