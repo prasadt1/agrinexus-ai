@@ -4,6 +4,16 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 4 October 2026 — web demo: room for the conversation (page only, no deploy)
+
+- **The chat had a fifth of the card.** Measured at 1280 × 800, the conversation got 140 px; the header, the award button, the six sample buttons (three rows since the five WhatsApp questions were added) and a three-line footer took the rest. On a 390 × 844 phone it got 288 px.
+- **Change.** The award is one small underlined line instead of a button, and the tagline is gone. After the first question the sample buttons, the WhatsApp row and the "How this works" fold collapse into one "Sample questions" link above the input. The footer is one line. Measured after the first answer: 402 px of the 720 px card on the laptop (was 140), 507 px on the phone (was 288).
+- **Sample buttons send at once.** They used to fill the input box and wait for Send.
+- **Stale limit text.** The welcome bubble still said "5 free questions per hour", and the reset path set the counter back to 5; both now say 20.
+- Checked in a headless browser at both sizes with the API stubbed; not checked on a real phone.
+
+---
+
 ## 4 October 2026 — visitor limits as circuit breakers, web demo questions, visitor voice reply (not deployed)
 
 - **Web demo locked out shared networks.** The page and API allowed 5 questions an hour, applied to the stricter of the browser ID and the source IP. Venue Wi-Fi and mobile carriers put many people behind one IP, so the first five questions from a network could block everyone on it for an hour. Now: 20 an hour per browser, 300 an hour per IP, separate SAM parameters (`WebRateLimitPerClient`, `WebRateLimitPerIp`).
