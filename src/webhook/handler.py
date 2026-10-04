@@ -15,6 +15,7 @@ from common.whatsapp import send_whatsapp_message, VOICE_RECEIVED_ACK
 from common.allowlist import is_approved_user, allowlist_expiry_hint
 from common.redact import message_ref, redact_phone
 from common.nudge_keywords import is_nudge_reply
+from common.visitor import VISITOR_VOICE_OFF_MSG, is_visitor_profile
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -195,14 +196,19 @@ def verify_signature(payload: str, signature: str) -> bool:
         return False
 
 
-def get_user_dialect(phone: str) -> str:
-    """Fast PROFILE lookup for localized voice ACK (defaults to hi)."""
+def get_user_profile(phone: str) -> Dict[str, Any]:
+    """PROFILE row for the number, or {} if missing or unreadable."""
     try:
         r = table.get_item(Key={'PK': f'USER#{phone}', 'SK': 'PROFILE'})
-        return (r.get('Item') or {}).get('dialect', 'hi') or 'hi'
+        return r.get('Item') or {}
     except Exception as e:
-        logger.warning(f"dialect lookup failed for voice ack: {e}")
-        return 'hi'
+        logger.warning(f"profile lookup failed: {e}")
+        return {}
+
+
+def get_user_dialect(phone: str) -> str:
+    """Fast PROFILE lookup for localized voice ACK (defaults to hi)."""
+    return get_user_profile(phone).get('dialect', 'hi') or 'hi'
 
 
 def send_voice_received_ack(from_number: str) -> None:
@@ -339,7 +345,12 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             if message_type == 'audio' and voice_queue_url:
                 # Gate expensive voice path for unapproved users (text-only still works)
                 if not is_approved_user(table, from_number):
-                    dialect = get_user_dialect(from_number)
+                    profile = get_user_profile(from_number)
+                    if is_visitor_profile(profile):
+                        # re:Invent visitor: plain wording, no allowlist jargon.
+                        send_whatsapp_message(from_number, VISITOR_VOICE_OFF_MSG)
+                        continue
+                    dialect = profile.get('dialect', 'hi') or 'hi'
                     gate_msg = {
                         'hi': f'अभी वॉइस सुविधा बंद है। कृपया टेक्स्ट में प्रश्न भेजें। {allowlist_expiry_hint(dialect)}',
                         'mr': f'सध्या व्हॉइस सुविधा बंद आहे. कृपया प्रश्न टेक्स्टमध्ये पाठवा. {allowlist_expiry_hint(dialect)}',

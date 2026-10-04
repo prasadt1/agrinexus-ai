@@ -18,6 +18,9 @@ Usage:
   python3 scripts/text-replay.py --runs 3
   python3 scripts/text-replay.py --question "How do I control whitefly on cotton?"
   python3 scripts/text-replay.py --out docs/try/replays/2026-10-04-text.json
+  python3 scripts/text-replay.py --web
+    Same questions through the web chat handler (its own prompt and filter), with rate
+    limits and the daily counter stubbed so nothing is written to DynamoDB.
 
 Checks per reply (heuristics; read the stored text):
   words        words in the model's answer (the prompt asks for under 100)
@@ -107,6 +110,48 @@ def farmer_reply(handler, question: str, dialect: str, result: dict) -> dict:
     return {"reply_text": reply, "source_labels": labels, "policy_reply": policy_reply}
 
 
+class _AllowAllTable:
+    """Stands in for DynamoDB in the web replay: every limit passes, nothing is written."""
+
+    def get_item(self, **_k):
+        return {}
+
+    def put_item(self, **_k):
+        return {}
+
+    def update_item(self, **_k):
+        return {"Attributes": {"count": 1}}
+
+
+def load_web_handler():
+    """The web chat handler from this checkout, with DynamoDB and CloudWatch stubbed."""
+    import importlib.util
+
+    web_dir = REPO / "src" / "web-chat"
+    spec = importlib.util.spec_from_file_location("webchat_replay_handler", web_dir / "handler.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    mod.table = _AllowAllTable()
+    mod.cloudwatch = MagicMock()
+    return mod
+
+
+def web_reply(web, question: str, dialect: str, captured: dict) -> dict:
+    """Run the web lambda_handler; query_bedrock is wrapped so the raw model result is kept."""
+    event = {
+        "httpMethod": "POST",
+        "headers": {"Content-Type": "application/json"},
+        "requestContext": {"identity": {"sourceIp": "replay"}},
+        "body": json.dumps({"message": question, "language": dialect, "client_id": "replay-client-0000"}),
+    }
+    resp = web.lambda_handler(event, None)
+    body = json.loads(resp["body"])
+    if resp["statusCode"] != 200:
+        raise RuntimeError(f"web handler returned {resp['statusCode']}: {body}")
+    return {"reply_text": body["reply"], "source_labels": body.get("citations", []),
+            "policy_reply": captured.get("policy", False)}
+
+
 def checks(model_text: str, reply: dict, result: dict) -> dict:
     from common import advice_filter
 
@@ -132,6 +177,7 @@ def main() -> int:
     ap.add_argument("--function", default="agrinexus-processor-dev", help="live processor function to read settings from")
     ap.add_argument("--region", default=os.environ.get("AWS_REGION", "us-east-1"))
     ap.add_argument("--out", default="/tmp/agrinexus-text-replay.json")
+    ap.add_argument("--web", action="store_true", help="replay through the web chat handler instead of WhatsApp")
     args = ap.parse_args()
 
     used = _setup_env(args.function, args.region)
@@ -139,26 +185,45 @@ def main() -> int:
     from common import advice_filter, visitor  # noqa: E402
 
     advice_filter._cloudwatch = MagicMock()
+    web = None
+    if args.web:
+        web = load_web_handler()
+        raw_query = web.query_bedrock
+        captured: dict = {}
+
+        def keep_result(q, d="en"):
+            captured["result"] = raw_query(q, d)
+            return captured["result"]
+
+        web.query_bedrock = keep_result
 
     if args.question:
         questions = [(args.dialect, args.question, "answer")]
     else:
         questions = [("en", q, "answer") for _id, _title, q in visitor.SAMPLE_QUESTIONS] + CONTROLS
 
-    print(f"knowledge base {used['KNOWLEDGE_BASE_ID'] or '?'}  guardrail {'set' if used['GUARDRAIL_ID'] else 'none'}  "
+    print(f"channel {'web' if args.web else 'whatsapp'}  knowledge base {used['KNOWLEDGE_BASE_ID'] or '?'}  guardrail {'set' if used['GUARDRAIL_ID'] else 'none'}  "
           f"model {used['BEDROCK_MODEL_ID'] or 'handler default'}")
     results = []
     for dialect, question, expect in questions:
         for run in range(args.runs):
             started = time.time()
             try:
-                result = handler.query_bedrock(question, dialect)
+                if web is not None:
+                    reply = web_reply(web, question, dialect, captured)
+                    result = captured["result"]
+                    reply["policy_reply"] = (
+                        advice_filter.is_pesticide_question(question)
+                        and web.is_rag_refusal_response(result["text"])
+                    )
+                else:
+                    result = handler.query_bedrock(question, dialect)
+                    reply = farmer_reply(handler, question, dialect, result)
             except Exception as e:  # keep going: one failed call should not hide the rest
                 print(f"\n=== [{dialect}] {question}\nERROR {type(e).__name__}: {e}")
                 results.append({"dialect": dialect, "question": question, "run": run, "error": f"{type(e).__name__}: {e}"})
                 continue
             model_text = result["text"]
-            reply = farmer_reply(handler, question, dialect, result)
             c = checks(model_text, reply, result)
             print(f"\n=== [{dialect}] {question}   (expect: {expect}, {time.time() - started:.1f}s)")
             print(f"words={c['words']} opener={c['opener']} markdown={c['markdown']} kvk_lines={c['kvk_lines']} "

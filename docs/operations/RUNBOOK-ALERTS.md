@@ -18,17 +18,33 @@ This runbook matches CloudWatch alarms defined in [template.yaml](../../template
 | `agrinexus-web-chat-errors-*` | **WebChatHandler** ≥ 3 errors / 5 min | Public demo path; check KB id env, Bedrock quotas, Dynamo rate-limit table. |
 | `agrinexus-voice-errors-*` | **VoiceProcessor** ≥ 3 errors / 5 min | Transcribe / S3 temp bucket / Polly; often media or quota related. |
 | `agrinexus-messages-queue-age-*` | Oldest SQS message age **> 300 s** (2 consecutive periods) | Processor stuck or throttled; check queue depth and processor concurrency/errors. |
+| `agrinexus-visitor-whatsapp-volume-*` | WhatsApp visitor answers passed **500** in a day (`VisitorVolumeAlarmThreshold`) | Real interest or abuse? Check `AgriNexus/Visitor` metrics and the webhook logs for many numbers in a short time. Raise caps below if real. |
+| `agrinexus-visitor-web-volume-*` | Web demo answers passed **500** in a day | Check `web_question_answered` and WAF sampled requests for one IP or a burst of new client IDs. |
 | `agrinexus-messages-dlq-depth-*` | **DLQ** has ≥ 1 visible message | Messages failed after retries; inspect DLQ payload, run **DLQHandler** logs, fix root cause and re-drive if needed. |
 
 ## Public web demo — abuse envelope
 
 Three independent layers limit the web chat endpoint:
 
-1. **Application** — 5 questions/hour per hashed IP **and** per `client_id` ([src/web-chat/handler.py](../../src/web-chat/handler.py)).
+1. **Application** — 20 questions/hour per browser (`client_id`) and 300/hour per source IP, plus 2,000 answers/day across all web visitors ([src/web-chat/handler.py](../../src/web-chat/handler.py)). The per-IP limit is loose on purpose: venue Wi-Fi and mobile carriers put many people behind one address.
 2. **API Gateway** — stage throttling (see template `MethodSettings` on Web Chat API).
 3. **WAF** — IP rate limit on URI path ending with `/chat` (5-minute evaluation window).
 
 Aggressive load tests will hit **429/403** by design; tune thresholds only if legitimate demos are blocked.
+
+## Changing visitor limits during an event (no deploy)
+
+The daily caps are circuit breakers, not budgets. If a volume alarm fires and the traffic is real, raise them in the Lambda console instead of redeploying:
+
+| Limit | Function | Environment variable |
+|-------|----------|----------------------|
+| Web, per browser per hour | `agrinexus-web-chat-dev` | `WEB_RATE_LIMIT` |
+| Web, per IP per hour | `agrinexus-web-chat-dev` | `WEB_IP_RATE_LIMIT` |
+| Web, per day (all) | `agrinexus-web-chat-dev` | `WEB_DAILY_GLOBAL_CAP` |
+| WhatsApp visitor, per number per day | `agrinexus-processor-dev` | `VISITOR_DAILY_PER_USER_CAP` |
+| WhatsApp visitor, per day (all) | `agrinexus-processor-dev` | `VISITOR_DAILY_GLOBAL_CAP` |
+
+AWS Console → Lambda → the function → Configuration → Environment variables → Edit → Save. New invocations pick up the value. The next `sam deploy` resets it to the template value, so pass the same number as a parameter override (`WebDailyGlobalCap`, `VisitorDailyGlobalCap`, ...) when you next deploy.
 
 ## Pre-demo smoke (automated)
 

@@ -55,6 +55,13 @@ SAMPLE_QUESTIONS = [
 ]
 
 SAMPLE_PHOTO_ID = "vq_sample_photo"
+# Reply to a visitor's voice note. Voice is off for visitors: the webhook answers before
+# anything reaches Transcribe, Bedrock or Polly (REQ-VISITOR-011).
+VISITOR_VOICE_OFF_MSG = (
+    "Voice is off in this demo. The video shows it working. "
+    "Please type your question, or send a crop photo."
+)
+
 # Caption on the sample photo sent before its diagnosis. The photo is USDA ARS public
 # domain; ARS asks for credit (docs/try/SAMPLE-PHOTO.md).
 SAMPLE_PHOTO_CAPTION = "Sample crop photo (USDA ARS). Running photo diagnosis on this image..."
@@ -77,14 +84,14 @@ def visitor_ttl_days() -> int:
 
 def visitor_global_cap() -> int:
     try:
-        return max(1, int(os.environ.get("VISITOR_DAILY_GLOBAL_CAP", "300")))
+        return max(1, int(os.environ.get("VISITOR_DAILY_GLOBAL_CAP", "2000")))
     except ValueError:
         return 300
 
 
 def visitor_per_user_cap() -> int:
     try:
-        return max(1, int(os.environ.get("VISITOR_DAILY_PER_USER_CAP", "10")))
+        return max(1, int(os.environ.get("VISITOR_DAILY_PER_USER_CAP", "30")))
     except ValueError:
         return 10
 

@@ -77,13 +77,33 @@ Parameters:
 
   VisitorDailyGlobalCap:
     Type: Number
-    Default: 300
-    Description: Max Bedrock-backed visitor answers per UTC day (all visitors combined).
+    Default: 2000
+    Description: Max Bedrock-backed WhatsApp visitor answers per UTC day (all visitors combined). A circuit breaker against abuse, set well above expected use.
 
   VisitorDailyPerUserCap:
     Type: Number
-    Default: 10
+    Default: 30
     Description: Max Bedrock-backed answers per visitor number per UTC day.
+
+  WebRateLimitPerClient:
+    Type: Number
+    Default: 20
+    Description: Web demo questions per browser (anonymous client ID) per hour.
+
+  WebRateLimitPerIp:
+    Type: Number
+    Default: 300
+    Description: Web demo questions per source IP per hour. Looser than the per-browser limit, because a venue network or mobile carrier puts many people behind one address.
+
+  WebDailyGlobalCap:
+    Type: Number
+    Default: 2000
+    Description: Max Bedrock-backed web demo answers per UTC day (all visitors combined). A circuit breaker against abuse.
+
+  VisitorVolumeAlarmThreshold:
+    Type: Number
+    Default: 500
+    Description: Email an alert when WhatsApp visitor answers, or web demo answers, pass this many in a day.
 
   VisitorSampleImageCrop:
     Type: String
@@ -477,8 +497,10 @@ Resources:
         - !Ref CommonLayer
       Environment:
         Variables:
-          WEB_RATE_LIMIT: "5"  # 5 queries per hour per IP
+          WEB_RATE_LIMIT: !Ref WebRateLimitPerClient  # per browser per window
+          WEB_IP_RATE_LIMIT: !Ref WebRateLimitPerIp  # per source IP per window
           WEB_RATE_LIMIT_WINDOW: "3600"  # 1 hour
+          WEB_DAILY_GLOBAL_CAP: !Ref WebDailyGlobalCap
           BEDROCK_MODEL_ID: !Ref BedrockModelId
           ACCOUNT_ID: !Ref AWS::AccountId
           WEB_IMAGE_MAX_BYTES: "5242880"
@@ -1083,6 +1105,73 @@ Resources:
   # ============================================================================
   # Cost Monitoring: Budget Alert
   # ============================================================================
+  # Visitor volume (re:Invent): hear about unusual traffic long before a daily cap is reached.
+  VisitorWhatsAppVolumeAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub agrinexus-visitor-whatsapp-volume-${Environment}
+      AlarmDescription: WhatsApp visitor answers (text and photo) passed the daily threshold. See docs/operations/RUNBOOK-ALERTS.md.
+      EvaluationPeriods: 1
+      Threshold: !Ref VisitorVolumeAlarmThreshold
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+      Metrics:
+        - Id: total
+          Expression: FILL(text, 0) + FILL(photo, 0)
+          Label: WhatsApp visitor answers per day
+          ReturnData: true
+        - Id: text
+          ReturnData: false
+          MetricStat:
+            Metric:
+              Namespace: AgriNexus/Visitor
+              MetricName: visitor_question_answered
+            Period: 86400
+            Stat: Sum
+        - Id: photo
+          ReturnData: false
+          MetricStat:
+            Metric:
+              Namespace: AgriNexus/Visitor
+              MetricName: visitor_photo_answered
+            Period: 86400
+            Stat: Sum
+
+  VisitorWebVolumeAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub agrinexus-visitor-web-volume-${Environment}
+      AlarmDescription: Web demo answers (text and photo) passed the daily threshold. See docs/operations/RUNBOOK-ALERTS.md.
+      EvaluationPeriods: 1
+      Threshold: !Ref VisitorVolumeAlarmThreshold
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlertTopic
+      Metrics:
+        - Id: total
+          Expression: FILL(text, 0) + FILL(photo, 0)
+          Label: Web demo answers per day
+          ReturnData: true
+        - Id: text
+          ReturnData: false
+          MetricStat:
+            Metric:
+              Namespace: AgriNexus/Visitor
+              MetricName: web_question_answered
+            Period: 86400
+            Stat: Sum
+        - Id: photo
+          ReturnData: false
+          MetricStat:
+            Metric:
+              Namespace: AgriNexus/Visitor
+              MetricName: web_photo_answered
+            Period: 86400
+            Stat: Sum
+
   CostAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:

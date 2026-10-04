@@ -32,13 +32,20 @@ logger.setLevel(logging.INFO)
 dynamodb = boto3.resource('dynamodb')
 bedrock_agent = boto3.client('bedrock-agent-runtime')
 bedrock_runtime = boto3.client('bedrock-runtime')
+cloudwatch = boto3.client('cloudwatch')
 
 TABLE_NAME = os.environ['TABLE_NAME']
 KB_ID = os.environ['KNOWLEDGE_BASE_ID']
 GUARDRAIL_ID = os.environ.get('GUARDRAIL_ID', '')
 GUARDRAIL_VERSION = os.environ.get('GUARDRAIL_VERSION', '1')
-RATE_LIMIT = int(os.environ.get('WEB_RATE_LIMIT', '5'))  # 5 queries per hour
+# Limits (REQ-WEB-RATE). Lambda reads them at cold start; a change in the Lambda console
+# applies to new invocations without a deploy (the next sam deploy restores template values).
+RATE_LIMIT = int(os.environ.get('WEB_RATE_LIMIT', '20'))  # per browser (client_id) per window
+IP_RATE_LIMIT = int(os.environ.get('WEB_IP_RATE_LIMIT', str(RATE_LIMIT)))  # per source IP per window
 RATE_LIMIT_WINDOW = int(os.environ.get('WEB_RATE_LIMIT_WINDOW', '3600'))  # 1 hour
+# Circuit breaker on Bedrock-backed web answers per UTC day, all visitors together.
+DAILY_GLOBAL_CAP = int(os.environ.get('WEB_DAILY_GLOBAL_CAP', '2000'))
+DAILY_CAP_MSG = "The web demo has reached today's limit. Please try again tomorrow, or try it on WhatsApp."
 BEDROCK_MODEL_ID = os.environ.get(
     'BEDROCK_MODEL_ID',
     'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
@@ -203,11 +210,12 @@ def collect_images(body: Dict[str, Any]) -> List[str]:
         )
     return images
 
-def _peek_rate_limit(identifier: str) -> Dict[str, Any]:
+def _peek_rate_limit(identifier: str, limit: int = None) -> Dict[str, Any]:
     """
     Read-only rate limit check (no increments).
     Returns same shape as check_rate_limit(): allowed/remaining/reset_at/current_count.
     """
+    limit = RATE_LIMIT if limit is None else limit
     now = int(datetime.utcnow().timestamp())
     ident_hash = hashlib.sha256(identifier.encode()).hexdigest()[:16]
 
@@ -225,12 +233,12 @@ def _peek_rate_limit(identifier: str) -> Dict[str, Any]:
         if ttl < now:
             return {
                 'allowed': True,
-                'remaining': RATE_LIMIT,
+                'remaining': limit,
                 'reset_at': now + RATE_LIMIT_WINDOW,
                 'current_count': 0
             }
 
-        if count >= RATE_LIMIT:
+        if count >= limit:
             return {
                 'allowed': False,
                 'remaining': 0,
@@ -240,7 +248,7 @@ def _peek_rate_limit(identifier: str) -> Dict[str, Any]:
 
         return {
             'allowed': True,
-            'remaining': max(0, RATE_LIMIT - count),
+            'remaining': max(0, limit - count),
             'reset_at': ttl,
             'current_count': count
         }
@@ -250,15 +258,58 @@ def _peek_rate_limit(identifier: str) -> Dict[str, Any]:
             'allowed': False,
             'remaining': 0,
             'reset_at': now + RATE_LIMIT_WINDOW,
-            'current_count': RATE_LIMIT
+            'current_count': limit
         }
 
 
-def check_rate_limit(identifier: str) -> Dict[str, Any]:
+def _utc_day() -> str:
+    return datetime.utcnow().strftime("%Y-%m-%d")
+
+
+def _next_utc_midnight() -> int:
+    now = int(datetime.utcnow().timestamp())
+    return now - now % 86400 + 86400
+
+
+def try_consume_web_daily_answer() -> bool:
+    """Count one Bedrock-backed web answer for today (UTC). False once the daily cap is reached."""
+    try:
+        table.update_item(
+            Key={'PK': 'COUNTER#web-answers', 'SK': f'DAY#{_utc_day()}'},
+            UpdateExpression='ADD #count :one SET #ttl = :ttl, #kind = :kind',
+            ConditionExpression='attribute_not_exists(#count) OR #count < :limit',
+            ExpressionAttributeNames={'#count': 'count', '#ttl': 'ttl', '#kind': 'kind'},
+            ExpressionAttributeValues={
+                ':one': 1,
+                ':limit': DAILY_GLOBAL_CAP,
+                ':ttl': _next_utc_midnight() + 2 * 86400,
+                ':kind': 'web_global_day',
+            },
+        )
+        return True
+    except ClientError as e:
+        if e.response.get('Error', {}).get('Code') == 'ConditionalCheckFailedException':
+            return False
+        raise
+
+
+def _emit_web_metric(name: str) -> None:
+    """Count web demo activity next to the WhatsApp visitor metrics (alarm in template.yaml)."""
+    try:
+        cloudwatch.put_metric_data(
+            Namespace="AgriNexus/Visitor",
+            MetricData=[{"MetricName": name, "Value": 1.0, "Unit": "Count"}],
+        )
+    except Exception as e:
+        print(f"Failed to emit web metric {name}: {e}")
+
+
+def check_rate_limit(identifier: str, limit: int = None) -> Dict[str, Any]:
     """
     Check if IP has exceeded rate limit.
     Returns: {'allowed': bool, 'remaining': int, 'reset_at': int, 'current_count': int}
     """
+    limit = RATE_LIMIT if limit is None else limit
     now = int(datetime.utcnow().timestamp())
     
     # Hash identifier for privacy (don't store raw IPs / client IDs)
@@ -285,7 +336,7 @@ def check_rate_limit(identifier: str) -> Dict[str, Any]:
             )
             return {
                 'allowed': True,
-                'remaining': max(0, RATE_LIMIT - 1),
+                'remaining': max(0, limit - 1),
                 'reset_at': reset_at,
                 'current_count': 1
             }
@@ -293,7 +344,7 @@ def check_rate_limit(identifier: str) -> Dict[str, Any]:
         current_count = int(item.get('count', 0))
         reset_at = int(item.get('ttl', now + RATE_LIMIT_WINDOW))
 
-        if current_count >= RATE_LIMIT:
+        if current_count >= limit:
             return {
                 'allowed': False,
                 'remaining': 0,
@@ -314,7 +365,7 @@ def check_rate_limit(identifier: str) -> Dict[str, Any]:
                 ExpressionAttributeValues={
                     ':inc': 1,
                     ':now': now,
-                    ':limit': RATE_LIMIT
+                    ':limit': limit
                 },
                 ReturnValues='ALL_NEW'
             )
@@ -338,7 +389,7 @@ def check_rate_limit(identifier: str) -> Dict[str, Any]:
                     )
                     return {
                         'allowed': True,
-                        'remaining': max(0, RATE_LIMIT - 1),
+                        'remaining': max(0, limit - 1),
                         'reset_at': reset_at,
                         'current_count': 1
                     }
@@ -354,7 +405,7 @@ def check_rate_limit(identifier: str) -> Dict[str, Any]:
         new_count = int(response['Attributes']['count'])
         return {
             'allowed': True,
-            'remaining': max(0, RATE_LIMIT - new_count),
+            'remaining': max(0, limit - new_count),
             'reset_at': reset_at,
             'current_count': new_count
         }
@@ -366,7 +417,7 @@ def check_rate_limit(identifier: str) -> Dict[str, Any]:
             'allowed': False,
             'remaining': 0,
             'reset_at': now + RATE_LIMIT_WINDOW,
-            'current_count': RATE_LIMIT
+            'current_count': limit
         }
 
 
@@ -656,15 +707,17 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         client_id = str(body.get('client_id', '')).strip()
 
         # Pre-check (no increments) so we don't partially increment one bucket if the other is already over limit.
-        identifiers = [f"IP#{client_ip}"]
+        # The browser ID is the per-person limit; the IP limit is looser, because a venue
+        # network or a mobile carrier puts many people behind one address.
+        identifiers = [(f"IP#{client_ip}", IP_RATE_LIMIT)]
         if client_id:
             # Keep it bounded; we only support a short anonymous identifier
             if 16 <= len(client_id) <= 80:
-                identifiers.append(f"CID#{client_id}")
+                identifiers.append((f"CID#{client_id}", RATE_LIMIT))
             else:
                 print("Ignoring invalid client_id length for rate limiting.")
 
-        peeked = [_peek_rate_limit(i) for i in identifiers]
+        peeked = [_peek_rate_limit(i, lim) for i, lim in identifiers]
         if any(not p.get('allowed') for p in peeked):
             reset_at = max(int(p.get('reset_at', 0)) for p in peeked)
             return {
@@ -677,8 +730,22 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 })
             }
 
+        # Daily circuit breaker before any counter moves, so a refused request costs nothing.
+        if not try_consume_web_daily_answer():
+            _emit_web_metric("web_cap_hit_global")
+            return {
+                'statusCode': 429,
+                'headers': headers,
+                'body': json.dumps({
+                    'error': DAILY_CAP_MSG,
+                    'daily_cap': True,
+                    'remaining': 0,
+                    'reset_at': _next_utc_midnight()
+                })
+            }
+
         # Increment all identifiers now that we know all are allowed.
-        statuses = [check_rate_limit(i) for i in identifiers]
+        statuses = [check_rate_limit(i, lim) for i, lim in identifiers]
         rate_limit_status = {
             'allowed': all(bool(s.get('allowed')) for s in statuses),
             'remaining': min(int(s.get('remaining', 0)) for s in statuses),
@@ -713,6 +780,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'body': json.dumps({'error': str(ve)})
                 }
             analysis = filter_advice(analyze_image(images[0], dialect), dialect, "web_photo", kind="photo")
+            _emit_web_metric("web_photo_answered")
 
             return {
                 'statusCode': 200,
@@ -727,6 +795,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         # Query Bedrock for text
         result = query_bedrock(message, dialect)
+        _emit_web_metric("web_question_answered")
 
         reply_text = result.get('text') or ''
         policy_reply = (

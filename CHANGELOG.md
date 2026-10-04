@@ -4,6 +4,19 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 4 October 2026 — visitor limits as circuit breakers, web demo questions, visitor voice reply (not deployed)
+
+- **Web demo locked out shared networks.** The page and API allowed 5 questions an hour, applied to the stricter of the browser ID and the source IP. Venue Wi-Fi and mobile carriers put many people behind one IP, so the first five questions from a network could block everyone on it for an hour. Now: 20 an hour per browser, 300 an hour per IP, separate SAM parameters (`WebRateLimitPerClient`, `WebRateLimitPerIp`).
+- **Daily caps are now circuit breakers, not budgets.** New web cap of 2,000 answers a UTC day (`WebDailyGlobalCap`); past it the API returns 429 with `daily_cap: true` and a fixed message, makes no Bedrock call and does not touch the hourly counters. WhatsApp visitor caps raised from 10 per number and 300 a day to 30 and 2,000. A real visitor should never see a limit message.
+- **Volume alarms.** WhatsApp visitor answers and web answers are counted in `AgriNexus/Visitor`; two alarms email the `agrinexus-alerts` topic when either passes 500 in a day (`VisitorVolumeAlarmThreshold`). The runbook lists how to raise any limit in the Lambda console without a deploy. Alerts reach email only if the topic has a confirmed subscription.
+- **Web demo sample questions.** English now offers the five WhatsApp visitor questions in the same order, plus the nudge-flow explainer. "Best time to spray cotton?" is gone. Hindi, Marathi and Telugu keep their earlier questions. A test checks the page against `common/visitor.py`.
+- **Visitor voice note.** A visitor got "Voice is not enabled in the public demo... This feature is enabled for evaluators (allowlist)." Now: "Voice is off in this demo. The video shows it working. Please type your question, or send a crop photo." Voice still never reaches Transcribe, Bedrock or Polly for visitors. Other non-allowlisted numbers keep the old message.
+- **`scripts/text-replay.py --web`** replays the sample questions through the web chat handler, with DynamoDB and CloudWatch stubbed.
+- **Test fake fixed.** The web chat test table applied the counter increment before checking the condition, unlike DynamoDB, so it refused one request early. The limit tests now pass against the corrected fake.
+- REQ-VISITOR-008 amended; REQ-VISITOR-011 and REQ-WEB-001 to 004 added, so the active count is now 173 (README and the quality metrics doc updated; the agrinexus-ai.farm home page still says 168). 13 new tests; full suite 1062 passed, 30 skipped.
+
+---
+
 ## 4 October 2026 — sample photo replaced, credited and recorded (not deployed)
 
 - **Wrong crop in the sample photo.** After the visitor started seeing the sample photo, the live one (a file named "cotton-bollworm-test", source unknown) turned out to show bean-like leaves, not cotton, while the bot is told the crop is cotton. Replaced on 4 October, about 02:00 CEST, by the USDA ARS photo of pink bollworm larvae in a cotton boll (public domain), uploaded by hand to `visitor-samples/crop-leaf.jpg`. Checked live on WhatsApp the same night.

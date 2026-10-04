@@ -239,11 +239,21 @@ The product identifies the pest or problem and gives non-chemical steps. It does
 
 **REQ-VISITOR-007**: The system shall not send nudges, reminders, or any other proactive messages to visitor-tier numbers.
 
-**REQ-VISITOR-008**: The system shall enforce a per-visitor daily answer cap and a global daily visitor answer cap (SAM parameters; defaults 10 and 300); on either cap, it shall send one fixed message and shall not call Bedrock.
+**REQ-VISITOR-008** (amended 4 Oct 2026): The system shall enforce a per-visitor daily answer cap and a global daily visitor answer cap (SAM parameters; defaults 30 and 2000, set as circuit breakers well above expected use); on either cap, it shall send one fixed message and shall not call Bedrock.
 
 **REQ-VISITOR-009** (amended 2 Oct 2026): Allowlisted numbers shall be exempt from visitor caps. A number counts as allowlisted only while it has an approved allowlist row whose `expires_at`, if set, is in the future; a missing row, a past or unreadable `expires_at`, or a lookup error counts as not allowlisted.
 
 **REQ-VISITOR-010**: Visitor activity shall be counted separately and shall not increment farmer nudge sent/completed metrics.
+
+**REQ-VISITOR-011**: When a number with a visitor profile sends a voice note, the webhook shall reply with one fixed English message that voice is off in the demo and invites a typed question or a crop photo, and shall not send the voice-received acknowledgement or pass the note to Transcribe, Bedrock or Polly. Numbers without a visitor profile that are not allowlisted keep the existing voice gate message.
+
+**REQ-WEB-001**: The public web demo shall limit questions per browser (anonymous client ID) and per source IP in a fixed hourly window, with separate SAM parameters (defaults 20 and 300 per hour), and shall answer HTTP 429 when either limit is reached.
+
+**REQ-WEB-002**: The public web demo shall cap Bedrock-backed answers per UTC day across all visitors (SAM parameter, default 2000). On the cap it shall answer HTTP 429 with `daily_cap: true`, a fixed message and the next UTC midnight as `reset_at`, shall not call Bedrock and shall not count the request against the hourly limits.
+
+**REQ-WEB-003**: The web demo's English sample questions shall be the five WhatsApp visitor sample questions, in the same wording and order.
+
+**REQ-WEB-004**: The system shall count WhatsApp visitor answers and web demo answers as metrics and shall alert the operations topic when either channel passes a daily threshold (SAM parameter, default 500).
 
 **REQ-CROP-001**: When a real crop photo shows a visible problem, crop confidence is not `high`, and the model's inferred crop does not contradict the farmer's registered crop, the system shall return the full diagnosis using the registered crop, state that assumption in the message, and offer a one-reply correction.
 
