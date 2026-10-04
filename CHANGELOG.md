@@ -4,6 +4,15 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 4 October 2026 — advice filter: an emptied pesticide answer becomes the policy reply (not deployed)
+
+- **Dead-end reply.** Live voice reply at 15:58 to "सफेद मक्खी के लिए कौन सी दवा छिड़कें?": "मैं कीटनाशक के नाम या मात्रा नहीं बता सकता।", a source line and the footer, nothing else. The model had answered with chemical steps under its own refusal sentence; the filter removed every chemical step (and, since #29, the "do this when..." sentence pointing at them), leaving only the refusal. The source line implied a sourced answer that was not there. [Likely: the raw model text was not captured.]
+- **Change.** When the farmer asked which pesticide or how much, and nothing is left after filtering except sentences that decline to name pesticides or doses (recognised in four languages), the filter sends the pesticide policy reply instead, which offers a photo diagnosis, and drops the source line. Answers with any advice left are unchanged; photo answers and other questions are not affected. Applies to WhatsApp text, voice and the web demo. REQ-GUARD-016 (177 active).
+- **Not changed:** the knowledge-base prompt. A better answer would always carry non-chemical steps for a product question; that needs a prompt change and a replay, and is listed for after the recording.
+- 250 stored model texts give identical output. 16 new tests; full suite 1163 passed, 30 skipped.
+
+---
+
 ## 4 October 2026 — spray-timing for visitors and the web demo: the rule, not a refusal (not deployed)
 
 - **Non-answer for visitors.** The 15:44 replay asked "Can I spray today?" with no district, which is what a re:Invent visitor or a web demo user sends: "I don't have information about this in my knowledge base. Please contact your nearest KVK...". Better than the pesticide-policy reply it got before #27, but still no answer, and spray timing is what the video invites people to ask.

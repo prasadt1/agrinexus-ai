@@ -131,6 +131,8 @@ The product identifies the pest or problem and gives non-chemical steps. It does
 
 **REQ-GUARD-015**: Every Bedrock model call on the WhatsApp photo path shall carry the content guardrail. If the guardrail intervenes on a diagnosis call, the system shall send only the localized farming-only refusal for that photo and no diagnosis.
 
+**REQ-GUARD-016**: When a farmer asks which pesticide to use or how much, and the answer has nothing left after the output filter except sentences declining to name pesticides or doses, the system shall send the pesticide policy reply (which offers a photo diagnosis) instead, without a source line, followed by the standard referral footer.
+
 ### 2.5 Visual Verification (Tier 2 - Working Implementation)
 
 **REQ-VIS-001**: When a farmer sends an image via WhatsApp, the system shall process it using Claude 3 Vision via direct invoke_model API (separate from the Bedrock Agent conversation flow).
