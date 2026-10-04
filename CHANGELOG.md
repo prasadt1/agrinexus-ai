@@ -4,6 +4,16 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 4 October 2026 — knowledge-base search: "rain" joins the keyword hints (not deployed)
+
+- **Refusal on a Hindi profile.** The 16:41 replay of "बारिश के बाद स्प्रे कब कर सकते हैं?" (when can I spray after rain?) with `--dialect hi` returned NO_KB_ANSWER 3 of 3: "मेरे पास इस बारे में जानकारी नहीं है..." The same question with `--dialect en` (sent as typed) was answered 3 of 3 from cotton-02 and cotton-03. This is the demo question in the video script.
+- **Cause [Likely].** For hi, mr and te, the search text gets English keyword hints appended. "स्प्रे" has one ("spray"); "बारिश" had none. The search became "...? (spray)", which leans toward spraying passages without the rain-timing context. The retrieved chunks were not inspected.
+- **Change.** Rain words get the hint "rain" in both the WhatsApp processor and the web chat (the two tables are identical copies): बारिश, वर्षा, बरसात (hi); पाऊस, पावसा (mr, including पावसानंतर); వర్షం, వాన (te). The search becomes "...? (rain spray)". English questions are unchanged.
+- **Tests.** 7 new tests call the real `query_bedrock` in both handlers and check the text sent to Bedrock; 6 fail without the change. The older hint tests in `test_web_chat_dialect.py` copy the hint logic instead of calling it, so they could not catch this. Full suite 1170 passed, 30 skipped.
+- **Not yet shown live.** Needs `text-replay.py --dialect hi` on this branch before merge.
+
+---
+
 ## 4 October 2026 — advice filter: an emptied pesticide answer becomes the policy reply (not deployed)
 
 - **Dead-end reply.** Live voice reply at 15:58 to "सफेद मक्खी के लिए कौन सी दवा छिड़कें?": "मैं कीटनाशक के नाम या मात्रा नहीं बता सकता।", a source line and the footer, nothing else. The model had answered with chemical steps under its own refusal sentence; the filter removed every chemical step (and, since #29, the "do this when..." sentence pointing at them), leaving only the refusal. The source line implied a sourced answer that was not there. [Likely: the raw model text was not captured.]
