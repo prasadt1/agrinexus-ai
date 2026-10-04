@@ -688,6 +688,39 @@ def _drop_model_referral(text: str) -> str:
     return text
 
 
+# A sentence that only declines to name pesticides or doses ("I can't give pesticide names
+# or quantities", "मैं कीटनाशक के नाम या मात्रा नहीं बता सकता"). Used to spot an answer that has
+# nothing else left after the filter removed every chemical step.
+_DECLINE_LATIN_RE = re.compile(
+    r"(?<![a-z])(?:can['\u2019]?t|cannot|can not|unable to|not able to|won['\u2019]?t|will not|do not|don['\u2019]?t)"
+    r"(?![a-z]).*(?<![a-z])(?:pesticide|insecticide|fungicide|herbicide|chemical|product|brand|name|dose|dosage|quantit|amount|recommend)"
+)
+_DECLINE_INDIC = tuple(
+    _normalize(w)
+    for w in (
+        "नहीं बता सकत", "नहीं दे सकत", "नहीं सुझा सकत", "सलाह नहीं", "नहीं बताऊंगा", "नहीं बताएंगे",
+        "सांगू शकत नाही", "देऊ शकत नाही", "सुचवू शकत नाही", "सल्ला देऊ शकत नाही",
+        "చెప్పలేను", "ఇవ్వలేను", "సూచించలేను", "చెప్పలేము", "ఇవ్వలేము",
+    )
+)
+
+
+def _is_decline(segment: str) -> bool:
+    norm = _normalize(segment)
+    return bool(_DECLINE_LATIN_RE.search(norm)) or any(w in norm for w in _DECLINE_INDIC)
+
+
+def _only_decline(text: str) -> bool:
+    """True when nothing in the text is advice: every sentence only declines (or there is none)."""
+    for line in text.split("\n"):
+        if _is_file_source_line(line):
+            continue
+        for seg in _segments(line):
+            if re.search(r"[A-Za-z\u0900-\u0D7F]", seg) and not _is_decline(seg):
+                return False
+    return True
+
+
 def filter_advice(
     text: str,
     dialect: str,
@@ -739,6 +772,14 @@ def filter_advice(
         _emit_metric(channel, hits)
     if state["orphans"]:
         print(f"Advice filter removed {state['orphans']} repeat step(s) left without their step channel={channel}")
+
+    # A pesticide-product question whose answer has nothing left but a refusal (the filter
+    # removed every chemical step) would be a dead end, and a source line under it would imply
+    # a sourced answer. Send the policy reply instead, which offers a photo diagnosis (REQ-GUARD-016).
+    if question is not None and kind == "answer" and is_pesticide_question(question) and _only_decline(out):
+        print(f"Advice filter: nothing left but a refusal, sending the pesticide policy reply channel={channel}")
+        out = pesticide_policy(dialect)
+        source_line = None
 
     if add_referral:
         out = _drop_model_referral(out)
