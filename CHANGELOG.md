@@ -4,6 +4,13 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 4 October 2026 — spray-timing: tomorrow's wind reply states the limit (not deployed)
+
+- **Overstated wind.** The live check (`scripts/spray-timing-check.py`, 15:20 CEST) gave Latur a forecast of 10.4 km/h for tomorrow morning, just over the 10 km/h limit, and the reply called it "strong wind" ("हवा तेज़"). A farmer who then feels a light breeze would distrust the answer. The tomorrow-wind sentence in all four languages now says the wind is likely to be too high for spraying and states the limit, as the "now" sentence already did: "(about 10.4 km/h; it should be under 10 km/h)".
+- The same check confirmed the forecast endpoint works with the existing OpenWeatherMap key: every district and language returned data. 5 new tests.
+
+---
+
 ## 4 October 2026 — spray-timing questions answered from weather, not refused as pesticide questions (not deployed)
 
 - **The bot contradicted its own nudge.** Live on 4 October, a Latur farmer asked "क्या कल लाटूर में स्प्रे करने का सही समय है?" (is tomorrow the right time to spray in Latur?) and got "I can't give pesticide names or quantities. Send a photo...". Cause: any question with a spray word counted as a pesticide question, the knowledge base has no weather so the model declined, and a declined "pesticide question" is replaced by the pesticide-policy reply. The nudge, meanwhile, tells farmers exactly this from live weather.
