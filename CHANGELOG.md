@@ -4,6 +4,15 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 4 October 2026 — advice filter: a removal no longer changes numbers or leaves "do this" behind (not deployed)
+
+- **A fertilizer grade was corrupted.** Live voice reply on 4 October to "सफेद मक्खी के लिए कौन सी दवा छिड़कें?": the model wrote potassium nitrate "(NPK 13:0:45)"; the farmer saw "(NPK 13:0:1)". When the filter removes a sentence it renumbers list items in that line, and its list-number pattern also matched "45)" after the colon. Reproduced with the filter alone. A list number now must not follow a digit and a colon (ratios, times) and must not close a bracket that is still open ("(about 45) days").
+- **A dangling sentence.** The same reply kept "यह तब करें जब 8 वयस्क सफेद मक्खी प्रति पत्ती दिखें" ("do this when...") after the spray sentence it referred to was removed. A sentence straight after a removed one that starts by pointing back at it ("do this", "यह तब", "इसका छिड़काव", "हे तेव्हा", "దీనిని", ...) is now dropped with it; "यह कीट..." ("this pest...") and back-references after nothing removed are kept.
+- **Two older defects found while testing.** A removal in the middle of a line left a double full stop ("bolls.. 2)"); the punctuation went onto the whitespace between sentences. Telugu "మి.లీ." (ml) split a sentence at the dot, leaving "లీటరుకు పిచికారీ చేయండి" ("spray per litre") behind; Telugu unit abbreviations are now known.
+- **Regression check.** All 250 model texts stored in `docs/try/replays/` give identical output before and after. 19 new tests, including the live reply; full suite 1138 passed, 30 skipped.
+
+---
+
 ## 4 October 2026 — spray-timing: tomorrow's wind reply states the limit (not deployed)
 
 - **Overstated wind.** The live check (`scripts/spray-timing-check.py`, 15:20 CEST) gave Latur a forecast of 10.4 km/h for tomorrow morning, just over the 10 km/h limit, and the reply called it "strong wind" ("हवा तेज़"). A farmer who then feels a light breeze would distrust the answer. The tomorrow-wind sentence in all four languages now says the wind is likely to be too high for spraying and states the limit, as the "now" sentence already did: "(about 10.4 km/h; it should be under 10 km/h)".
