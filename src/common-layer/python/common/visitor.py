@@ -86,14 +86,14 @@ def visitor_global_cap() -> int:
     try:
         return max(1, int(os.environ.get("VISITOR_DAILY_GLOBAL_CAP", "2000")))
     except ValueError:
-        return 300
+        return 2000
 
 
 def visitor_per_user_cap() -> int:
     try:
         return max(1, int(os.environ.get("VISITOR_DAILY_PER_USER_CAP", "30")))
     except ValueError:
-        return 10
+        return 30
 
 
 def matches_reinvent_trigger(text: str) -> bool:

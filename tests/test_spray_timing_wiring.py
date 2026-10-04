@@ -114,10 +114,35 @@ def test_general_when_question_goes_to_the_knowledge_base(english_farmer):
     assert len(english_farmer._calls) == 1
 
 
-def test_unknown_district_falls_back_to_the_knowledge_base(unknown_district):
+def test_unknown_district_gets_the_rule_without_a_model_call(unknown_district):
     reply = _ask(unknown_district, "Can I spray today?")
+    assert reply.startswith("I can't see the weather where you are. Spray only when the wind is under 10 km/h")
+    assert "KVK" in reply
+    assert unknown_district._calls == []
+    saved = [i for i in unknown_district.table.put_items if i.get("SK", "").startswith("MSG#")]
+    assert saved[-1]["source_citation"] == "spray_timing_rule"
+
+
+@pytest.fixture
+def visitor(monkeypatch):
+    return _load(monkeypatch, {"onboarding_complete": True, "dialect": "en", "demo_tier": "visitor",
+                               "source": "reinvent-2026"})
+
+
+def test_visitor_gets_the_rule_and_it_counts_as_an_answer(visitor, monkeypatch):
+    metrics = []
+    monkeypatch.setattr(visitor, "cloudwatch",
+                        types.SimpleNamespace(put_metric_data=lambda **kw: metrics.append(kw["MetricData"][0]["MetricName"])))
+    reply = _ask(visitor, "Is tomorrow a good time to spray?")
+    assert reply.startswith("I can't see the weather where you are.")
+    assert visitor._calls == []
+    assert "visitor_question_answered" in metrics
+
+
+def test_visitor_general_when_question_still_goes_to_the_knowledge_base(visitor):
+    reply = _ask(visitor, "When is it safe to spray after rain?")
     assert reply.startswith(KB_ANSWER)
-    assert len(unknown_district._calls) == 1
+    assert len(visitor._calls) == 1
 
 
 def test_weather_failure_says_so_and_states_the_rule(english_farmer):

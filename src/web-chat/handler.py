@@ -22,7 +22,8 @@ from common.guardrail_reply import (
     apply_kb_no_answer,
     apply_localized_guardrail_reply,
 )
-from common.advice_filter import filter_advice, is_pesticide_question, pesticide_policy
+from common.advice_filter import filter_advice, is_pesticide_question, pesticide_policy, spray_question_kind, spray_timing_day
+from common.spray_timing import general_rule_reply
 from common.source_line import strip_source_lines
 from common.source_labels import source_labels
 
@@ -788,6 +789,21 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'body': json.dumps({
                     'reply': analysis,
                     'citations': ['Vision Analysis'],
+                    'remaining': rate_limit_status['remaining'],
+                    'reset_at': rate_limit_status['reset_at']
+                })
+            }
+
+        # "Can I spray today / tomorrow?": the web demo knows no location, so state the rule
+        # instead of a knowledge-base refusal (REQ-SPRAY-003). No Bedrock call.
+        if spray_question_kind(message) == "timing" and spray_timing_day(message):
+            _emit_web_metric("web_question_answered")
+            return {
+                'statusCode': 200,
+                'headers': headers,
+                'body': json.dumps({
+                    'reply': filter_advice(general_rule_reply(dialect), dialect, "web_text", kind="answer", question=message),
+                    'citations': [],
                     'remaining': rate_limit_status['remaining'],
                     'reset_at': rate_limit_status['reset_at']
                 })

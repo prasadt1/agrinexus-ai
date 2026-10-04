@@ -13,8 +13,8 @@ in fixed sentences, so the model never invents a forecast.
 - Any failure (no key, request error, unusable response) returns None and the reply says
   the weather is not available and states the rule, instead of guessing (REQ-SPRAY-003).
 
-Only the three onboarding districts have coordinates. Other locations get None from
-lookups, and the caller falls back to the knowledge base.
+Only the three onboarding districts have coordinates. For anyone else (visitors, the web
+demo, other districts) the caller sends general_rule_reply(): the rule, without a lookup.
 """
 from __future__ import annotations
 
@@ -185,6 +185,21 @@ _TEXT = {
         "caveat": "This is the district weather; also check the wind and clouds at your own field.",
     },
 }
+
+
+# For someone whose district the system does not know (re:Invent visitors, the web demo, a
+# farmer outside the three districts): no weather lookup is possible, so state the rule.
+GENERAL_RULE = {
+    "hi": "मैं आपके इलाके का मौसम नहीं देख सकता। स्प्रे तभी करें जब हवा 10 km/h से कम हो और अगले 3-4 घंटे बारिश की संभावना न हो। सुबह जल्दी या शाम का समय सबसे अच्छा है।",
+    "mr": "मला तुमच्या भागातील हवामान दिसत नाही. वारा 10 km/h पेक्षा कमी असेल आणि पुढील 3-4 तास पावसाची शक्यता नसेल तेव्हाच फवारणी करा. सकाळी लवकर किंवा संध्याकाळची वेळ सर्वात चांगली.",
+    "te": "మీ ప్రాంతంలో వాతావరణం నేను చూడలేను. గాలి 10 km/h కంటే తక్కువగా ఉండి, తర్వాతి 3-4 గంటలు వర్షం అవకాశం లేనప్పుడే స్ప్రే చేయండి. ఉదయం త్వరగా లేదా సాయంత్రం సమయం ఉత్తమం.",
+    "en": "I can't see the weather where you are. Spray only when the wind is under 10 km/h and no rain is expected for the next 3 to 4 hours. Early morning or evening is best.",
+}
+
+
+def general_rule_reply(dialect: str) -> str:
+    """Spray-timing answer when the district is unknown (REQ-SPRAY-003)."""
+    return GENERAL_RULE.get((dialect or "en").strip().lower(), GENERAL_RULE["en"])
 
 
 def _t(dialect: str) -> Dict[str, str]:

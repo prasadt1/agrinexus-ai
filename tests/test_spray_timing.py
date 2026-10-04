@@ -227,3 +227,16 @@ def test_answer_spray_timing_never_raises(monkeypatch):
 def test_district_known():
     assert spray_timing.district_known("Latur") and spray_timing.district_known("Jalna")
     assert not spray_timing.district_known("Pune") and not spray_timing.district_known(None)
+
+
+@pytest.mark.parametrize("dialect", ["hi", "mr", "te", "en"])
+def test_general_rule_states_the_limits_and_passes_the_filter(dialect):
+    advice_filter._cloudwatch = MagicMock()
+    text = spray_timing.general_rule_reply(dialect)
+    assert "10 km/h" in text and "3" in text and "4" in text
+    out = advice_filter.filter_advice(text, dialect, "whatsapp_text", kind="answer", question="can I spray today")
+    assert out.startswith(text)
+
+
+def test_general_rule_unknown_dialect_is_english():
+    assert spray_timing.general_rule_reply("xx") == spray_timing.GENERAL_RULE["en"]

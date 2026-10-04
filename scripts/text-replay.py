@@ -219,6 +219,13 @@ def main() -> int:
                         advice_filter.is_pesticide_question(question)
                         and web.is_rag_refusal_response(result["text"])
                     )
+                elif advice_filter.spray_question_kind(question) == "timing" and advice_filter.spray_timing_day(question):
+                    # The processor answers this without Bedrock; a replay has no district, like a visitor.
+                    from common import spray_timing
+                    text = spray_timing.general_rule_reply(dialect)
+                    result = {"text": text, "citations": []}
+                    reply = {"reply_text": advice_filter.filter_advice(text, dialect, "whatsapp_text", kind="answer", question=question),
+                             "source_labels": [], "policy_reply": False}
                 else:
                     result = handler.query_bedrock(question, dialect)
                     reply = farmer_reply(handler, question, dialect, result)
