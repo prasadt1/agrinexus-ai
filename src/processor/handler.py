@@ -968,6 +968,7 @@ def query_bedrock(query: str, dialect: str = 'hi', session_id: Optional[str] = N
             'कीट': 'pest', 'कीड': 'pest', 'పురుగు': 'pest',
             'रोग': 'disease', 'వ్యాధి': 'disease',
             'सफेद मक्खी': 'whitefly', 'पांढरी माशी': 'whitefly', 'पांढऱ्या माशी': 'whitefly', 'తెల్ల దోమ': 'whitefly',
+            'बारिश': 'rain', 'वर्षा': 'rain', 'बरसात': 'rain', 'पाऊस': 'rain', 'पावसा': 'rain', 'వర్షం': 'rain', 'వాన': 'rain',
             'स्प्रे': 'spray', 'फवार': 'spray', 'స్ప్రే': 'spray',
             'खाद': 'fertilizer', 'खत': 'fertilizer', 'ఎరువు': 'fertilizer',
             'पाने': 'leaves', 'पान': 'leaves', 'ఆకులు': 'leaves',
