@@ -276,3 +276,6 @@ scripts/allowlist-user.py
 scripts/demo-video-nudge-triggers.sh
 scripts/deploy-web-demo.sh
 
+
+# The re:Invent visitor sample photo is tracked on purpose (docs/try/SAMPLE-PHOTO.md)
+!docs/try/sample-photo/*.jpg

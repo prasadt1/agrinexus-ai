@@ -4,6 +4,14 @@ A living record of significant fixes, architectural decisions, and system evolut
 
 ---
 
+## 4 October 2026 — sample photo replaced, credited and recorded (not deployed)
+
+- **Wrong crop in the sample photo.** After the visitor started seeing the sample photo, the live one (a file named "cotton-bollworm-test", source unknown) turned out to show bean-like leaves, not cotton, while the bot is told the crop is cotton. Replaced on 4 October, about 02:00 CEST, by the USDA ARS photo of pink bollworm larvae in a cotton boll (public domain), uploaded by hand to `visitor-samples/crop-leaf.jpg`. Checked live on WhatsApp the same night.
+- **Credit.** ARS asks for credit, so the caption now reads "Sample crop photo (USDA ARS). Running photo diagnosis on this image...". Ships with the next deploy.
+- **Record.** The photo and its provenance PDF are now in `docs/try/sample-photo/`; `docs/try/SAMPLE-PHOTO.md` names the source, terms, crop setting and the rejected candidates. The bucket's lifecycle rules do not cover `visitor-samples/`, so the sample does not expire.
+
+---
+
 ## 4 October 2026 — visitor sees the sample photo; photo advice matched to what is visible (not deployed)
 
 - **The visitor never saw the photo being diagnosed.** The "Photo diagnosis" row sent "Running photo diagnosis on a sample crop image..." and then a diagnosis of an image the visitor could not see, so the reply could not be checked. The processor now sends the sample image first (`common.whatsapp.send_whatsapp_image`, a WhatsApp image message by link) with the caption "Sample crop photo. Running photo diagnosis on this image...", then the diagnosis. The link is a presigned S3 URL that expires after 10 minutes, the same way voice replies are sent, so the bucket stays private; the link is never logged. If the link or the send fails, the old text notice goes out and the diagnosis still follows. REQ-VISITOR-004 amended.
